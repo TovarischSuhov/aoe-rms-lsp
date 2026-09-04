@@ -1,0 +1,160 @@
+Usages:
+  conventions: .goga/usages/conventions.md
+  kbdata: |
+    Embedded knowledge base files under kb/data/ (go:embed, no runtime downloads):
+    - xs-functions.json  — adapted from docs/ref/ugc-guide/xs/functions/functions.json
+      (categories flattened; fields: name, category, return_type, params[], desc, since_update)
+    - xs-constants.json — from constants/constants.json (fields: name, section, value, desc, since_update)
+    - rms-commands.json — extracted from docs/ref/zetnus-rms-guide.txt
+      (fields: name, section, args[], attributes[], desc, game_versions, since_update)
+    since_update sourced from docs/ref/aoe2de-xs-rms-changelog.md; empty string when unknown.
+    Names must be unique within each file — validated on load.
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `kbdata` for the embedded JSON file layout and schema.
+
+  Cell is the AoE2 RMS+XS knowledge base: loads embedded JSON once at
+  construction and serves read-only lookups. No IO after construction.
+
+---
+
+"Store()":
+  location: store.go
+  annotations: |
+    Загруженная база знаний; единственная точка lookup для всех потребителей.
+
+    Requirements:
+    - конструктор NewStore() читает файлы по `kbdata` и валидирует схему:
+      неизвестные ключи, дубликаты имён, пустые name — ошибка загрузки
+    - после построения Store потокобезопасен для чтения (immutable данные)
+  methods:
+    "Function(name: string) -> fn: Function, found: bool": |
+      Lookup XS-функции по точному имени.
+
+      `name`: точное имя функции (case-sensitive); found=false при отсутствии
+    "Functions() -> fns: []Function": |
+      Все XS-функции (для completion); порядок — как в файле данных.
+    "Constant(name: string) -> c: Constant, found: bool": |
+      Lookup XS-константы по точному имени; found=false при отсутствии.
+    "Constants(section: string) -> cs: []Constant": |
+      Константы одной секции ("" — все секции).
+    "Command(name: string) -> cmd: Command, found: bool": |
+      Lookup RMS-команды по точному имени; found=false при отсутствии.
+    "Commands(section: string) -> cmds: []Command": |
+      Команды одной секции RMS ("" — все).
+    "Attribute(command: string, attr: string) -> arg: CommandArg, found: bool": |
+      Спецификация атрибута команды; found=false если команда или атрибут неизвестен.
+
+      `command`: имя команды; `attr`: имя атрибута
+
+"Function()":
+  location: model.go
+  annotations: |
+    XS-функция из базы (данные).
+  properties:
+    "Name -> string": |
+      Имя функции.
+    "ReturnType -> string": |
+      Тип возврата.
+    "Params -> []Param": |
+      Параметры функции.
+    "Desc -> string": |
+      Описание.
+    "SinceUpdate -> string": |
+      Апдейт добавления ("" если неизвестен).
+
+"Param()":
+  location: model.go
+  annotations: |
+    Параметр XS-функции (данные). Required=false — есть значение по умолчанию.
+  properties:
+    "Name -> string": |
+      Имя параметра.
+    "Type -> string": |
+      Тип параметра.
+    "Required -> bool": |
+      Обязательность.
+    "Desc -> string": |
+      Описание параметра.
+
+"Constant()":
+  location: model.go
+  annotations: |
+    XS-константа из базы (данные).
+  properties:
+    "Name -> string": |
+      Имя константы.
+    "Section -> string": |
+      Секция констант.
+    "Value -> string": |
+      Строковое представление значения.
+    "Desc -> string": |
+      Описание.
+    "SinceUpdate -> string": |
+      Апдейт добавления ("" если неизвестен).
+
+"Command()":
+  location: model.go
+  annotations: |
+    RMS-команда из базы (данные).
+
+    Requirements:
+    - Args — позиционные аргументы; Attributes — допустимые атрибуты команды
+  properties:
+    "Name -> string": |
+      Имя команды.
+    "Section -> string": |
+      Секция синтаксиса.
+    "Args -> []CommandArg": |
+      Позиционные аргументы.
+    "Attributes -> []CommandArg": |
+      Допустимые атрибуты.
+    "Desc -> string": |
+      Описание.
+    "GameVersions -> string": |
+      Версии игры, где работает.
+    "SinceUpdate -> string": |
+      Апдейт добавления ("" если неизвестен).
+
+"CommandArg()":
+  location: model.go
+  annotations: |
+    Спецификация аргумента/атрибута RMS-команды (данные).
+  properties:
+    "Name -> string": |
+      Имя аргумента/атрибута.
+    "Kind -> string": |
+      Ожидаемая форма значения: number / percent / const / terrain / object / ...
+    "Required -> bool": |
+      Обязательность.
+    "Desc -> string": |
+      Описание.
+
+"ExtractRmsCommands(path: string) -> commands: []Command, err: error":
+  location: extract.go
+  annotations: |
+    Разовое извлечение RMS-команд из текстового экспорта гайда Zetnus
+    в rms-commands.json (формат по `kbdata`).
+
+    `path`: путь к docs/ref/zetnus-rms-guide.txt
+    `commands`: извлечённые команды; `err`: ошибки чтения/разбора
+
+    Algorithm:
+    1. Прочитать файл по `path`
+    2. Найти секции Syntax Skeleton и пройтись по блокам команд
+    3. Для каждой команды собрать Name, Section, Args, Attributes, Desc, GameVersions
+    4. Обогатить SinceUpdate по changelog (docs/ref/aoe2de-xs-rms-changelog.md)
+    5. Проверить дубликаты имён; вернуть []Command
+
+    Constraints:
+    - утилита сборки данных, не вызывается в рантайме сервера
+    - при неоднозначном разборе — пропускать фрагмент и писать WARN в slog,
+      не прерывать весь проход
+
+---
+
+Author: Goga
+CreatedAt: 04/09/26
+Description: |
+  База знаний AoE2 RMS+XS: встроенные JSON, lookup API и экстракция из Zetnus.

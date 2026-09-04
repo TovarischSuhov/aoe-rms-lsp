@@ -1,0 +1,116 @@
+Imports:
+  - Types:
+      - Store
+    Usages:
+      - lookups
+    From: kb
+  - Types:
+      - Parse
+      - RmsFile
+      - XsBlock
+    Usages:
+      - rms-parsing
+    From: rms
+  - Types:
+      - XsParse
+      - XsFile
+    Usages:
+      - xs-parsing
+    From: xs
+  - Types:
+      - Analyzer
+    Usages:
+      - checks
+    From: analysis
+
+Usages:
+  conventions: .goga/usages/conventions.md
+  lsp-protocol: .goga/usages/cooks/lsp-protocol.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `lsp-protocol` for go.lsp.dev patterns (NewServer bootstrap, Full sync,
+  PublishDiagnostics, Hover/Completion result shapes, Boolean/Optional arms).
+  Use `lookups`, `rms-parsing`, `xs-parsing`, `checks` from Imports for the
+  provider APIs wired into handlers.
+
+  Language selection by URI extension: .rms → `Parse` → `RmsFile`
+  (+ inline `XsBlock` → `XsParse` with range shift), .xs → `XsParse` →
+  `XsFile`. One change = one diagnostics batch.
+  Protocol types (InitializeParams, Hover, CompletionList, ...) belong to
+  go.lsp.dev/protocol — follow `lsp-protocol` for their construction.
+
+---
+
+"Server(store: Store, analyzer: Analyzer)":
+  location: server.go
+  annotations: |
+    LSP-сервер: протокол поверх kb/rms/xs/analysis.
+
+    `store`: база знаний; `analyzer`: семантические проверки (DI)
+
+    Requirements:
+    - паттерны протокола строго по `lsp-protocol` (UnimplementedServer, Full sync)
+  methods:
+    "Initialize(ctx: Context, params: InitializeParams) -> result: InitializeResult, err: error": |
+      Заявить возможности: TextDocumentSync Full+OpenClose, HoverProvider
+      Boolean(true), CompletionProvider с триггерами; согласовать
+      positionEncoding (utf-8 при поддержке клиентом).
+    "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |
+      Algorithm:
+      1. DocStore.Put(uri, text, version)
+      2. Пересчитать диагностики (общая функция с DidChange)
+      3. PublishDiagnostics по `lsp-protocol`
+    "DidChange(ctx: Context, params: DidChangeTextDocumentParams) -> err: error": |
+      Algorithm:
+      1. Взять весь текст из ContentChanges (WholeDocument)
+      2. DocStore.Put; пересчитать; PublishDiagnostics
+    "DidClose(ctx: Context, params: DidCloseTextDocumentParams) -> err: error": |
+      DocStore.Remove(uri); опубликовать пустой список диагностик.
+    "Hover(ctx: Context, params: HoverParams) -> hover: Hover, err: error": |
+      Algorithm:
+      1. Для .rms: StatementAt → Store.Command → Markdown (сигнатура+desc+
+         GameVersions/SinceUpdate); для .xs: SymbolAt → Store.Function
+      2. nil, nil когда под курсором ничего нет
+    "Completion(ctx: Context, params: CompletionParams) -> result: CompletionResult, err: error": |
+      Algorithm:
+      1. .rms: SectionAt → Store.Commands(section) + константы;
+         .xs: префикс слова → Store.Functions + Store.Constants
+      2. CompletionList: label, kind, detail=сигнатура, documentation=desc
+    "Shutdown(ctx: Context) -> err: error": |
+      Вернуть nil (default Unimplemented возвращает not-implemented).
+    "Exit(ctx: Context) -> err: error": |
+      Завершить соединение/процесс.
+
+"DocStore()":
+  location: docstore.go
+  annotations: |
+    Кэш открытых документов uri → text + version.
+
+    Requirements:
+    - Put со stale version (меньше текущей) игнорируется
+  methods:
+    "Put(uri: string, text: string, version: int)": |
+      Сохранить текст документа с версией.
+    "Get(uri: string) -> text: string, version: int, found: bool": |
+      Текст и версия документа; found=false если документ не открыт.
+    "Remove(uri: string)": |
+      Удалить документ из кэша.
+
+"Serve(ctx: Context) -> err: error":
+  location: serve.go
+  annotations: |
+    stdio-бутстрап по `lsp-protocol`.
+
+    `ctx`: контекст процесса; `err`: причина завершения
+
+    Algorithm:
+    1. Собрать зависимости: NewStore, NewAnalyzer, Server, DocStore
+    2. protocol.NewServer(ctx, srv, stream); ждать conn.Done()
+
+---
+
+Author: Goga
+CreatedAt: 04/09/26
+Description: |
+  Корневая ячейка: LSP-сервер (stdio) над kb/rms/xs/analysis для редакторов.

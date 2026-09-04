@@ -1,0 +1,160 @@
+Imports:
+  - Types:
+      - Pos
+      - Range
+      - Diagnostic
+    Usages:
+      - positions-and-diagnostics
+    From: common
+
+Usages:
+  conventions: .goga/usages/conventions.md
+  rms_grammar: .goga/usages/rms-grammar.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `rms_grammar` for the RMS language structure being parsed.
+  Use `positions-and-diagnostics` from Imports for building positions and diagnostics.
+
+  Parser never fails hard: every problem becomes a Diagnostic; recovery
+  resynchronizes to the next statement/section. Every AST node carries a Range.
+
+---
+
+"Parse(source: string, name: string) -> file: RmsFile, diags: []Diagnostic":
+  location: parse.go
+  annotations: |
+    Разбор RMS-файла в AST с восстановлением после ошибок.
+
+    `source`: текст файла; `name`: имя файла (для сообщений)
+    `file`: AST (всегда не-nil, возможно частичный); `diags`: синтаксические проблемы
+
+    Algorithm:
+    1. Лексер: токены по `rms_grammar` (слова, числа, проценты, строки,
+       комментарии, директивы #include/#includeXS, секции <...>)
+    2. Построить список секций; вне секций — глобальные statements
+    3. Для каждого statement: команда + позиционные аргументы (Expr),
+       последующие атрибуты прикреплять к текущей команде (позиционная семантика)
+    4. Блоки start_random/percent_chance и if/elseif/else вкладывать в Children
+    5. #includeXS — начать XsBlock; собирать строки до следующей директивы/секции
+    6. При ошибке: Diagnostic с диапазоном токена, sync на следующий
+       statement/секцию, продолжить разбор
+
+    Requirements:
+    - возвращённый File всегда не-nil (пустой при полном провале)
+    - diags отсортированы по позиции
+
+    Constraints:
+    - не паниковать и не возвращать err для некорректного входа
+
+"RmsFile()":
+  location: ast.go
+  annotations: |
+    Корень AST RMS-файла.
+
+    Requirements:
+    - XsBlocks содержат встроенный XS-код, но не разбираются здесь
+  properties:
+    "Name -> string": |
+      Имя файла.
+    "Sections -> []Section": |
+      Секции скрипта.
+    "Includes -> []string": |
+      Пути #include.
+    "XsBlocks -> []XsBlock": |
+      Встроенные XS-блоки (#includeXS).
+  methods:
+    "SectionAt(pos: Pos) -> section: Section, found: bool": |
+      Секция, содержащая позицию (для completion-контекста).
+
+      `pos`: позиция в файле
+    "StatementAt(pos: Pos) -> stmt: Statement, found: bool": |
+      Ближайший statement, содержащий/предшествующий позиции (для hover).
+
+      `pos`: позиция в файле
+
+      Requirements:
+      - для позиции на атрибуте возвращает команду-владельца
+
+"XsBlock()":
+  location: ast.go
+  annotations: |
+    Встроенный XS-код (после #includeXS) с диапазоном исходника.
+
+    Constraints:
+    - RMS-парсер не разбирает содержимое; потребитель передаёт Code в xs.Parse
+  properties:
+    "Code -> string": |
+      Исходный текст блока (позиции — относительно блока).
+    "Range -> Range": |
+      Диапазон блока в RMS-файле.
+
+"Section()":
+  location: ast.go
+  annotations: |
+    Секция скрипта (например land_generation). Name — без угловых скобок.
+  properties:
+    "Name -> string": |
+      Имя секции.
+    "Statements -> []Statement": |
+      Утверждения секции.
+    "Range -> Range": |
+      Диапазон секции.
+
+"Statement()":
+  location: ast.go
+  annotations: |
+    Команда или блок.
+
+    Requirements:
+    - позиционная семантика: Attributes принадлежат команде, после которой записаны
+    - Kind=random — Children вложены; Kind=conditional — if/elseif/else
+  properties:
+    "Kind -> string": |
+      Вид: command / random / conditional.
+    "Name -> string": |
+      Имя команды.
+    "Args -> []Expr": |
+      Позиционные аргументы.
+    "Attributes -> []Attribute": |
+      Атрибуты команды.
+    "Children -> []Statement": |
+      Вложенные statements (блоки).
+    "Range -> Range": |
+      Диапазон statement.
+
+"Attribute()":
+  location: ast.go
+  annotations: |
+    Атрибут в коде: имя + одно значение-выражение.
+  properties:
+    "Name -> string": |
+      Имя атрибута.
+    "Value -> Expr": |
+      Значение атрибута.
+    "Range -> Range": |
+      Диапазон атрибута.
+
+"Expr()":
+  location: ast.go
+  annotations: |
+    Выражение DE-математики: рекурсивное дерево.
+
+    Requirements:
+    - Kind=binary: Value=оператор, Children=операнды; Kind=ident/const: Value=имя
+  properties:
+    "Kind -> string": |
+      Вид: number / percent / const / ident / binary / unary.
+    "Value -> string": |
+      Литерал, имя или оператор.
+    "Children -> []Expr": |
+      Операнды.
+    "Range -> Range": |
+      Диапазон выражения.
+
+---
+
+Author: Goga
+CreatedAt: 04/09/26
+Description: |
+  Парсер Random Map Scripts: лексер, AST с восстановлением, навигация по позициям.

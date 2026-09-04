@@ -1,0 +1,90 @@
+Usages:
+  conventions: .goga/usages/conventions.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+
+  Cell holds pure data types shared by parsers, analysis and server.
+  No external dependencies beyond stdlib; no behavior beyond ordering.
+  All types are immutable data holders: construct-and-use, no mutation methods.
+
+---
+
+"Pos(line: uint32, column: uint32, offset: int)":
+  location: pos.go
+  annotations: |
+    Позиция в исходном файле: zero-based, координаты LSP.
+
+    `line`: zero-based номер строки
+    `column`: zero-based смещение в строке
+    `offset`: байтовое смещение от начала файла
+
+    Requirements:
+    - сравнение по (line, column); Pos упорядочиваем
+
+    Constraints:
+    - чистый тип данных: никаких методов кроме сравнения
+  properties:
+    "Line -> uint32": |
+      Zero-based номер строки.
+    "Column -> uint32": |
+      Zero-based смещение в строке.
+    "Offset -> int": |
+      Байтовое смещение от начала файла.
+
+"Range(start: Pos, end: Pos)":
+  location: range.go
+  annotations: |
+    Полуоткрытый промежуток [Start, End).
+
+    `start`: начало, включительно
+    `end`: конец, исключительно
+
+    Requirements:
+    - End >= Start для корректно построенного диапазона
+  properties:
+    "Start -> Pos": |
+      Начало промежутка (включительно).
+    "End -> Pos": |
+      Конец промежутка (исключительно).
+  methods:
+    "Contains(p: Pos) -> contains: bool": |
+      Проверка принадлежности позиции промежутку [Start, End).
+
+      `p`: проверяемая позиция
+
+      Algorithm:
+      1. Сравнить `p` с нижней и верхней границами промежутка по порядку позиций
+      2. Вернуть true, когда `p` лежит внутри [начало, конец)
+
+"Diagnostic(r: Range, severity: int, message: string, code: string)":
+  location: diagnostic.go
+  annotations: |
+    Проблема в файле: единое представление для rms.Parse, xs.Parse и Analyzer.
+
+    `r`: диапазон, к которому относится проблема
+    `severity`: 1 error / 2 warning / 3 info / 4 hint
+    `message`: человекочитаемый текст
+    `code`: стабильный идентификатор правила ("unknown-command", ...)
+
+    Requirements:
+    - code стабилен между релизами — на него опираются тесты
+
+    Constraints:
+    - значения severity следуют нумерации LSP; новых значений не вводить
+  properties:
+    "Range -> Range": |
+      Диапазон проблемы.
+    "Severity -> int": |
+      Важность: 1..4 по LSP.
+    "Message -> string": |
+      Текст проблемы.
+    "Code -> string": |
+      Стабильный код правила.
+
+---
+
+Author: Goga
+CreatedAt: 04/09/26
+Description: |
+  Общие позиционные типы и диагностика для LSP-сервера aoe2-lsp.

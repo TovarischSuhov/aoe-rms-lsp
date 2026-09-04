@@ -1,0 +1,136 @@
+Imports:
+  - Types:
+      - Pos
+      - Range
+      - Diagnostic
+    Usages:
+      - positions-and-diagnostics
+    From: common
+
+Usages:
+  conventions: .goga/usages/conventions.md
+  xs_grammar: .goga/usages/xs-grammar.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `xs_grammar` for the XS language structure being parsed.
+  Use `positions-and-diagnostics` from Imports for building positions and diagnostics.
+
+  Parser never fails hard: every problem becomes a Diagnostic; recovery
+  resynchronizes to the next statement/declaration. Every AST node carries a Range.
+
+---
+
+"XsParse(source: string, name: string) -> file: XsFile, diags: []Diagnostic":
+  location: parse.go
+  annotations: |
+    Разбор XS-кода (C-like + rules/events) в AST с восстановлением.
+
+    `source`: текст (файл .xs или inline-блок из rms.XsBlock)
+    `name`: имя для сообщений
+
+    Algorithm:
+    1. Лексер по `xs_grammar`: идентификаторы, числа (int/float/hex), строки,
+       векторные литералы (x,y,z), операторы, комментарии // и /* */
+    2. Верхний уровень: объявления — functions (с Params), variables, rules
+       (условие+тело), events, include, extern
+    3. Тела: statements (if/else, while, for, do, switch, return, break,
+       выражения-стейтменты, блоки) и выражения
+    4. При ошибке: Diagnostic, sync на следующий ';' или '}', продолжить
+
+    Requirements:
+    - File всегда не-nil; diags отсортированы по позиции
+
+    Constraints:
+    - не паниковать; err не возвращается для некорректного входа
+
+"XsFile()":
+  location: ast.go
+  annotations: |
+    Корень XS: Decls верхнего уровня. Имя — как передано в Parse.
+  properties:
+    "Name -> string": |
+      Имя файла/блока.
+    "Decls -> []Decl": |
+      Объявления верхнего уровня.
+  methods:
+    "SymbolAt(pos: Pos) -> name: string, found: bool": |
+      Идентификатор под позицией (для hover и completion-триггера).
+
+      `pos`: позиция в файле
+
+      Requirements:
+      - для позиции на call возвращает имя вызываемой функции
+
+"Decl()":
+  location: ast.go
+  annotations: |
+    Объявление.
+
+    Requirements:
+    - Kind=function — Params и Body заполнены; Kind=rule — условие в Body[0]
+      как Exprs; Kind=extern — только сигнатура (prelude.xs)
+  properties:
+    "Kind -> string": |
+      Вид: function / variable / rule / event / include / extern.
+    "Name -> string": |
+      Имя объявленного символа.
+    "Type -> string": |
+      Тип (переменной или возврата функции).
+    "Params -> []Param": |
+      Параметры функции.
+    "Body -> []Stmt": |
+      Тело.
+    "Range -> Range": |
+      Диапазон объявления.
+
+"Param()":
+  location: ast.go
+  annotations: |
+    Параметр XS-функции.
+  properties:
+    "Name -> string": |
+      Имя параметра.
+    "Type -> string": |
+      Тип (int/float/bool/string/vector/void/...).
+
+"Stmt()":
+  location: ast.go
+  annotations: |
+    Оператор; Kind определяет смысл Exprs (условие) и Body (ветки/тело).
+  properties:
+    "Kind -> string": |
+      Вид оператора.
+    "Exprs -> []Expr": |
+      Выражения (условие/значение).
+    "Body -> []Stmt": |
+      Вложенные операторы.
+    "Range -> Range": |
+      Диапазон оператора.
+
+"Expr()":
+  location: ast.go
+  annotations: |
+    Выражение.
+
+    Requirements:
+    - Kind=call: Callee=имя функции, Children=аргументы; Kind=vector:
+      Children=3 операнда; Kind=binary: Value=оператор
+  properties:
+    "Kind -> string": |
+      Вид: call / binary / unary / literal / vector / ident.
+    "Callee -> string": |
+      Имя вызываемой функции (для call).
+    "Value -> string": |
+      Литерал или оператор.
+    "Children -> []Expr": |
+      Операнды/аргументы.
+    "Range -> Range": |
+      Диапазон выражения.
+
+---
+
+Author: Goga
+CreatedAt: 04/09/26
+Description: |
+  Парсер XS (External Subroutines): C-like грамматика с rules/events, AST с восстановлением.

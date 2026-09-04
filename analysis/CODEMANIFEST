@@ -1,0 +1,92 @@
+Imports:
+  - Types:
+      - Diagnostic
+    From: common
+  - Types:
+      - Store
+    Usages:
+      - lookups
+    From: kb
+  - Types:
+      - RmsFile
+    Usages:
+      - rms-parsing
+    From: rms
+  - Types:
+      - XsFile
+    Usages:
+      - xs-parsing
+    From: xs
+
+Usages:
+  conventions: .goga/usages/conventions.md
+  rms_grammar: .goga/usages/rms-grammar.md
+  xs_grammar: .goga/usages/xs-grammar.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `rms_grammar` and `xs_grammar` for the languages being checked.
+  Use `lookups` from Imports for kb.Store queries.
+  Use `rms-parsing`/`xs-parsing` from Imports for AST shapes and navigation.
+
+  Only semantic checks live here: syntax problems are already reported by
+  parsers. Analyzer is stateless per call — no caching, no IO.
+
+---
+
+"Analyzer(store: Store)":
+  location: analyzer.go
+  annotations: |
+    Семантические проверки RMS и XS поверх AST + базы знаний.
+
+    `store`: база знаний (DI)
+
+    Requirements:
+    - паттерны lookup строго по `lookups`
+  methods:
+    "AnalyzeRms(file: RmsFile) -> diags: []Diagnostic": |
+      Проверки RMS-файла.
+
+      `file`: AST из rms.Parse
+
+      Algorithm:
+      1. Пройти все statement (вкл. Children блоков)
+      2. Неизвестная команда/секция — lookup через `lookups` (Store.Command);
+         Diagnostic severity=error, code="unknown-command"/"unknown-section"
+      3. Для известных команд: неизвестные атрибуты (Store.Attribute) —
+         code="unknown-attribute"; несоответствие числа/вида аргументов —
+         code="bad-argument"
+      4. effect_percent — code="deprecated-effect-percent", severity=warning
+      5. Отсортировать diags по позиции
+
+      Requirements:
+      - не дублировать синтаксические diags парсера
+
+      Constraints:
+      - не изменять входной AST
+
+    "AnalyzeXs(file: XsFile) -> diags: []Diagnostic": |
+      Проверки XS-файла.
+
+      `file`: AST из xs.Parse
+
+      Algorithm:
+      1. Собрать объявленные имена (functions, variables, params, rules)
+      2. Пройти выражения: ident вне объявленных и вне kb (Store.Function,
+         Store.Constant) — code="undefined-symbol", severity=error
+      3. Для вызовов известных функций: число аргументов vs Params
+         (Required=false — можно опускать) — code="bad-arity"
+      4. Отсортировать diags
+
+      Requirements:
+      - не дублировать синтаксические diags парсера
+
+      Constraints:
+      - не изменять входной AST
+
+---
+
+Author: Goga
+CreatedAt: 04/09/26
+Description: |
+  Семантический анализ RMS/XS: unknown-символы, арность, устаревания.

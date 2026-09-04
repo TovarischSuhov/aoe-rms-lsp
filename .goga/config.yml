@@ -1,0 +1,7 @@
+language: golang
+image: qarium/goga-golang-1.26:1.2
+codemanifest:
+  usages:
+    conventions: .goga/usages/conventions.md
+  annotations: |
+    Use `conventions` for code writing rules and testing.
