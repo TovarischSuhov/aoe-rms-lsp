@@ -1,0 +1,1739 @@
+[
+  {
+    "name": "random_placement",
+    "section": "player_setup",
+    "args": [],
+    "attributes": [],
+    "desc": "Players of the same team are positioned in close proximity to each other.  Distance between team members is double the base_size used in create_player_lands.",
+    "game_versions": "UP/HD/DE",
+    "since_update": ""
+  },
+  {
+    "name": "grouped_by_team",
+    "section": "player_setup",
+    "args": [],
+    "attributes": [],
+    "desc": "Allows the land_position attribute in create_land to be used in combination with the assign_to_player or assign_to attributes to individually position players at exact positions on the map.",
+    "game_versions": "UP/DE",
+    "since_update": ""
+  },
+  {
+    "name": "direct_placement",
+    "section": "player_setup",
+    "args": [],
+    "attributes": [],
+    "desc": "Allows the land_position attribute in create_land to be used in combination with the assign_to_player or assign_to attributes to individually position players at exact positions on the map.",
+    "game_versions": "UP/DE",
+    "since_update": ""
+  },
+  {
+    "name": "nomad_resources",
+    "section": "player_setup",
+    "args": [],
+    "attributes": [],
+    "desc": "Used for versioning changes that might affect how existing maps generate.  Changes land generation such that when specifying number_of_tiles or land_percent, the square land origin covered by the base_size is included in the total, rather than being additive.  Also fixes a bug where land order would influence the generation.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "force_nomad_treaty",
+    "section": "player_setup",
+    "args": [],
+    "attributes": [],
+    "desc": "Used for versioning changes that might affect how existing maps generate.  Changes land generation such that when specifying number_of_tiles or land_percent, the square land origin covered by the base_size is included in the total, rather than being additive.  Also fixes a bug where land order would influence the generation.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "behavior_version",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "VersionNumber",
+        "kind": "number",
+        "required": false,
+        "desc": "number (0-2) (default: 0)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Used for versioning changes that might affect how existing maps generate.  Changes land generation such that when specifying number_of_tiles or land_percent, the square land origin covered by the base_size is included in the total, rather than being additive.  Also fixes a bug where land order would influence the generation.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "override_map_size",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "SideLength",
+        "kind": "number",
+        "required": false,
+        "desc": "number (36-480) (default: use size set in lobby) (see: Map Sizes)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Used to manually adjust the square dimensions of the map.  This is used to make some of the official water maps one size larger than the size selected in the lobby.",
+    "game_versions": "DE only",
+    "since_update": "81058"
+  },
+  {
+    "name": "set_gaia_civilization",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "CivNumber",
+        "kind": "number",
+        "required": false,
+        "desc": "number (0-53) (default: 0 - gaia) (see: Civilizations)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Set the civilization for gaia to use.  This will affect the architectural style of any gaia buildings, and the appearance of any units that have regional variations.  It will also affect any civilization bonuses, upgrades and unique technologies (relevant especially for battle royale)",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "ai_info_map_type",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "MapType",
+        "kind": "const",
+        "required": false,
+        "desc": "map type constant (see: Map Types) (default: CUSTOM)"
+      },
+      {
+        "name": "IsNomad",
+        "kind": "number",
+        "required": false,
+        "desc": "boolean (1 or 0) (default: 0)"
+      },
+      {
+        "name": "IsMichi",
+        "kind": "number",
+        "required": false,
+        "desc": "boolean (1 or 0) (default: 0)"
+      },
+      {
+        "name": "ShowType",
+        "kind": "number",
+        "required": false,
+        "desc": "boolean (1 or 0) (default: 0)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Provides information about the map to AI players.  Many AIs do not rely on this information regardless or whether or not you include it.  If your map is not very similar to an existing map, it is best to leave out the command entirely, or to use CUSTOM as the map type. This command works differently in different versions of the game:",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "effect_amount",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "EffectType",
+        "kind": "const",
+        "required": true,
+        "desc": "effect constant (see: Effect Constants)"
+      },
+      {
+        "name": "Type",
+        "kind": "const",
+        "required": true,
+        "desc": "object/resource/technology/effect constant (see: Objects, Resource Constants, Technology Constants, Miscellaneous Constants, Class Constants, Advanced Genie Editor)"
+      },
+      {
+        "name": "AttributeType",
+        "kind": "const",
+        "required": true,
+        "desc": "attribute constant (see: Attribute Constants)"
+      },
+      {
+        "name": "Amount",
+        "kind": "float",
+        "required": true,
+        "desc": "number"
+      }
+    ],
+    "attributes": [],
+    "desc": "Modify various aspects of the gamedata, specifically for your map.  See the linked guides for a better overview of the possibilities.",
+    "game_versions": "UP/DE",
+    "since_update": ""
+  },
+  {
+    "name": "effect_percent",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "EffectType",
+        "kind": "const",
+        "required": true,
+        "desc": "effect constant (see: Effect Constants)"
+      },
+      {
+        "name": "Type",
+        "kind": "const",
+        "required": true,
+        "desc": "object/resource/technology/effect constant (see: Objects, Resource Constants, Technology Constants, Class Constants, Miscellaneous Constants, Advanced Genie Editor)"
+      },
+      {
+        "name": "AttributeType",
+        "kind": "const",
+        "required": true,
+        "desc": "attribute constant (see: Attribute Constants)"
+      },
+      {
+        "name": "%",
+        "kind": "float",
+        "required": true,
+        "desc": "number"
+      }
+    ],
+    "attributes": [],
+    "desc": "Same as effect_amount but allows for greater precision.  The specified value is divided by 100 so that you can use decimal values.",
+    "game_versions": "UP/DE",
+    "since_update": ""
+  },
+  {
+    "name": "guard_state",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "ObjectType",
+        "kind": "const",
+        "required": true,
+        "desc": "object constant or class constant (see: Objects, Class Constants)"
+      },
+      {
+        "name": "ResourceType",
+        "kind": "const",
+        "required": true,
+        "desc": "resource amount constant (see: Resource Constants)"
+      },
+      {
+        "name": "ResourceDelta",
+        "kind": "float",
+        "required": false,
+        "desc": "number (default: 0)"
+      },
+      {
+        "name": "Flags",
+        "kind": "number",
+        "required": false,
+        "desc": "number (0-7) (default: 0)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Set up additional lose conditions and/or resource trickles based on controlling or not controlling a specified object.",
+    "game_versions": "UP/DE",
+    "since_update": ""
+  },
+  {
+    "name": "terrain_state",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "Mode",
+        "kind": "number",
+        "required": false,
+        "desc": "number (0) (default: 0)"
+      },
+      {
+        "name": "Parameter1",
+        "kind": "number",
+        "required": false,
+        "desc": "number (0) (default: 0)"
+      },
+      {
+        "name": "Parameter1",
+        "kind": "number",
+        "required": false,
+        "desc": "number (0) (default: 0)"
+      },
+      {
+        "name": "Flags",
+        "kind": "number",
+        "required": false,
+        "desc": "number (0-7) (default: 0)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Changes the shallows terrain to allow it to be buildable.  Can also be used to modify shallows and ice blending properties.  There may be further unknown and undocumented functionality.",
+    "game_versions": "UP only",
+    "since_update": ""
+  },
+  {
+    "name": "weather_type",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "PrecipitationStyle",
+        "kind": "number",
+        "required": false,
+        "desc": "number (-4 to 4) (default: 0)"
+      },
+      {
+        "name": "LiveColor",
+        "kind": "number",
+        "required": false,
+        "desc": "number (0 to 255) (default: 0)"
+      },
+      {
+        "name": "FogColor",
+        "kind": "number",
+        "required": false,
+        "desc": "number (0 to 255) (default: 0)"
+      },
+      {
+        "name": "WaterDirection",
+        "kind": "number",
+        "required": false,
+        "desc": "number (-1 to 1) (default 0)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Set up precipitation and terrain tinting.",
+    "game_versions": "UP only",
+    "since_update": ""
+  },
+  {
+    "name": "water_definition",
+    "section": "player_setup",
+    "args": [
+      {
+        "name": "WaterType",
+        "kind": "number",
+        "required": false,
+        "desc": "water color correction constant (see: Water Definitions) (default: 0 (sunny daytime))"
+      }
+    ],
+    "attributes": [],
+    "desc": "Specify a water profile to apply on your map.  Each option applies different color correction, waves and reflections to 3D water.",
+    "game_versions": "DE only",
+    "since_update": "153015"
+  },
+  {
+    "name": "base_terrain",
+    "section": "land_generation",
+    "args": [
+      {
+        "name": "TerrainType",
+        "kind": "const",
+        "required": false,
+        "desc": "terrain constant (see: Terrains) (default: GRASS)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Specify the base terrain on which you want to place your new terrain.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "base_layer",
+    "section": "land_generation",
+    "args": [
+      {
+        "name": "TerrainType",
+        "kind": "const",
+        "required": false,
+        "desc": "terrain constant (see: Terrains) (default: none)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Specify a layered terrain on which you want to place your new terrain.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "enable_waves",
+    "section": "land_generation",
+    "args": [
+      {
+        "name": "ShowWaves",
+        "kind": "number",
+        "required": false,
+        "desc": "boolean (1 or 0) (default: 1)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Enabled by default, so you only need to include it if you want to disable animated beach waves on your map.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "create_player_lands",
+    "section": "land_generation",
+    "args": [],
+    "attributes": [
+      {
+        "name": "terrain_type",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "land_percent",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "number_of_tiles",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "base_size",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_circular_base",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "generate_mode",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "land_position",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "circle_radius",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "left_border",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "right_border",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "top_border",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "bottom_border",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "border_fuzziness",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "clumping_factor",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "land_conformity",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "base_elevation",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "assign_to_player",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "assign_to",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "zone",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_zone_by_team",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_zone_randomly",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "other_zone_avoidance_distance",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "min_placement_distance",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "land_id",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Creates a land for every player.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "create_land",
+    "section": "land_generation",
+    "args": [],
+    "attributes": [
+      {
+        "name": "terrain_type",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "land_percent",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "number_of_tiles",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "base_size",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_circular_base",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "generate_mode",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "land_position",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "circle_radius",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "left_border",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "right_border",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "top_border",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "bottom_border",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "border_fuzziness",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "clumping_factor",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "land_conformity",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "base_elevation",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "assign_to_player",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "assign_to",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "zone",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_zone_by_team",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_zone_randomly",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "other_zone_avoidance_distance",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "min_placement_distance",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "land_id",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Create a single non-player (neutral) land.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "create_elevation",
+    "section": "elevation_generation",
+    "args": [
+      {
+        "name": "MaxHeight",
+        "kind": "number",
+        "required": false,
+        "desc": "number (1-16) (default: 0 - not elevated)"
+      }
+    ],
+    "attributes": [
+      {
+        "name": "base_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "base_layer",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "number_of_tiles",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "number_of_clumps",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_scale_by_size",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_scale_by_groups",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "spacing",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "enable_balanced_elevation",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Create one or more hills of random height, up to the given height.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "cliff_type",
+    "section": "cliff_generation",
+    "args": [
+      {
+        "name": "CliffType",
+        "kind": "const",
+        "required": false,
+        "desc": "cliff type constant (see: Cliff Types) (default: gray granite cliffs)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Choose the color of the cliffs to match the theme of your map. Currently the following are available:",
+    "game_versions": "DE only",
+    "since_update": "95810"
+  },
+  {
+    "name": "min_number_of_cliffs",
+    "section": "cliff_generation",
+    "args": [
+      {
+        "name": "Amount",
+        "kind": "number",
+        "required": false,
+        "desc": "number (default: min 3, max 8)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Set the minimum and maximum number of distinct cliffs to create.  The actual number of cliffs is chosen at random from between min (inclusive) and max (exclusive).  Does not scale with map size, so you must do so manually using Conditionals or using Math Expressions.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "max_number_of_cliffs",
+    "section": "cliff_generation",
+    "args": [
+      {
+        "name": "Amount",
+        "kind": "number",
+        "required": false,
+        "desc": "number (default: min 3, max 8)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Set the minimum and maximum number of distinct cliffs to create.  The actual number of cliffs is chosen at random from between min (inclusive) and max (exclusive).  Does not scale with map size, so you must do so manually using Conditionals or using Math Expressions.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "min_length_of_cliff",
+    "section": "cliff_generation",
+    "args": [
+      {
+        "name": "Length",
+        "kind": "number",
+        "required": false,
+        "desc": "number (3+) (default: min 5, max 9)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Cliff lengths are chosen at random from between min and max (inclusive).  The unit is NOT tiles, but rather \"cliff segments\".",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "max_length_of_cliff",
+    "section": "cliff_generation",
+    "args": [
+      {
+        "name": "Length",
+        "kind": "number",
+        "required": false,
+        "desc": "number (3+) (default: min 5, max 9)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Cliff lengths are chosen at random from between min and max (inclusive).  The unit is NOT tiles, but rather \"cliff segments\".",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "cliff_curliness",
+    "section": "cliff_generation",
+    "args": [
+      {
+        "name": "%",
+        "kind": "percent",
+        "required": false,
+        "desc": "number (0-100) (default: 36)"
+      }
+    ],
+    "attributes": [],
+    "desc": "The chance that a cliff changes direction at each segment.  Use low values for straight cliffs and high values for curly cliffs.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "min_distance_cliffs",
+    "section": "cliff_generation",
+    "args": [
+      {
+        "name": "Distance",
+        "kind": "number",
+        "required": false,
+        "desc": "number (default: 2)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Minimum distance in \"cliff units\" between separate cliffs.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "min_terrain_distance",
+    "section": "cliff_generation",
+    "args": [
+      {
+        "name": "Distance",
+        "kind": "number",
+        "required": false,
+        "desc": "number (default: 2)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Minimum distance in \"cliff units\" that cliffs will avoid water terrains by.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "color_correction",
+    "section": "terrain_generation",
+    "args": [
+      {
+        "name": "ColorCorrectionType",
+        "kind": "const",
+        "required": false,
+        "desc": "color correction constant (see: Season Types) (default: no color correction)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Specify a color correction type to apply on your map.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "create_terrain",
+    "section": "terrain_generation",
+    "args": [
+      {
+        "name": "TerrainType",
+        "kind": "const",
+        "required": false,
+        "desc": "terrain constant (see: Terrains) (default: GRASS)"
+      }
+    ],
+    "attributes": [
+      {
+        "name": "base_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "base_layer",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "beach_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_mask",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "spacing_to_other_terrain_types",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "spacing_to_specific_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_flat_terrain_only",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "land_percent",
+        "kind": "percent",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "number_of_tiles",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "number_of_clumps",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "clumping_factor",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_scale_by_size",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_scale_by_groups",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_avoid_player_start_areas",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "height_limits",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Create a clump of terrain.  The exact behavior is dependent on the attributes specified.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "accumulate_connections",
+    "section": "connection_generation",
+    "args": [],
+    "attributes": [],
+    "desc": "Can be used to revert a DE-specific behavior change where all connections are based on the terrain prior to connection generation, and replacing terrain created by earlier connections is impossible.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "create_connect_all_players_land",
+    "section": "connection_generation",
+    "args": [],
+    "attributes": [
+      {
+        "name": "default_terrain_replacement",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "replace_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_cost",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_size",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Connections will be generated between the origins of all player lands, and all lands assigned to players.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "create_connect_teams_lands",
+    "section": "connection_generation",
+    "args": [],
+    "attributes": [
+      {
+        "name": "default_terrain_replacement",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "replace_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_cost",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_size",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Connections will be generated between the origins of player lands belonging to members of the same team.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "create_connect_all_lands",
+    "section": "connection_generation",
+    "args": [],
+    "attributes": [
+      {
+        "name": "default_terrain_replacement",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "replace_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_cost",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_size",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Connections will be generated between the origins of all lands.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "create_connect_same_land_zones",
+    "section": "connection_generation",
+    "args": [],
+    "attributes": [
+      {
+        "name": "default_terrain_replacement",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "replace_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_cost",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_size",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Behaves identically to create_connect_all_lands",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "create_connect_land_zones",
+    "section": "connection_generation",
+    "args": [
+      {
+        "name": "ZoneNumber1",
+        "kind": "number",
+        "required": true,
+        "desc": "numeric zone ID (maximum 245)"
+      },
+      {
+        "name": "ZoneNumber2",
+        "kind": "number",
+        "required": true,
+        "desc": "numeric zone ID (maximum 245)"
+      }
+    ],
+    "attributes": [
+      {
+        "name": "default_terrain_replacement",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "replace_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_cost",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_size",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Generate connections between all lands belonging to the zones listed.",
+    "game_versions": "DE only",
+    "since_update": "153015"
+  },
+  {
+    "name": "create_connect_to_nonplayer_land",
+    "section": "connection_generation",
+    "args": [],
+    "attributes": [
+      {
+        "name": "default_terrain_replacement",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "replace_terrain",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_cost",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_size",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Connect all player lands to all neutral lands, but do not directly generate connections between individual players.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "create_actor_area",
+    "section": "objects_generation",
+    "args": [
+      {
+        "name": "X",
+        "kind": "number",
+        "required": true,
+        "desc": "number (x-coordinate in tiles; see Map Sizes)"
+      },
+      {
+        "name": "Y",
+        "kind": "number",
+        "required": true,
+        "desc": "number (y-coordinate in tiles; see Map Sizes)"
+      },
+      {
+        "name": "Identifier",
+        "kind": "number",
+        "required": true,
+        "desc": "number"
+      },
+      {
+        "name": "Radius",
+        "kind": "number",
+        "required": true,
+        "desc": "number (square radius in tiles)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Create an actor area at the given location (rather than being associated with a specific object), with the ID and radius specified.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "create_object_group",
+    "section": "objects_generation",
+    "args": [
+      {
+        "name": "GroupName",
+        "kind": "const",
+        "required": true,
+        "desc": "text"
+      }
+    ],
+    "attributes": [
+      {
+        "name": "add_object",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "List a selection of objects with probabilities.  When the chosen constant name is used in your script, an object will be chosen from the group at random, using the specified probabilities.",
+    "game_versions": "DE only",
+    "since_update": "153015"
+  },
+  {
+    "name": "create_object",
+    "section": "objects_generation",
+    "args": [
+      {
+        "name": "ObjectType",
+        "kind": "const",
+        "required": true,
+        "desc": "object constant (see: Objects)"
+      }
+    ],
+    "attributes": [
+      {
+        "name": "number_of_objects",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "number_of_groups",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "group_variance",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "group_placement_radius",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_tight_grouping",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_loose_grouping",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "min_connected_tiles",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "resource_delta",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "second_object",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_scaling_to_map_size",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_scaling_to_player_number",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_place_for_every_player",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "place_on_specific_land_id",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "avoid_other_land_zones",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "generate_for_first_land_only",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_gaia_object_only",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_gaia_unconvertible",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_building_capturable",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "make_indestructible",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "min_distance_to_players",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "max_distance_to_players",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_circular_placement",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "terrain_to_place_on",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "layer_to_place_on",
+        "kind": "const",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "ignore_terrain_restrictions",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "max_distance_to_other_zones",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "place_on_forest_zone",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "avoid_forest_zone",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "avoid_cliff_zone",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "min_distance_to_map_edge",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "min_distance_group_placement",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "temp_min_distance_group_placement",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "find_closest",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "find_closest_to_map_center",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "find_closest_to_map_edge",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "enable_tile_shuffling",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "require_path",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "force_placement",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "actor_area",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "actor_area_radius",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "override_actor_radius_if_required",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "actor_area_to_place_in",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "avoid_actor_area",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "avoid_all_actor_areas",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "set_facet",
+        "kind": "number",
+        "required": false,
+        "desc": ""
+      },
+      {
+        "name": "match_player_civ",
+        "kind": "",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "Place the specified object, according to the chosen attributes.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "#include_drs",
+    "section": "global",
+    "args": [
+      {
+        "name": "Filename",
+        "kind": "filename",
+        "required": true,
+        "desc": "name (or path and name)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Include a file located in the gamedata folder.",
+    "game_versions": "HD/DE (in AoC it is used for the built-in maps, but doesn't seem to work for custom maps)",
+    "since_update": ""
+  },
+  {
+    "name": "#includeXS",
+    "section": "global",
+    "args": [
+      {
+        "name": "Filename",
+        "kind": "filename",
+        "required": true,
+        "desc": "name (or path and name)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Include an xs file, located in the xs folder.",
+    "game_versions": "DE only",
+    "since_update": ""
+  },
+  {
+    "name": "start_random",
+    "section": "global",
+    "args": [],
+    "attributes": [],
+    "desc": "Specify a piece of code that has a defined chance of being chosen.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "percent_chance",
+    "section": "global",
+    "args": [
+      {
+        "name": "%",
+        "kind": "percent",
+        "required": true,
+        "desc": "number (0-99)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Specify a piece of code that has a defined chance of being chosen.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "end_random",
+    "section": "global",
+    "args": [],
+    "attributes": [],
+    "desc": "Specify a piece of code that has a defined chance of being chosen.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "rnd",
+    "section": "global",
+    "args": [
+      {
+        "name": "arg1",
+        "kind": "number",
+        "required": true,
+        "desc": ""
+      },
+      {
+        "name": "arg2",
+        "kind": "number",
+        "required": true,
+        "desc": ""
+      }
+    ],
+    "attributes": [],
+    "desc": "",
+    "game_versions": "",
+    "since_update": ""
+  },
+  {
+    "name": "if",
+    "section": "global",
+    "args": [
+      {
+        "name": "ConditionLabel",
+        "kind": "condition",
+        "required": true,
+        "desc": "either a predefined condition or a custom condition"
+      }
+    ],
+    "attributes": [],
+    "desc": "Execute a piece of code if a condition is fulfilled, with the option of specifying alternative conditions and pieces of code to execute.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "elseif",
+    "section": "global",
+    "args": [
+      {
+        "name": "ConditionLabel",
+        "kind": "condition",
+        "required": true,
+        "desc": "either a predefined condition or a custom condition"
+      }
+    ],
+    "attributes": [],
+    "desc": "Execute a piece of code if a condition is fulfilled, with the option of specifying alternative conditions and pieces of code to execute.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "else",
+    "section": "global",
+    "args": [],
+    "attributes": [],
+    "desc": "Execute a piece of code if a condition is fulfilled, with the option of specifying alternative conditions and pieces of code to execute.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "endif",
+    "section": "global",
+    "args": [],
+    "attributes": [],
+    "desc": "Define your own condition labels, to refer to at a later point.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "#define",
+    "section": "global",
+    "args": [
+      {
+        "name": "ConditionLabel",
+        "kind": "condition",
+        "required": true,
+        "desc": "text"
+      }
+    ],
+    "attributes": [],
+    "desc": "Define your own condition labels, to refer to at a later point.",
+    "game_versions": "All",
+    "since_update": ""
+  },
+  {
+    "name": "#const",
+    "section": "global",
+    "args": [
+      {
+        "name": "Constant",
+        "kind": "const",
+        "required": true,
+        "desc": "text"
+      },
+      {
+        "name": "Identifier",
+        "kind": "number",
+        "required": true,
+        "desc": "number (see: Constant Reference)"
+      }
+    ],
+    "attributes": [],
+    "desc": "Assign a label of your choice to a numeric ID, to be able to use the terrain/object associated with that ID.",
+    "game_versions": "All",
+    "since_update": ""
+  }
+]
