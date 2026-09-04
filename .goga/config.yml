@@ -1,5 +1,11 @@
 language: golang
 image: qarium/goga-golang-1.26:1.2
+build:
+  task_executor:
+    agent: claude
+    env:
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: "off"
 codemanifest:
   usages:
     conventions: .goga/usages/conventions.md

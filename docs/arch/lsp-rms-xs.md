@@ -79,8 +79,8 @@ Annotations: |
       `p`: проверяемая позиция
 
       Algorithm:
-      1. Сравнить `p` с `start` и `end` по порядку позиций
-      2. Вернуть true, когда p >= start и p < end
+      1. Сравнить `p` с нижней и верхней границами промежутка по порядку позиций
+      2. Вернуть true, когда `p` лежит внутри [начало, конец)
 
 "Diagnostic(r: Range, severity: int, message: string, code: string)":
   location: diagnostic.go
@@ -428,7 +428,7 @@ Annotations: |
 
 ---
 
-"Parse(source: string, name: string) -> file: File, diags: []Diagnostic":
+"Parse(source: string, name: string) -> file: RmsFile, diags: []Diagnostic":
   location: parse.go
   annotations: |
     Разбор RMS-файла в AST с восстановлением после ошибок.
@@ -454,7 +454,7 @@ Annotations: |
     Constraints:
     - не паниковать и не возвращать err для некорректного входа
 
-"File()":
+"RmsFile()":
   location: ast.go
   annotations: |
     Корень AST RMS-файла.
@@ -567,7 +567,7 @@ Description: |
   Парсер Random Map Scripts: лексер, AST с восстановлением, навигация по позициям.
 ```
 
-#### `rms/.usages/parsing.md`
+#### `rms/.usages/rms-parsing.md`
 
 ```markdown
 # RMS Parsing — consuming the rms cell
@@ -602,7 +602,7 @@ to the xs parser and merge diagnostics with the block's offset applied:
 
 ```go
 for _, block := range file.XsBlocks {
-    xsFile, xsDiags := xs.Parse(block.Code, "inline:"+uri)
+    xsFile, xsDiags := xs.XsParse(block.Code, "inline:"+uri)
     // shift xsDiags ranges by block.Range.Start before publishing
 }
 ```
@@ -643,7 +643,7 @@ Annotations: |
 
 ---
 
-"Parse(source: string, name: string) -> file: File, diags: []Diagnostic":
+"Parse(source: string, name: string) -> file: RmsFile, diags: []Diagnostic":
   location: parse.go
   annotations: |
     Разбор XS-кода (C-like + rules/events) в AST с восстановлением.
@@ -666,7 +666,7 @@ Annotations: |
     Constraints:
     - не паниковать; err не возвращается для некорректного входа
 
-"File()":
+"XsFile()":
   location: ast.go
   annotations: |
     Корень XS: Decls верхнего уровня. Имя — как передано в Parse.
@@ -758,7 +758,7 @@ Description: |
   Парсер XS (External Subroutines): C-like грамматика с rules/events, AST с восстановлением.
 ```
 
-#### `xs/.usages/parsing.md`
+#### `xs/.usages/xs-parsing.md`
 
 ```markdown
 # XS Parsing — consuming the xs cell
@@ -770,7 +770,7 @@ and server cells.
 ## Parse and collect diagnostics
 
 ```go
-xsFile, xsDiags := xs.Parse(text, uri)
+xsFile, xsDiags := xs.XsParse(text, uri)
 // partial AST + syntax diagnostics sorted by position
 ```
 
@@ -807,14 +807,14 @@ Imports:
       - lookups
     From: kb
   - Types:
-      - File AS RmsFile
+      - RmsFile
     Usages:
-      - parsing AS rms-parsing
+      - rms-parsing
     From: rms
   - Types:
-      - File AS XsFile
+      - XsFile
     Usages:
-      - parsing AS xs-parsing
+      - xs-parsing
     From: xs
 
 Usages:
@@ -936,16 +936,16 @@ Imports:
     From: kb
   - Types:
       - Parse
-      - File AS RmsFile
+      - RmsFile
       - XsBlock
     Usages:
-      - parsing AS rms-parsing
+      - rms-parsing
     From: rms
   - Types:
-      - Parse AS XsParse
-      - File AS XsFile
+      - XsParse
+      - XsFile
     Usages:
-      - parsing AS xs-parsing
+      - xs-parsing
     From: xs
   - Types:
       - Analyzer

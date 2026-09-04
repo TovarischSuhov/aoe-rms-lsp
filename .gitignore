@@ -1,0 +1,6 @@
+# ralphex runtime
+.ralphex/
+
+# go build artifacts
+aoe2-lsp
+*.test
