@@ -1,0 +1,18 @@
+/* expressions.rms — DE math operators, floats, percents, helpers */
+<LAND_GENERATION>
+base_terrain GRASS
+create_land {
+	land_percent 3*4
+	number_of_tiles 1000+500*2
+	left_border 7.5
+	bottom_border -2
+	other_zone_avoidance_distance -1+2
+	circle_radius 2.5% 3
+	land_position 50 50
+}
+#const START_GOLD 800
+<PLAYER_SETUP>
+effect_amount SET_ATTRIBUTE HOUSE ATTR_STORAGE_VALUE 10
+if TINY_MAP
+	override_map_size rnd(120,144) + 0
+endif

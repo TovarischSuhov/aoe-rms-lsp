@@ -1,0 +1,11 @@
+/* sections.rms — plain sections, no randomness */
+<PLAYER_SETUP>
+random_placement
+nomad_resources
+
+<LAND_GENERATION>
+base_terrain GRASS
+create_player_lands {
+	terrain_type DIRT
+	land_percent 32
+}

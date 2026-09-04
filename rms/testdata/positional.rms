@@ -1,0 +1,17 @@
+/* positional.rms — attribute semantics: braces on the same line,
+   on the next line, and a one-line block */
+<TERRAIN_GENERATION>
+create_terrain FOREST {
+	land_percent 12
+	number_of_clumps 8
+	spacing_to_other_terrain_types 3
+	set_scale_by_size
+}
+
+create_terrain DIRT
+{
+	land_percent 4
+	number_of_clumps 2
+}
+
+create_terrain GRASS3 { land_percent 2 set_scale_by_groups }

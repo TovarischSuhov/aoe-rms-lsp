@@ -1,0 +1,24 @@
+/* conditionals.rms — if / elseif / else / endif around commands and
+   inside a block */
+<CLIFF_GENERATION>
+if TINY_MAP
+	min_number_of_cliffs 4
+	max_number_of_cliffs 6
+elseif GIGANTIC_MAP
+	min_number_of_cliffs 10
+	max_number_of_cliffs 16
+else
+	min_number_of_cliffs 8
+	max_number_of_cliffs 12
+endif
+
+<LAND_GENERATION>
+create_land {
+	if EASY
+		land_percent 5
+	elseif HARD
+		land_percent 1
+	else
+		land_percent 3
+	endif
+}

@@ -1,0 +1,21 @@
+/* includes.rms — #include and an embedded XS block */
+#include Team_Islands_lands.rms
+#const SNOW_ZONE 3
+
+<LAND_GENERATION>
+base_terrain SNOW
+create_land {
+	land_percent 20
+}
+
+#includeXS
+int seed = 0;
+void main() {
+	seed = xsGetMapSeed();
+	if (seed % 2 == 0) {
+		xsSetRiverHeight(3.0);
+	}
+}
+<OBJECTS_GENERATION>
+create_object WOLF
+number_of_objects 2

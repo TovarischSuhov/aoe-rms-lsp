@@ -1,0 +1,22 @@
+/* random.rms — start_random / percent_chance nesting, also inside
+   an attribute block */
+<OBJECTS_GENERATION>
+start_random
+	percent_chance 35
+		create_object SHEEP
+		number_of_objects 7
+	percent_chance 65
+		create_object DEER
+		number_of_objects 4
+end_random
+
+create_object RELIC
+{
+	number_of_objects 5
+	start_random
+		percent_chance 50
+			set_gaia_object_only
+		percent_chance 50
+			avoid_player_start_areas 4
+	end_random
+}
