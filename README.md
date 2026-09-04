@@ -1,0 +1,65 @@
+# aoe2-lsp — Language Server for AoE2 RMS + XS
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+
+Language Server Protocol implementation (Go, stdio) for two Age of Empires II:
+Definitive Edition languages:
+
+- **RMS** — Random Map Scripts (section-declarative map generation language)
+- **XS** — External Subroutines (C-like scripting used inside RMS and scenarios)
+
+MVP feature set: **diagnostics** (syntax + semantic), **hover** (signatures +
+descriptions from the knowledge base), **completion** (RMS commands/attributes,
+XS functions/constants). Editor-agnostic: connection configs for Neovim
+(lspconfig) and VS Code (generic LSP extension) — see
+[`server/.usages/lifecycle.md`](server/.usages/lifecycle.md).
+
+No LSP tooling existed for these languages: the only RMS linter (mangudai) has
+a pre-DE grammar, and fresh editor extensions provide highlighting only.
+
+## Project layout
+
+```
+common/    positions, ranges, diagnostics (shared data types)
+kb/        knowledge base: embedded JSON (XS functions, constants, RMS commands)
+rms/       RMS parser (lexer → AST with error recovery)
+xs/        XS parser (C-like grammar, rules/events, externs)
+analysis/  semantic checks (unknown symbols, arity, deprecations)
+server/    LSP server over go.lsp.dev/protocol (stdio)
+docs/
+  tasks/lsp-rms-xs.md    task definition & acceptance criteria
+  arch/lsp-rms-xs.md     architecture plan (cells, CODEMANIFEST contracts)
+  ref/                   local copies of all data sources (see below)
+```
+
+The repository follows the [goga](https://pypi.org/project/goga/) CODEMANIFEST
+workflow: each package is a cell with a `CODEMANIFEST` contract and `.usages/`
+consumer docs; `.goga/usages/` holds project-wide practices (Go conventions,
+RMS/XS grammars, go.lsp.dev patterns).
+
+## Data sources
+
+All sources are vendored locally under `docs/ref/` (no network at build or
+runtime).
+
+| Source | What it provides | License | Link |
+|---|---|---|---|
+| **AoE2DE UGC Guide** (Divy1211 et al.) | `xs-functions.json` (204 XS functions), `xs-constants.json` (27 sections), `prelude.xs` dump, XS language docs | **GPL-3.0** | [github.com/Divy1211/AoE2DE_UGC_Guide](https://github.com/Divy1211/AoE2DE_UGC_Guide) · [ugc.aoe2.rocks](https://ugc.aoe2.rocks/general/xs/) |
+| **Zetnus — Definitive Random Map Scripting Guide** | RMS commands/attributes reference (Syntax Skeleton, Constant Reference) | no explicit license; used factually with attribution | [Google Doc](https://docs.google.com/document/d/1jnhZXoeL9mkRUJxcGlKnO98fIwFKStP_OBozpr0CHXo/edit) · [forum thread](https://forums.ageofempires.com/t/definitive-random-map-scripting-guide/104902) |
+| **Official AoE2 DE release notes** (World's Edge) | version metadata ("since update N") for KB entries | quoted factually | [ageofempires.com/news](https://www.ageofempires.com/news/) |
+| **aoe2map.net / snippets** (siegeengineers) | real-world RMS corpus for parser fixtures | community content | [aoe2map.net](https://aoe2map.net/) · [snippets.aoe2map.net](https://snippets.aoe2map.net/) |
+
+Derived knowledge-base files (`kb/data/xs-functions.json`,
+`kb/data/xs-constants.json`) are adapted from the UGC Guide and are covered by
+GPL-3.0 accordingly.
+
+## License
+
+**GPL-3.0** — see [LICENSE](LICENSE).
+
+The project is licensed under GPL-3.0 as a whole because its embedded
+knowledge-base data derives from the GPL-3.0 AoE2DE UGC Guide. Zetnus guide
+material is used factually (command/attribute structure) with attribution.
+
+Age of Empires II: Definitive Edition is a product of World's Edge / Xbox Game
+Studios; this project is not affiliated with or endorsed by them.
