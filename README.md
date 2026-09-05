@@ -63,3 +63,88 @@ material is used factually (command/attribute structure) with attribution.
 
 Age of Empires II: Definitive Edition is a product of World's Edge / Xbox Game
 Studios; this project is not affiliated with or endorsed by them.
+
+## Install & run
+
+Requires Go 1.23+.
+
+```sh
+go build -o aoe2-lsp ./cmd/aoe2-lsp
+./aoe2-lsp   # speaks LSP over stdio; logs go to stderr
+```
+
+No flags: capabilities are declared in `initialize`, full-text sync, hover and
+completion. Position encoding is negotiated per client (utf-8 preferred).
+
+## Editor setup
+
+### Neovim (nvim-lspconfig)
+
+Register the server manually (custom server, not shipped with lspconfig) —
+e.g. in `init.lua`:
+
+```lua
+local lspconfig = require('lspconfig')
+local configs = require('lspconfig.configs')
+
+if not configs.aoe2 then
+  configs.aoe2 = {
+    default_config = {
+      cmd = { '/path/to/aoe2-lsp' },
+      filetypes = { 'aoe2rms', 'aoe2xs' },
+      root_dir = function(fname)
+        return lspconfig.util.find_git_ancestor(fname)
+      end,
+    },
+  }
+end
+
+lspconfig.aoe2.setup({})
+```
+
+Map the file extensions to the filetypes (e.g. in `filetype.lua` or via
+`vim.filetype.add`):
+
+```lua
+vim.filetype.add({
+  extension = {
+    rms = 'aoe2rms',
+    xs = 'aoe2xs',
+  },
+})
+```
+
+### VS Code (generic LSP extension)
+
+Install a generic LSP client extension (e.g.
+[`vscode-glsl-linter`-style adapters or `lsp-vscode`](https://marketplace.visualstudio.com/items?itemName=llllvvuu.lsp-vscode))
+and point it at the binary over stdio. With
+[lsp-vscode](https://marketplace.visualstudio.com/items?itemName=llllvvuu.lsp-vscode),
+in `settings.json`:
+
+```jsonc
+{
+  "lsp-vscode": {
+    "languages": ["aoe2rms", "aoe2xs"],
+    "servers": {
+      "aoe2-lsp": {
+        "module": "/path/to/aoe2-lsp",
+        "args": [],
+        "transport": "stdio"
+      }
+    }
+  }
+}
+```
+
+Associate the extensions in `files.associations`:
+
+```jsonc
+{
+  "files.associations": {
+    "*.rms": "aoe2rms",
+    "*.xs": "aoe2xs"
+  }
+}
+```
+

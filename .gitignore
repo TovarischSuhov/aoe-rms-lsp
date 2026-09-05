@@ -2,5 +2,5 @@
 .ralphex/
 
 # go build artifacts
-aoe2-lsp
+/aoe2-lsp
 *.test
