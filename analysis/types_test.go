@@ -49,7 +49,9 @@ func TestTypeEnv_ScopeShadowing(t *testing.T) {
 	file := xs.XsFile{Decls: []xs.Decl{
 		{Kind: xs.DeclVariable, Name: "x", Type: "int"},
 		{Kind: xs.DeclFunction, Name: "f", Type: "void", Params: []xs.Param{{Name: "x", Type: "float"}}},
+		{Kind: xs.DeclExtern, Name: "ext", Type: "int"},
 		{Kind: xs.DeclRule, Name: "r"},
+		{Name: ""}, // recovery artifact: nameless declarations are skipped
 	}}
 
 	env := NewTypeEnv(file)
@@ -58,7 +60,17 @@ func TestTypeEnv_ScopeShadowing(t *testing.T) {
 	env.Push()
 	env.Declare("x", "float")
 
+	// a nested block shadows the parameter again
+	env.Push()
+	env.Declare("x", "vector")
+
 	typ, found := env.Lookup("x")
+	require.True(t, found)
+	require.Equal(t, "vector", typ)
+
+	env.Pop()
+
+	typ, found = env.Lookup("x")
 	require.True(t, found)
 	require.Equal(t, "float", typ)
 
@@ -66,6 +78,11 @@ func TestTypeEnv_ScopeShadowing(t *testing.T) {
 	typ, found = env.Lookup("r")
 	require.True(t, found)
 	require.Equal(t, "", typ)
+
+	// externs expose their return type
+	typ, found = env.Lookup("ext")
+	require.True(t, found)
+	require.Equal(t, "int", typ)
 
 	// after Pop the top-level symbol is visible again
 	env.Pop()
@@ -81,14 +98,16 @@ func TestTypeEnv_ScopeShadowing(t *testing.T) {
 }
 
 func TestTypeEnv_PopRootNoOp(t *testing.T) {
-	env := NewTypeEnv(xs.XsFile{})
+	env := NewTypeEnv(xs.XsFile{Decls: []xs.Decl{
+		{Kind: xs.DeclVariable, Name: "x", Type: "int"},
+	}})
 
 	env.Pop()
 	env.Pop() // the root scope must survive
 
 	typ, found := env.Lookup("x")
-	require.False(t, found)
-	require.Equal(t, "", typ)
+	require.True(t, found)
+	require.Equal(t, "int", typ)
 }
 
 func TestTypeEnv_Undeclared(t *testing.T) {
@@ -99,4 +118,9 @@ func TestTypeEnv_Undeclared(t *testing.T) {
 	typ, found := env.Lookup("missing")
 	require.False(t, found)
 	require.Equal(t, "", typ)
+
+	// Declare is live: the symbol resolves immediately
+	typ, found = env.Lookup("tmp")
+	require.True(t, found)
+	require.Equal(t, "int", typ)
 }
