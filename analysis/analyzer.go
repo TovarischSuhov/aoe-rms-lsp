@@ -23,6 +23,9 @@ const (
 	CodeUnknownAttribute = "unknown-attribute"
 	// CodeBadArgument marks a wrong number of positional arguments.
 	CodeBadArgument = "bad-argument"
+	// CodeBadArgumentValue marks an argument value outside its allowed
+	// range (percent specs: 0..100).
+	CodeBadArgumentValue = "bad-argument-value"
 	// CodeDeprecatedEffectPercent marks the legacy effect_percent command.
 	CodeDeprecatedEffectPercent = "deprecated-effect-percent"
 	// CodeUndefinedSymbol marks an XS identifier that is neither declared

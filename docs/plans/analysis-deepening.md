@@ -322,15 +322,15 @@ kind, value, r)` — проверка одного значения против
 
 **CRITICAL: `CODEMANIFEST` files — read-only contract definitions. Do NOT modify them. If implementation does not match the contract.**
 
-- [ ] **STEP 0 (DECLARATION)**: объявить задачу Task 3 — CheckRmsValue
-- [ ] **Contract tests**: `analysis.CheckRmsValue(kb.CommandArg, string,
+- [x] **STEP 0 (DECLARATION)**: объявить задачу Task 3 — CheckRmsValue
+- [x] **Contract tests**: `analysis.CheckRmsValue(kb.CommandArg, string,
   string, common.Range) (common.Diagnostic, bool)` компилируется и
   вызывается (facade/shape)
-- [ ] **Code**: создать `analysis/values.go`; константу кода добавить в
+- [x] **Code**: создать `analysis/values.go`; константу кода добавить в
   существующий const-блок `analysis/analyzer.go`:
   `CodeBadArgumentValue = "bad-argument-value"` (рядом с
   CodeUnknownCommand)
-- [ ] **Code**: Algorithm:
+- [x] **Code**: Algorithm:
   1. `spec.Kind == "percent"` && `kind ∈ {rms.KindNumber, rms.KindPercent}`:
      `s := strings.TrimSuffix(value, "%")`; `n, err :=
      strconv.ParseFloat(s, 64)`; err → reported=false (молчание);
@@ -339,21 +339,21 @@ kind, value, r)` — проверка одного значения против
      диапазон 0..100}
   2. прочее (spec.Kind const/number/float/condition/filename/пусто; kind
      binary/unary/const/ident) → (Diagnostic{}, false)
-- [ ] **Interface verification**: sandbox-запуск
+- [x] **Interface verification**: sandbox-запуск
   `go test ./analysis/... -count=1 -run "TestCheckRmsValue"`
-- [ ] **Logic tests**: позитив — `TestCheckRmsValue_PercentOutOfRange`
+- [x] **Logic tests**: позитив — `TestCheckRmsValue_PercentOutOfRange`
   (KindPercent "150" → error bad-argument-value; KindNumber "-1" → то же);
   негатив — `TestCheckRmsValue_ExpressionSkipped` (KindBinary "1 + 2" →
   false; spec{const} + KindConst "GRASS" → false; spec{number} +
   KindNumber "7" → false); edge — `TestCheckRmsValue_PercentBoundaries`
   ("0", "100", "0%", "100%" → reported false; границы включительно);
   непарсимый литерал "12x" → false
-- [ ] **Debugging**: sandbox-запуск всех тестов пакета; чинить реализацию
+- [x] **Debugging**: sandbox-запуск всех тестов пакета; чинить реализацию
   (НЕ тесты)
-- [ ] **Contract re-verification**: чистая функция, без IO, spec не
+- [x] **Contract re-verification**: чистая функция, без IO, spec не
   мутируется; сигнатура соответствует CODEMANIFEST
-- [ ] **Lint**: `goimports -w . && golangci-lint run && goga lint`
-- [ ] **STEP 8 (COMPLETION)**: отметить чекбоксы
+- [x] **Lint**: `goimports -w . && golangci-lint run && goga lint`
+- [x] **STEP 8 (COMPLETION)**: отметить чекбоксы
 
 ### Task 4: Интеграция в `Analyzer` — новые шаги AnalyzeRms/AnalyzeXs (TDD coding)
 
