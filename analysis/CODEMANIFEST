@@ -4,6 +4,7 @@ Imports:
     From: common
   - Types:
       - Store
+      - CommandArg
     Usages:
       - lookups
     From: kb
@@ -14,6 +15,9 @@ Imports:
     From: rms
   - Types:
       - XsFile
+      - Expr AS XsExpr
+      - Decl
+      - Param AS XsParam
     Usages:
       - xs-parsing
     From: xs
@@ -22,10 +26,21 @@ Usages:
   conventions: .goga/usages/conventions.md
   rms_grammar: .goga/usages/rms-grammar.md
   xs_grammar: .goga/usages/xs-grammar.md
+  xs_coercion: |
+    Таблица коерции типов XS (основа Coerce и типизации операций):
+    - одинаковые типы совместимы; int → float допустимо неявно (расширение)
+    - float → int, bool ↔ числа, string ↔ прочее, vector ↔ скаляры —
+      несовместимы
+    - тип "" (не выведен / неизвестен) — не ошибка: вызывающая сторона
+      пропускает проверку (консервативность против ложных срабатываний)
+    - арифметика: результат — «шире» операндов (int⊕float=float, int⊕int=int);
+      сравнения и логические операторы → bool; vector±vector → vector,
+      vector*скаляр → vector
 
 Annotations: |
   Use `conventions` for code writing rules and testing.
   Use `rms_grammar` and `xs_grammar` for the languages being checked.
+  Use `xs_coercion` for type compatibility rules in XS checks.
   Use `lookups` from Imports for kb.Store queries.
   Use `rms-parsing`/`xs-parsing` from Imports for AST shapes and navigation.
 
@@ -43,6 +58,8 @@ Annotations: |
 
     Requirements:
     - паттерны lookup строго по `lookups`
+    - проверки значений RMS делегируются `CheckRmsValue`, типизация XS —
+      `TypeEnv`/`InferType`/`Coerce`
   methods:
     "AnalyzeRms(file: RmsFile) -> diags: []Diagnostic": |
       Проверки RMS-файла.
@@ -56,8 +73,11 @@ Annotations: |
       3. Для известных команд: неизвестные атрибуты (Store.Attribute) —
          code="unknown-attribute"; несоответствие числа/вида аргументов —
          code="bad-argument"
-      4. effect_percent — code="deprecated-effect-percent", severity=warning
-      5. Отсортировать diags по позиции
+      4. Для каждого позиционного аргумента с имеющейся спецификацией и
+         каждого атрибута вызвать `CheckRmsValue` с kind и value выражения;
+         reported=true — добавить Diagnostic к результату
+      5. effect_percent — code="deprecated-effect-percent", severity=warning
+      6. Отсортировать diags по позиции
 
       Requirements:
       - не дублировать синтаксические diags парсера
@@ -71,12 +91,20 @@ Annotations: |
       `file`: AST из xs.Parse
 
       Algorithm:
-      1. Собрать объявленные имена (functions, variables, params, rules)
-      2. Пройти выражения: ident вне объявленных и вне kb (Store.Function,
+      1. Построить `TypeEnv` из Decls файла
+      2. Собрать объявленные имена (functions, variables, params, rules)
+      3. Обойти объявления: при входе в тело функции — Push, объявить
+         параметры (`XsParam`) и локальные переменные через Declare; при
+         выходе — Pop. ident вне объявленных и вне kb (Store.Function,
          Store.Constant) — code="undefined-symbol", severity=error
-      3. Для вызовов известных функций: число аргументов vs Params
+      4. Для вызовов известных функций: число аргументов vs Params
          (Required=false — можно опускать) — code="bad-arity"
-      4. Отсортировать diags
+      5. Для каждого аргумента вызова известной функции: тип через
+         `InferType`; несовместимость с типом параметра (`Coerce` по
+         `xs_coercion`) — code="bad-type", severity=error
+      6. Присваивание и return: тип выражения vs объявленный тип (`InferType`
+         + `Coerce`) — code="bad-type", severity=error
+      7. Отсортировать diags
 
       Requirements:
       - не дублировать синтаксические diags парсера
@@ -84,9 +112,104 @@ Annotations: |
       Constraints:
       - не изменять входной AST
 
+"CheckRmsValue(store: Store, spec: CommandArg, kind: string, value: string) -> diag: Diagnostic, reported: bool":
+  location: values.go
+  annotations: |
+    Проверка значения одного аргумента/атрибута RMS против спецификации Kind.
+
+    `store`: база знаний
+    `spec`: спецификация аргумента/атрибута из kb
+    `kind`: вид значения из AST (number / percent / const / ident /
+    binary / unary)
+    `value`: текст значения (литерал или имя)
+    `diag`: диагностика (валидна при reported=true)
+    `reported`: проверка дала результат
+
+    Algorithm:
+    1. spec.Kind=percent и kind — number или percent: числовое значение
+       `value` вне [0, 100] — Diagnostic severity=error,
+       code="bad-argument-value"
+    2. spec.Kind=const и kind — const или ident: lookup Store.Constant
+       по `lookups` с `value`; not found — severity=warning,
+       code="unknown-constant" (в сообщении оговорка: константа скрипта
+       #const — не ошибка)
+    3. Прочие случаи — kind binary/unary, spec.Kind number/float/condition/
+       filename/пусто — reported=false
+
+    Requirements:
+    - фактический набор spec.Kind в данных: number, const, percent, float,
+      condition, filename, пусто; проверяются только percent и const
+    - единая проверка для позиционных Args и Attributes
+
+    Constraints:
+    - чистая функция: без IO, не изменять spec
+
+"TypeEnv(file: XsFile)":
+  location: types.go
+  annotations: |
+    Таблица символов XS-файла: имя → тип, со стеком областей видимости.
+
+    `file`: AST из xs.Parse
+
+    Algorithm:
+    1. Из Decls файла: variables → тип (`Decl`); functions и extern —
+       тип возврата; rules/events — имена без типа
+    2. Верхний уровень — исходная область видимости
+
+    Requirements:
+    - построение только из `file`, без других источников
+  methods:
+    "Push()": |
+      Открыть вложенную область видимости (тело функции/блока).
+    "Pop()": |
+      Закрыть текущую область видимости.
+    "Declare(name: string, typ: string)": |
+      Объявить символ в самой внутренней области.
+
+      `name`: имя символа; `typ`: тип ("" — неизвестен)
+    "Lookup(name: string) -> typ: string, found: bool": |
+      Поиск символа изнутри наружу по стеку областей.
+
+      `name`: имя; `typ`: тип ("" — неизвестен); `found`: символ объявлен
+
+"InferType(store: Store, env: TypeEnv, e: XsExpr) -> typ: string":
+  location: types.go
+  annotations: |
+    Тип XS-выражения; "" — не выведен.
+
+    `store`: база знаний; `env`: окружение символов; `e`: выражение
+
+    Algorithm:
+    1. literal — тип по лексеме (int/float/hex→int, bool, string, vector)
+    2. ident — `TypeEnv` Lookup; call — Store.Function по `lookups`, иначе
+       локальная функция из env
+    3. доступ к компоненте vector (x/y/z) — float
+    4. unary/binary — операнды рекурсивно; совместимость и результат по
+       `xs_coercion`
+    5. нераспознанная форма — ""
+
+    Constraints:
+    - консервативность: сомнение — вернуть "" (не порождать ложный bad-type)
+
+"Coerce(expected: string, actual: string) -> ok: bool":
+  location: types.go
+  annotations: |
+    Совместимость фактического типа с ожидаемым по `xs_coercion`.
+
+    `expected`: ожидаемый тип; `actual`: фактический тип; `ok`: приведение
+    допустимо
+
+    Algorithm:
+    1. Типы равны — true; actual=int и expected=float — true
+    2. Прочие комбинации — false
+
+    Requirements:
+    - actual="" не передаётся: вызывающая сторона пропускает проверку
+
 ---
 
 Author: Goga
 CreatedAt: 04/09/26
 Description: |
-  Семантический анализ RMS/XS: unknown-символы, арность, устаревания.
+  Семантический анализ RMS/XS: unknown-символы, арность, значения
+  аргументов, типы XS, устаревания.

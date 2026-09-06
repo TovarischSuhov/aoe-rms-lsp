@@ -20,10 +20,12 @@
 
 Без удалений. Изменения:
 
-- **Imports (change):** kb: добавить `CommandArg` к `Store`; rms: добавить
-  `Expr AS RmsExpr` к `RmsFile`; xs: добавить `Expr AS XsExpr`, `Decl`,
-  `Param AS XsParam` к `XsFile` (алиасы устраняют коллизии `Expr` rms↔xs и
-  `Param` xs↔kb).
+- **Imports (change):** kb: добавить `CommandArg` к `Store`; xs: добавить
+  `Expr AS XsExpr`, `Decl`, `Param AS XsParam` к `XsFile` (алиасы
+  устраняют коллизии `Expr` и `Param` с kb). Импорт `Expr` из rms
+  невозможен: линтер запрещает импорт одного имени типа из двух ячеек
+  даже с алиасом — поэтому `CheckRmsValue` принимает примитивные
+  `kind`/`value` вместо узла AST (фикс при материализации, `goga lint`).
 - **Usages (add):** inline-ключ `xs_coercion` — таблица коерции типов XS.
 - **Annotations (change):** добавить строку про `xs_coercion`.
 - **Body `Analyzer` (change):** Requirements + делегирование хелперам;
@@ -52,7 +54,6 @@ Imports:
     From: kb
   - Types:
       - RmsFile
-      - Expr AS RmsExpr
     Usages:
       - rms-parsing
     From: rms
@@ -117,8 +118,8 @@ Annotations: |
          code="unknown-attribute"; несоответствие числа/вида аргументов —
          code="bad-argument"
       4. Для каждого позиционного аргумента с имеющейся спецификацией и
-         каждого атрибута вызвать `CheckRmsValue`; reported=true — добавить
-         Diagnostic к результату
+         каждого атрибута вызвать `CheckRmsValue` с kind и value выражения;
+         reported=true — добавить Diagnostic к результату
       5. effect_percent — code="deprecated-effect-percent", severity=warning
       6. Отсортировать diags по позиции
 
@@ -155,34 +156,37 @@ Annotations: |
       Constraints:
       - не изменять входной AST
 
-"CheckRmsValue(store: Store, spec: CommandArg, value: RmsExpr) -> diag: Diagnostic, reported: bool":
+"CheckRmsValue(store: Store, spec: CommandArg, kind: string, value: string) -> diag: Diagnostic, reported: bool":
   location: values.go
   annotations: |
     Проверка значения одного аргумента/атрибута RMS против спецификации Kind.
 
     `store`: база знаний
     `spec`: спецификация аргумента/атрибута из kb
-    `value`: значение из AST (`RmsExpr`)
+    `kind`: вид значения из AST (number / percent / const / ident /
+    binary / unary)
+    `value`: текст значения (литерал или имя)
     `diag`: диагностика (валидна при reported=true)
     `reported`: проверка дала результат
 
     Algorithm:
-    1. Kind=percent и value — числовой литерал (number или percent):
-       значение вне [0, 100] — Diagnostic severity=error,
+    1. spec.Kind=percent и kind — number или percent: числовое значение
+       `value` вне [0, 100] — Diagnostic severity=error,
        code="bad-argument-value"
-    2. Kind=const и value — имя: lookup Store.Constant по `lookups`;
-       not found — severity=warning, code="unknown-constant" (в сообщении
-       оговорка: константа скрипта #const — не ошибка)
-    3. Прочие случаи — выражения-операторы, Kind number/float/condition/
+    2. spec.Kind=const и kind — const или ident: lookup Store.Constant
+       по `lookups` с `value`; not found — severity=warning,
+       code="unknown-constant" (в сообщении оговорка: константа скрипта
+       #const — не ошибка)
+    3. Прочие случаи — kind binary/unary, spec.Kind number/float/condition/
        filename/пусто — reported=false
 
     Requirements:
-    - фактический набор Kind в данных: number, const, percent, float,
+    - фактический набор spec.Kind в данных: number, const, percent, float,
       condition, filename, пусто; проверяются только percent и const
     - единая проверка для позиционных Args и Attributes
 
     Constraints:
-    - не изменять входные AST и spec
+    - чистая функция: без IO, не изменять spec
 
 "TypeEnv(file: XsFile)":
   location: types.go
@@ -192,7 +196,7 @@ Annotations: |
     `file`: AST из xs.Parse
 
     Algorithm:
-    1. Из Decls файла: variables → тип (`Decl.Type`); functions и extern —
+    1. Из Decls файла: variables → тип (`Decl`); functions и extern —
        тип возврата; rules/events — имена без типа
     2. Верхний уровень — исходная область видимости
 
@@ -317,7 +321,8 @@ Target audience: implementers of CLI lint tooling and the server cell.
 ```go
 spec, found := store.Attribute("create_land", "percent")
 if found {
-    if diag, reported := analysis.CheckRmsValue(store, spec, attr.Value); reported {
+    v := attr.Value // rms.Expr
+    if diag, reported := analysis.CheckRmsValue(store, spec, v.Kind, v.Value); reported {
         // bad-argument-value (error) / unknown-constant (warning)
     }
 }
@@ -354,7 +359,7 @@ Constraints:
 ```
 common ──(Diagnostic)─────────────────┐
 kb ──(Store, CommandArg★, lookups)────┼──> analysis ──(Analyzer, checks)──> server
-rms ──(RmsFile, RmsExpr★, rms-parsing)│
+rms ──(RmsFile, rms-parsing)──────────│
 xs ──(XsFile, XsExpr★, XsParam★, Decl★, xs-parsing)┘
 
 ★ — новые импорты этого плана. Циклов нет; server/kb/rms/xs/common
