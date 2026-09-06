@@ -100,7 +100,8 @@ var (
 
 // InferType returns the XS type of the expression, or "" when the type
 // cannot be determined. Conservative by contract: doubt means "" so the
-// caller skips the check instead of reporting a false bad-type.
+// caller skips the check instead of reporting a false bad-type. A nil
+// store is tolerated as long as the tree holds no call expressions.
 func InferType(store *kb.Store, env *TypeEnv, e xs.Expr) string {
 	switch e.Kind {
 	case xs.ExprVector:
@@ -110,8 +111,10 @@ func InferType(store *kb.Store, env *TypeEnv, e xs.Expr) string {
 	case xs.ExprIdent:
 		return identType(env, e.Value)
 	case xs.ExprCall:
-		if fn, ok := store.Function(e.Callee); ok {
-			return fn.ReturnType
+		if store != nil {
+			if fn, ok := store.Function(e.Callee); ok {
+				return fn.ReturnType
+			}
 		}
 
 		typ, found := env.Lookup(e.Callee)
