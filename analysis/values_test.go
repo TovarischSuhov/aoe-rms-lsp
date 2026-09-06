@@ -24,6 +24,7 @@ func TestCheckRmsValue_PercentOutOfRange(t *testing.T) {
 		value string
 	}{
 		{name: "percent literal too large", kind: rms.KindPercent, value: "150"},
+		{name: "percent literal with suffix too large", kind: rms.KindPercent, value: "150%"},
 		{name: "number literal negative", kind: rms.KindNumber, value: "-1"},
 		{name: "number literal too large", kind: rms.KindNumber, value: "100.5"},
 	}
@@ -36,6 +37,7 @@ func TestCheckRmsValue_PercentOutOfRange(t *testing.T) {
 			require.Equal(t, common.SeverityError, diag.Severity)
 			require.Equal(t, CodeBadArgumentValue, diag.Code)
 			require.Equal(t, r, diag.Range)
+			require.Contains(t, diag.Message, "0..100")
 		})
 	}
 }

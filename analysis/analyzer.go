@@ -26,6 +26,9 @@ const (
 	// CodeBadArgumentValue marks an argument value outside its allowed
 	// range (percent specs: 0..100).
 	CodeBadArgumentValue = "bad-argument-value"
+	// CodeBadType marks an XS value whose inferred type is incompatible
+	// with the expected one (call argument, assignment, return).
+	CodeBadType = "bad-type"
 	// CodeDeprecatedEffectPercent marks the legacy effect_percent command.
 	CodeDeprecatedEffectPercent = "deprecated-effect-percent"
 	// CodeUndefinedSymbol marks an XS identifier that is neither declared
@@ -90,7 +93,14 @@ func (a *Analyzer) walkStmts(stmts []rms.Statement, diags []common.Diagnostic) [
 			diags = a.checkCommand(stmt, &lastKnown, diags)
 		default:
 			// structural blocks carry no own semantics; nested commands
-			// are checked in place
+			// are checked in place. percent_chance folds its chance into
+			// positional args of the block statement itself.
+			if stmt.Name != "" && stmt.Name[0] != '#' {
+				if cmd, known := a.store.Command(stmt.Name); known {
+					diags = a.checkArgValues(stmt.Args, cmd.Args, diags)
+				}
+			}
+
 			diags = a.walkStmts(stmt.Children, diags)
 		}
 	}
@@ -148,17 +158,31 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 		})
 	}
 
+	// positional argument values: leaf expressions against their specs
+	diags = a.checkArgValues(stmt.Args, cmd.Args, diags)
+
 	// attributes inside braces belong to the command
 	for j := range stmt.Attributes {
 		attr := &stmt.Attributes[j]
 
-		if _, ok := a.store.Attribute(cmd.Name, attr.Name); !ok {
+		spec, known := a.store.Attribute(cmd.Name, attr.Name)
+		if !known {
 			diags = append(diags, common.Diagnostic{
 				Range:    attr.Range,
 				Severity: common.SeverityError,
 				Message:  fmt.Sprintf("unknown attribute %q of %q", attr.Name, cmd.Name),
 				Code:     CodeUnknownAttribute,
 			})
+
+			continue
+		}
+
+		if len(attr.Value.Children) > 0 {
+			continue
+		}
+
+		if diag, reported := CheckRmsValue(spec, attr.Value.Kind, attr.Value.Value, attr.Value.Range); reported {
+			diags = append(diags, diag)
 		}
 	}
 
@@ -166,8 +190,9 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 }
 
 // AnalyzeXs checks one XS file: identifiers that are neither declared in
-// the file nor known to the knowledge base, and calls with a wrong number
-// of arguments. The result is sorted by position.
+// the file nor known to the knowledge base, calls with a wrong number of
+// arguments and value types incompatible with the expected ones. The
+// result is sorted by position.
 func (a *Analyzer) AnalyzeXs(file xs.XsFile) []common.Diagnostic {
 	declared := map[string]bool{}
 
@@ -184,10 +209,32 @@ func (a *Analyzer) AnalyzeXs(file xs.XsFile) []common.Diagnostic {
 		collectLocals(decl.Body, declared)
 	}
 
+	env := NewTypeEnv(file)
+
 	var diags []common.Diagnostic
 
 	for i := range file.Decls {
-		diags = a.walkStmtsXs(file.Decls[i].Body, declared, diags)
+		decl := &file.Decls[i]
+
+		switch decl.Kind {
+		case xs.DeclFunction, xs.DeclRule, xs.DeclEvent:
+			// function bodies get their own scope with typed params
+			env.Push()
+
+			for _, param := range decl.Params {
+				env.Declare(param.Name, param.Type)
+			}
+
+			fnType := ""
+			if decl.Kind == xs.DeclFunction {
+				fnType = decl.Type
+			}
+
+			diags = a.walkStmtsXs(decl.Body, declared, env, fnType, diags)
+			env.Pop()
+		default:
+			diags = a.walkStmtsXs(decl.Body, declared, env, "", diags)
+		}
 	}
 
 	sortDiags(diags)
@@ -214,40 +261,102 @@ func collectLocals(stmts []xs.Stmt, declared map[string]bool) {
 	}
 }
 
-// walkStmtsXs checks the expressions of a statement tree.
-func (a *Analyzer) walkStmtsXs(stmts []xs.Stmt, declared map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
+// walkStmtsXs checks the expressions of a statement tree; fnType is the
+// return type of the enclosing function ("" disables the return check).
+func (a *Analyzer) walkStmtsXs(stmts []xs.Stmt, declared map[string]bool, env *TypeEnv, fnType string, diags []common.Diagnostic) []common.Diagnostic {
 	for i := range stmts {
 		stmt := &stmts[i]
 
-		for j := range stmt.Exprs {
-			diags = a.checkExpr(stmt.Exprs[j], declared, diags)
+		if stmt.Kind == xs.StmtDecl {
+			env.declareLocals(stmt.Exprs)
 		}
 
-		diags = a.walkStmtsXs(stmt.Body, declared, diags)
+		if stmt.Kind == xs.StmtReturn && len(stmt.Exprs) > 0 && knownXsType(fnType) {
+			diags = a.checkReturnType(stmt.Exprs[0], env, fnType, diags)
+		}
+
+		for j := range stmt.Exprs {
+			diags = a.checkExpr(stmt.Exprs[j], declared, env, diags)
+		}
+
+		diags = a.walkStmtsXs(stmt.Body, declared, env, fnType, diags)
 	}
 
 	return diags
 }
 
 // checkExpr validates one expression tree.
-func (a *Analyzer) checkExpr(e xs.Expr, declared map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
+func (a *Analyzer) checkExpr(e xs.Expr, declared map[string]bool, env *TypeEnv, diags []common.Diagnostic) []common.Diagnostic {
 	switch e.Kind {
 	case xs.ExprCall:
-		diags = a.checkCall(e, declared, diags)
+		diags = a.checkCall(e, declared, env, diags)
 	case xs.ExprIdent:
 		diags = a.checkIdent(e, declared, diags)
 	case xs.ExprBinary:
 		if e.Value == "." && len(e.Children) == 2 {
 			// vector member access: v.x — only the operand is a symbol
-			return a.checkExpr(e.Children[0], declared, diags)
+			return a.checkExpr(e.Children[0], declared, env, diags)
+		}
+
+		if e.Value == "=" && len(e.Children) == 2 && e.Children[0].Kind == xs.ExprIdent {
+			diags = a.checkAssign(e, env, diags)
 		}
 	}
 
 	for _, child := range e.Children {
-		diags = a.checkExpr(child, declared, diags)
+		diags = a.checkExpr(child, declared, env, diags)
 	}
 
 	return diags
+}
+
+// checkAssign reports a typed assignment whose value type is incompatible
+// with the declared type of the target identifier.
+func (a *Analyzer) checkAssign(e xs.Expr, env *TypeEnv, diags []common.Diagnostic) []common.Diagnostic {
+	target, value := e.Children[0], e.Children[1]
+
+	targetType, found := env.Lookup(target.Value)
+	if !found || !knownXsType(targetType) {
+		return diags
+	}
+
+	typ := InferType(a.store, env, value)
+	if typ == "" || Coerce(targetType, typ) {
+		return diags
+	}
+
+	return append(diags, common.Diagnostic{
+		Range:    value.Range,
+		Severity: common.SeverityError,
+		Message:  fmt.Sprintf("cannot assign %s to %s %q", typ, targetType, target.Value),
+		Code:     CodeBadType,
+	})
+}
+
+// checkReturnType reports a return value whose type is incompatible with
+// the declared return type of the enclosing function.
+func (a *Analyzer) checkReturnType(e xs.Expr, env *TypeEnv, fnType string, diags []common.Diagnostic) []common.Diagnostic {
+	typ := InferType(a.store, env, e)
+	if typ == "" || Coerce(fnType, typ) {
+		return diags
+	}
+
+	return append(diags, common.Diagnostic{
+		Range:    e.Range,
+		Severity: common.SeverityError,
+		Message:  fmt.Sprintf("return value of type %s is not compatible with %s", typ, fnType),
+		Code:     CodeBadType,
+	})
+}
+
+// knownXsType reports whether the type name participates in type checks.
+func knownXsType(typ string) bool {
+	switch typ {
+	case "int", "float", "bool", "string", "vector":
+		return true
+	}
+
+	return false
 }
 
 // checkIdent reports one plain identifier when it resolves to nothing.
@@ -272,8 +381,9 @@ func (a *Analyzer) checkIdent(e xs.Expr, declared map[string]bool, diags []commo
 	})
 }
 
-// checkCall validates the callee name and the argument count of a call.
-func (a *Analyzer) checkCall(e xs.Expr, declared map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
+// checkCall validates the callee name, the argument count and the
+// argument types of a call of a knowledge base function.
+func (a *Analyzer) checkCall(e xs.Expr, declared map[string]bool, env *TypeEnv, diags []common.Diagnostic) []common.Diagnostic {
 	callee := e.Callee
 
 	fn, known := a.store.Function(callee)
@@ -312,6 +422,38 @@ func (a *Analyzer) checkCall(e xs.Expr, declared map[string]bool, diags []common
 			Message:  fmt.Sprintf("%s takes at most %d argument(s), got %d", callee, len(fn.Params), len(e.Children)),
 			Code:     CodeBadArity,
 		})
+	}
+
+	for i, arg := range e.Children {
+		if i >= len(fn.Params) || !knownXsType(fn.Params[i].Type) {
+			continue
+		}
+
+		typ := InferType(a.store, env, arg)
+		if typ != "" && !Coerce(fn.Params[i].Type, typ) {
+			diags = append(diags, common.Diagnostic{
+				Range:    arg.Range,
+				Severity: common.SeverityError,
+				Message:  fmt.Sprintf("argument %d of %s is %s, want %s", i+1, callee, typ, fn.Params[i].Type),
+				Code:     CodeBadType,
+			})
+		}
+	}
+
+	return diags
+}
+
+// checkArgValues value-checks leaf positional arguments against their
+// specs; helper calls and operator expressions stay unchecked.
+func (a *Analyzer) checkArgValues(args []rms.Expr, spec []kb.CommandArg, diags []common.Diagnostic) []common.Diagnostic {
+	for j := range args {
+		if j >= len(spec) || len(args[j].Children) > 0 {
+			continue
+		}
+
+		if diag, reported := CheckRmsValue(spec[j], args[j].Kind, args[j].Value, args[j].Range); reported {
+			diags = append(diags, diag)
+		}
 	}
 
 	return diags

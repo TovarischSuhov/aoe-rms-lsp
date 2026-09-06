@@ -86,6 +86,33 @@ func (env *TypeEnv) Lookup(name string) (string, bool) {
 	return "", false
 }
 
+// declareLocals declares the names of a typed local declaration statement
+// in the innermost scope. Local declarations carry no type in the AST, so
+// the type is "". Root-scope declarations are skipped: their names are
+// already typed by NewTypeEnv.
+func (env *TypeEnv) declareLocals(exprs []xs.Expr) {
+	if len(env.scopes) < 2 {
+		return
+	}
+
+	for i := range exprs {
+		e := &exprs[i]
+
+		name := ""
+
+		switch {
+		case e.Kind == xs.ExprIdent:
+			name = e.Value
+		case e.Kind == xs.ExprBinary && e.Value == "=" && len(e.Children) > 0 && e.Children[0].Kind == xs.ExprIdent:
+			name = e.Children[0].Value
+		}
+
+		if name != "" {
+			env.scopes[len(env.scopes)-1][name] = ""
+		}
+	}
+}
+
 // inferBoolOps yield a bool result; inferArithOps widen their operands.
 var (
 	inferBoolOps = map[string]bool{

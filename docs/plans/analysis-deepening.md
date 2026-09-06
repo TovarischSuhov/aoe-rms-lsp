@@ -376,22 +376,22 @@ effect_percent, `declared`-map, `collectLocals`) НЕ переписывать �
 
 **CRITICAL: `CODEMANIFEST` files — read-only contract definitions. Do NOT modify them. If implementation does not match the contract, fix the implementation — never fix the contract.**
 
-- [ ] **STEP 0 (DECLARATION)**: объявить задачу Task 4 — Analyzer
-- [ ] **Contract tests**: `goga contract analysis` — весь контракт ячейки
+- [x] **STEP 0 (DECLARATION)**: объявить задачу Task 4 — Analyzer
+- [x] **Contract tests**: `goga contract analysis` — весь контракт ячейки
   (Analyzer + 4 новых типа) разрешается (это и есть фасад-тест); запуск
   фиксируется как проверка в задаче
-- [ ] **Code**: const-блок analyzer.go: добавить `CodeBadType =
+- [x] **Code**: const-блок analyzer.go: добавить `CodeBadType =
   "bad-type"` (CodeBadArgumentValue уже из Task 3)
-- [ ] **Code** (AnalyzeRms, шаг 4 контракта): в `checkCommand` —
+- [x] **Code** (AnalyzeRms, шаг 4 контракта): в `checkCommand` —
   позиционные: `for j := range stmt.Args` при `j < len(cmd.Args)`, skip
   если `len(stmt.Args[j].Children) > 0` (leaf-guard: выражения и
   вызовы-хелперы вроде rand_float не проверяются); `CheckRmsValue(a.store,
   cmd.Args[j], e.Kind, e.Value, e.Range)` → reported → append
-- [ ] **Code** (AnalyzeRms, шаг 4 контракта): атрибуты — в существующем
+- [x] **Code** (AnalyzeRms, шаг 4 контракта): атрибуты — в существующем
   цикле после `store.Attribute(cmd.Name, attr.Name)` сохранить spec; тот же
   leaf-guard по `attr.Value.Children`; `CheckRmsValue(a.store, spec,
   attr.Value.Kind, attr.Value.Value, attr.Value.Range)` → reported → append
-- [ ] **Code** (AnalyzeXs, шаги 1/3/5/6 контракта): `env := NewTypeEnv
+- [x] **Code** (AnalyzeXs, шаги 1/3/5/6 контракта): `env := NewTypeEnv
   (file)`; существующую плоскую `declared`-map НЕ трогать; обход decls:
   для DeclFunction — `env.Push()`, `Declare(param.Name, param.Type)` для
   каждого параметра, обход тела с контекстом (env + тип возврата
@@ -407,9 +407,9 @@ effect_percent, `declared`-map, `collectLocals`) НЕ переписывать �
   (Range = children[1].Range); (d) StmtReturn с Exprs[0] в теле
   DeclFunction при `decl.Type` известного вида: `InferType` + `Coerce` →
   bad-type (Range = Exprs[0].Range)
-- [ ] **Interface verification**: `goga contract analysis` — pass;
+- [x] **Interface verification**: `goga contract analysis` — pass;
   sandbox-запуск `go test ./analysis/... -count=1`
-- [ ] **Logic tests** (в `analysis/analyzer_test.go`, расширение):
+- [x] **Logic tests** (в `analysis/analyzer_test.go`, расширение):
   `TestAnalyzeRms_BadArgumentValue_Attribute` — `<land_generation>` +
   create_land с percent = 150 → bad-argument-value, Range на значении,
   diags отсортированы; `TestAnalyzeRms_HelperCallNotFlagged` — percent =
@@ -421,13 +421,13 @@ effect_percent, `declared`-map, `collectLocals`) НЕ переписывать �
   `TestAnalyzeXs_ReturnMismatch` — `int f() { return 1.5; }` → bad-type;
   `TestAnalyzeXs_UnknownInferTypeSilent` — вызов с аргументом-бестиповым
   локалом → bad-type отсутствует
-- [ ] **Debugging**: sandbox-запуск `go test ./... -count=1` — чинить
+- [x] **Debugging**: sandbox-запуск `go test ./... -count=1` — чинить
   реализацию (НЕ тесты); существующие тесты (включая server) обязаны
   остаться зелёными
-- [ ] **Contract re-verification**: `goga contract analysis` pass; AST не
+- [x] **Contract re-verification**: `goga contract analysis` pass; AST не
   мутируется; нет дублей синтаксических диагностик; diags отсортированы
-- [ ] **Lint**: `goimports -w . && golangci-lint run && goga lint`
-- [ ] **STEP 8 (COMPLETION)**: отметить чекбоксы
+- [x] **Lint**: `goimports -w . && golangci-lint run && goga lint`
+- [x] **STEP 8 (COMPLETION)**: отметить чекбоксы
 
 ### Task 5: Интеграционные регресс-тесты (integration tests)
 

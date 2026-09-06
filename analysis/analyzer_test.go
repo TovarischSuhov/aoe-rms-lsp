@@ -106,6 +106,30 @@ end_random
 			want: []string{CodeUnknownCommand},
 		},
 		{
+			name: "percent attribute out of range",
+			src: `<LAND_GENERATION>
+create_land {
+	land_percent = 150
+}
+`,
+			want: []string{CodeBadArgumentValue},
+		},
+		{
+			name: "percent positional argument out of range",
+			src: `percent_chance 150
+`,
+			want: []string{CodeBadArgumentValue},
+		},
+		{
+			name: "helper call values are not flagged",
+			src: `<LAND_GENERATION>
+create_land {
+	land_percent = rand_float(10, 20)
+}
+`,
+			want: []string{},
+		},
+		{
 			name: "directives are not commands",
 			src: `#const START_GOLD 800
 <LAND_GENERATION>
@@ -213,6 +237,48 @@ void tick(int step) {
 }
 `,
 			want: []string{CodeUndefinedSymbol}, // ready is nowhere declared
+		},
+		{
+			name: "call argument type mismatch",
+			src: `void f() {
+	sqrt("fast");
+}
+`,
+			want: []string{CodeBadType}, // sqrt takes float
+		},
+		{
+			name: "int widens to float silently",
+			src: `void f() {
+	sqrt(2);
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "assignment to a typed top-level variable",
+			src: `int x = 1.5;
+
+void f() {
+}
+`,
+			want: []string{CodeBadType},
+		},
+		{
+			name: "return type mismatch",
+			src: `int f() {
+	return 1.5;
+}
+`,
+			want: []string{CodeBadType},
+		},
+		{
+			name: "untyped locals stay silent",
+			src: `void g(int p) {
+	int local = p;
+	local = 1.5;
+}
+`,
+			want: []string{},
 		},
 	}
 
