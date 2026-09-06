@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,7 +26,9 @@ func TestAnalyzeXs_PreludeNoFalsePositives(t *testing.T) {
 
 	a := newAnalyzer(t)
 
-	assert.Empty(t, codes(a.AnalyzeXs(file)), "prelude.xs must not trigger analyzer diagnostics")
+	diags := a.AnalyzeXs(file)
+
+	require.Empty(t, diags, "prelude.xs must not trigger analyzer diagnostics: %v", messagesWithPos(diags))
 }
 
 // TestAnalyzeRms_FixturesRegression walks the parser fixtures and pins the
@@ -54,10 +57,13 @@ func TestAnalyzeRms_FixturesRegression(t *testing.T) {
 			raw, err := os.ReadFile(path)
 			require.NoError(t, err)
 
-			file, _ := rms.Parse(string(raw), filepath.Base(path))
+			base := filepath.Base(path)
+			require.Contains(t, want, base, "pin the baseline for the new fixture")
+
+			file, _ := rms.Parse(string(raw), base)
 			got := codes(a.AnalyzeRms(file))
 
-			assert.Equal(t, want[filepath.Base(path)], got)
+			assert.Equal(t, want[base], got)
 			assert.NotContains(t, got, CodeBadArgumentValue, "fixtures must not gain value diagnostics")
 		})
 	}
@@ -65,8 +71,8 @@ func TestAnalyzeRms_FixturesRegression(t *testing.T) {
 
 // TestPipeline_MergedDiagnostics mirrors the server composition: syntax
 // diagnostics of both parsers plus analyzer output for the RMS file and
-// every inline XS block, shifted to document coordinates — one sorted
-// batch.
+// every inline XS block, shifted to document coordinates — one batch,
+// sorted before publishing.
 func TestPipeline_MergedDiagnostics(t *testing.T) {
 	src := `<LAND_GENERATION>
 create_land_bogus
@@ -85,9 +91,11 @@ void f() {
 	for _, block := range file.XsBlocks {
 		xfile, xdiags := xs.XsParse(block.Code, "inline:map.rms")
 
-		diags = append(diags, shiftDiags(a.AnalyzeXs(xfile), block.Range.Start)...)
 		diags = append(diags, shiftDiags(xdiags, block.Range.Start)...)
+		diags = append(diags, shiftDiags(a.AnalyzeXs(xfile), block.Range.Start)...)
 	}
+
+	sortDiags(diags) // the server sorts the merged batch the same way
 
 	got := codes(diags)
 
@@ -99,27 +107,44 @@ void f() {
 	assertSorted(t, diags)
 }
 
-// shiftDiags moves block-relative diagnostics into document coordinates.
-func shiftDiags(diags []common.Diagnostic, by common.Pos) []common.Diagnostic {
-	out := make([]common.Diagnostic, len(diags))
+// messagesWithPos renders diagnostics as line:col message for readable
+// failures.
+func messagesWithPos(diags []common.Diagnostic) []string {
+	out := make([]string, 0, len(diags))
 
-	for i, d := range diags {
-		start, end := d.Range.Start, d.Range.End
-
-		if start.Line == 0 {
-			start.Column += by.Column
-		}
-
-		if end.Line == 0 {
-			end.Column += by.Column
-		}
-
-		start.Line += by.Line
-		end.Line += by.Line
-
-		out[i] = d
-		out[i].Range = common.Range{Start: start, End: end}
+	for _, d := range diags {
+		out = append(out, fmt.Sprintf("%d:%d %s", d.Range.Start.Line, d.Range.Start.Column, d.Message))
 	}
 
 	return out
+}
+
+// shiftDiags moves block-relative diagnostics into document coordinates.
+// It mirrors the server implementation (server.shiftPos) verbatim.
+func shiftDiags(diags []common.Diagnostic, base common.Pos) []common.Diagnostic {
+	out := make([]common.Diagnostic, len(diags))
+
+	for i, d := range diags {
+		out[i] = d
+		out[i].Range.Start = shiftPos(d.Range.Start, base)
+		out[i].Range.End = shiftPos(d.Range.End, base)
+	}
+
+	return out
+}
+
+// shiftPos maps a block-relative position into the document by adding the
+// block start; only the first block line also gains the start column.
+func shiftPos(p common.Pos, base common.Pos) common.Pos {
+	shifted := common.Pos{
+		Line:   p.Line + base.Line,
+		Column: p.Column,
+		Offset: p.Offset + base.Offset,
+	}
+
+	if p.Line == 0 {
+		shifted.Column += base.Column
+	}
+
+	return shifted
 }
