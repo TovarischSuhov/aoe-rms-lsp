@@ -109,8 +109,16 @@ end_random
 			name: "percent attribute out of range",
 			src: `<LAND_GENERATION>
 create_land {
-	land_percent = 150
+	land_percent 150
 }
+`,
+			want: []string{CodeBadArgumentValue},
+		},
+		{
+			name: "bare attribute value out of range",
+			src: `<LAND_GENERATION>
+create_land
+land_percent 150
 `,
 			want: []string{CodeBadArgumentValue},
 		},
@@ -123,9 +131,8 @@ create_land {
 		{
 			name: "helper call values are not flagged",
 			src: `<LAND_GENERATION>
-create_land {
-	land_percent = rand_float(10, 20)
-}
+create_land
+land_percent rand_float(10, 20)
 `,
 			want: []string{},
 		},

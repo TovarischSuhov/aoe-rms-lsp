@@ -128,10 +128,11 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 	cmd, known := a.store.Command(stmt.Name)
 	if !known {
 		// a bare attribute line outside braces: known attribute of the
-		// previous command, not an unknown command
+		// previous command, not an unknown command — its value gets the
+		// same checks as an attribute inside braces
 		if *lastKnown != "" {
-			if _, ok := a.store.Attribute(*lastKnown, stmt.Name); ok {
-				return diags
+			if spec, ok := a.store.Attribute(*lastKnown, stmt.Name); ok {
+				return a.checkArgValues(stmt.Args, []kb.CommandArg{spec}, diags)
 			}
 		}
 
