@@ -250,7 +250,10 @@ func collectLocals(stmts []xs.Stmt, declared map[string]bool) {
 
 		if stmt.Kind == xs.StmtDecl {
 			for _, e := range stmt.Exprs {
-				if e.Kind == xs.ExprBinary && e.Value == "=" && len(e.Children) > 0 {
+				switch {
+				case e.Kind == xs.ExprIdent:
+					declared[e.Value] = true // bare declarator: int x;
+				case e.Kind == xs.ExprBinary && e.Value == "=" && len(e.Children) > 0:
 					if e.Children[0].Kind == xs.ExprIdent {
 						declared[e.Children[0].Value] = true
 					}

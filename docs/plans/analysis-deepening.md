@@ -443,24 +443,24 @@ effect_percent, `declared`-map, `collectLocals`) НЕ переписывать �
 
 **CRITICAL: `CODEMANIFEST` files — read-only contract definitions.**
 
-- [ ] Создать `analysis/integration_test.go`
-- [ ] `TestAnalyzeXs_PreludeNoFalsePositives`: XsParse(
+- [x] Создать `analysis/integration_test.go`
+- [x] `TestAnalyzeXs_PreludeNoFalsePositives`: XsParse(
   docs/ref/ugc-guide/xs/prelude.xs) → AnalyzeXs — набор диагностик
   содержит 0 bad-type (undefined-symbol/bad-arity — как в базлайне до
   изменения; если базлайн-тест уже существует — расширить его сравнением
   по Code)
-- [ ] `TestAnalyzeRms_FixturesRegression`: все `rms/testdata/*.rms` →
+- [x] `TestAnalyzeRms_FixturesRegression`: все `rms/testdata/*.rms` →
   Parse → AnalyzeRms — новые bad-argument-value только на реально
   нарушающих значениях; прочие коды не изменились против базлайна
-- [ ] `TestPipeline_MergedDiagnostics`: для .rms с unknown-command +
+- [x] `TestPipeline_MergedDiagnostics`: для .rms с unknown-command +
   percent=150 и inline-XS блока с sqrt("fast") — собрать
   полный батч как в server (syntax diags парсера + AnalyzeRms +
   XsParse+AnalyzeXs со сдвигом диапазонов XsBlock.Range.Start) — батч
   содержит все 3 кода (unknown-command, bad-argument-value, bad-type),
   отсортирован по позиции
-- [ ] Run validation: sandbox-запуск `go test ./analysis/... -count=1`;
+- [x] Run validation: sandbox-запуск `go test ./analysis/... -count=1`;
   затем полный `go test ./... -count=1` (sandbox)
-- [ ] Lint: `goimports -w . && golangci-lint run && goga lint`
+- [x] Lint: `goimports -w . && golangci-lint run && goga lint`
 
 ---
 

@@ -287,6 +287,15 @@ void f() {
 `,
 			want: []string{},
 		},
+		{
+			name: "bare local declarations are declared",
+			src: `void h() {
+	int x;
+	x = 1;
+}
+`,
+			want: []string{},
+		},
 	}
 
 	a := newAnalyzer(t)
