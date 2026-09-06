@@ -10,8 +10,8 @@ Target audience: implementers of CLI lint tooling and the server cell.
 spec, found := store.Attribute("create_land", "percent")
 if found {
     v := attr.Value // rms.Expr
-    if diag, reported := analysis.CheckRmsValue(store, spec, v.Kind, v.Value, v.Range); reported {
-        // bad-argument-value (error) / unknown-constant (warning)
+    if diag, reported := analysis.CheckRmsValue(spec, v.Kind, v.Value, v.Range); reported {
+        // bad-argument-value (error): percent outside 0..100
     }
 }
 ```

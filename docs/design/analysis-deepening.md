@@ -64,6 +64,13 @@ No implementation code is written at this stage.
 - `analysis/CODEMANIFEST`: `CheckRmsValue(store, spec, kind, value)` →
   `+ r: Range` (reason: трассировка — рутина не могла построить
   позиционированную `common.Diagnostic` без диапазона)
+- `analysis/CODEMANIFEST` (при исполнении Task 3): ветка unknown-constant
+  УДАЛЕНА из `CheckRmsValue`, параметр `store` убран, код
+  `unknown-constant` исключён из скоупа (reason: данные — const-kind
+  аргументы RMS принимают имена уровня RMS (terrain/effect types), которые
+  kb не моделирует: kb.Constants — только XS-константы; проверка дала бы
+  6/6 ложных срабатываний на rms-фикстурах против критерия приёмки.
+  Follow-up: добавить RMS-имена в kb → вернуть проверку)
 
 ## Entity Interaction and Data Flow
 
@@ -276,11 +283,8 @@ No implementation code is written at this stage.
    - IF err != nil OR n < 0 OR n > 100:
      - IF err != nil → reported=false (молчание)
      - ELSE → Diagnostic{r, error, bad-argument-value}
-2. ELSE IF spec.Kind == "const" AND kind ∈ {const, ident}:
-   - _, found := store.Constant(value)
-   - IF !found → Diagnostic{r, warning, unknown-constant,
-     сообщение упоминает #const-оговорку}
-3. ELSE → reported=false
+2. ELSE → reported=false (const-имена RMS kb не моделирует —
+   см. Applied Fixes)
 ```
 
 **Errors:** нет (сигнатура без error).
@@ -555,15 +559,6 @@ InferType(1.5)="float" → Coerce("int","float")=false → bad-type.
 ---
 
 ### Negative Tests
-
-#### `TestCheckRmsValue_UnknownConst`
-
-**Input**: `(store, spec{const}, rms.KindConst, "NOT_A_TERRAIN", r)`.
-
-**Assertions**: reported true; Code "unknown-constant"; Severity ==
-common.SeverityWarning; сообщение содержит "#const".
-
-**Sufficiency**: warning-семантика с #const-оговоркой.
 
 #### `TestCheckRmsValue_ExpressionSkipped`
 

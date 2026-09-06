@@ -159,12 +159,11 @@ Annotations: |
       Constraints:
       - не изменять входной AST
 
-"CheckRmsValue(store: Store, spec: CommandArg, kind: string, value: string, r: Range) -> diag: Diagnostic, reported: bool":
+"CheckRmsValue(spec: CommandArg, kind: string, value: string, r: Range) -> diag: Diagnostic, reported: bool":
   location: values.go
   annotations: |
     Проверка значения одного аргумента/атрибута RMS против спецификации Kind.
 
-    `store`: база знаний
     `spec`: спецификация аргумента/атрибута из kb
     `kind`: вид значения из AST (number / percent / const / ident /
     binary / unary)
@@ -177,16 +176,12 @@ Annotations: |
     1. spec.Kind=percent и kind — number или percent: числовое значение
        `value` вне [0, 100] — Diagnostic с диапазоном `r`, severity=error,
        code="bad-argument-value"
-    2. spec.Kind=const и kind — const или ident: lookup Store.Constant
-       по `lookups` с `value`; not found — severity=warning,
-       code="unknown-constant" (в сообщении оговорка: константа скрипта
-       #const — не ошибка)
-    3. Прочие случаи — kind binary/unary, spec.Kind number/float/condition/
-       filename/пусто — reported=false
+    2. Прочие случаи — reported=false
 
     Requirements:
     - фактический набор spec.Kind в данных: number, const, percent, float,
-      condition, filename, пусто; проверяются только percent и const
+      condition, filename, пусто; проверяется только percent — const-имена
+      уровня RMS (terrain/effect types) базой знаний не моделируются
     - единая проверка для позиционных Args и Attributes
 
     Constraints:
@@ -326,8 +321,8 @@ Target audience: implementers of CLI lint tooling and the server cell.
 spec, found := store.Attribute("create_land", "percent")
 if found {
     v := attr.Value // rms.Expr
-    if diag, reported := analysis.CheckRmsValue(store, spec, v.Kind, v.Value, v.Range); reported {
-        // bad-argument-value (error) / unknown-constant (warning)
+    if diag, reported := analysis.CheckRmsValue(spec, v.Kind, v.Value, v.Range); reported {
+        // bad-argument-value (error): percent outside 0..100
     }
 }
 ```

@@ -28,7 +28,6 @@ all = append(all, analyzer.AnalyzeXs(xsFile)...)
 | unknown-attribute | error | атрибут не принадлежит команде |
 | bad-argument | error | число/вид аргументов против спецификации |
 | bad-argument-value | error | значение аргумента вне диапазона (percent 0..100) |
-| unknown-constant | warning | const не резолвится в kb (возможно #const скрипта) |
 | deprecated-effect-percent | warning | effect_percent устарел в пользу операторов |
 | undefined-symbol | error | ident вне объявлений и kb |
 | bad-arity | error | неверное число аргументов вызова |

@@ -7,9 +7,10 @@
 `kb.CommandArg.Kind`, (2) типы XS против `Param.Type`/`ReturnType` с
 консервативным выводом типов. После реализации пакет `analysis` экспортирует
 помимо существующего `Analyzer` четыре новые сущности: `CheckRmsValue`,
-`TypeEnv` (+`NewTypeEnv`), `InferType`, `Coerce` — и выдаёт 3 новых кода
-диагностик: `bad-argument-value` (error), `unknown-constant` (warning),
-`bad-type` (error). Контракт уже материализован в `analysis/CODEMANIFEST`
+`TypeEnv` (+`NewTypeEnv`), `InferType`, `Coerce` — и выдаёт 2 новых кода
+диагностик: `bad-argument-value` (error) и `bad-type` (error). Код
+`unknown-constant` исключён из скоупа при исполнении (const-имена RMS не
+моделируются kb — см. дизайн, Applied Fixes). Контракт уже материализован в `analysis/CODEMANIFEST`
 (коммиты 55c378b, ed312bf); провал `goga contract analysis` — текущий разрыв
 между контрактом и кодом. Стратегия: TDD-задачи от простых сущностей
 (`Coerce`, `TypeEnv`) к сложной интеграции (`Analyzer`), затем
@@ -51,21 +52,17 @@
 
 **Routine: `CheckRmsValue`**
 - Type: function (`analysis/values.go`, НОВЫЙ файл)
-- Signature: `CheckRmsValue(store: Store, spec: CommandArg, kind: string, value: string, r: Range) -> diag: Diagnostic, reported: bool`
-- Go-вид: `func CheckRmsValue(store *kb.Store, spec kb.CommandArg, kind, value string, r common.Range) (common.Diagnostic, bool)`
+- Signature: `CheckRmsValue(spec: CommandArg, kind: string, value: string, r: Range) -> diag: Diagnostic, reported: bool`
+- Go-вид: `func CheckRmsValue(spec kb.CommandArg, kind, value string, r common.Range) (common.Diagnostic, bool)`
 - Algorithm:
   1. spec.Kind=percent и kind — number или percent: числовое значение
      `value` вне [0, 100] — Diagnostic с диапазоном `r`, severity=error,
      code="bad-argument-value"
-  2. spec.Kind=const и kind — const или ident: lookup Store.Constant по
-     `lookups` с `value`; not found — severity=warning,
-     code="unknown-constant" (в сообщении оговорка: константа скрипта
-     #const — не ошибка)
-  3. Прочие случаи — kind binary/unary, spec.Kind number/float/condition/
-     filename/пусто — reported=false
+  2. Прочие случаи — reported=false
 - Requirements: фактический набор spec.Kind в данных: number, const,
-  percent, float, condition, filename, пусто; проверяются только percent и
-  const; единая проверка для позиционных Args и Attributes
+  percent, float, condition, filename, пусто; проверяется только percent —
+  const-имена уровня RMS (terrain/effect types) базой знаний не
+  моделируются; единая проверка для позиционных Args и Attributes
 - Constraints: чистая функция: без IO, не изменять spec
 
 **Entity: `TypeEnv`**
@@ -164,6 +161,10 @@
   → проверки типов для них молчат.
 - `xs.Decl.Type` заполнен для top-level variables и функций (тип возврата);
   `xs.Param.Type` заполнен для параметров.
+- kb-константы — только XS (882, `c...`-префикс); const-имена уровня RMS
+  (GRASS, DIRT, effect types) в kb ОТСУТСТВУЮТ — поэтому unknown-constant
+  исключён из скоупа (6/6 ложных срабатываний на фикстурах). `sqrt`/`abs`
+  имеют float-параметр (для bad-type-тестов); `xsSetWorldGravity` в kb НЕТ.
 - В `analyzer.go` уже есть `xsBuiltins` (true/false/vector/null) —
   переиспользовать в InferType (true/false → bool, vector → vector,
   null → "").
@@ -310,28 +311,25 @@
 
 ### Task 3: `CheckRmsValue` — проверка значения RMS-аргумента (TDD coding)
 
-Задача создаёт файл `analysis/values.go` с рутиной `CheckRmsValue(store,
-spec, kind, value, r)` — проверка одного значения против
-`kb.CommandArg.Kind`. Функция чистая, без позиционной логики: Range приходит
-параметром `r`.
+Задача создаёт файл `analysis/values.go` с рутиной `CheckRmsValue(spec,
+kind, value, r)` — проверка одного значения против `kb.CommandArg.Kind`
+(только percent; см. Facts про const-имена RMS). Функция чистая, без
+позиционной логики: Range приходит параметром `r`.
 
 **Usages relevant to this task:**
 - `rms_grammar`: percent-литерал `50%` и число `25` — обе формы допустимы
-  для percent-Kind; выражения с операторами (153015+) не проверяются;
-  `#const NAME value` — константы скрипта (не в kb → warning с оговоркой).
-- `lookups` from Imports: `store.Constant(name) (Constant, bool)` —
-  точное имя, case-sensitive.
+  для percent-Kind; выражения с операторами (153015+) не проверяются.
 
 **CRITICAL: `CODEMANIFEST` files — read-only contract definitions. Do NOT modify them. If implementation does not match the contract.**
 
 - [ ] **STEP 0 (DECLARATION)**: объявить задачу Task 3 — CheckRmsValue
-- [ ] **Contract tests**: `analysis.CheckRmsValue(*kb.Store, kb.CommandArg,
-  string, string, common.Range) (common.Diagnostic, bool)` компилируется и
+- [ ] **Contract tests**: `analysis.CheckRmsValue(kb.CommandArg, string,
+  string, common.Range) (common.Diagnostic, bool)` компилируется и
   вызывается (facade/shape)
-- [ ] **Code**: создать `analysis/values.go`; константы кодов НЕ здесь —
-  добавить `CodeBadArgumentValue = "bad-argument-value"` и
-  `CodeUnknownConstant = "unknown-constant"` в существующий const-блок
-  `analysis/analyzer.go` (рядом с CodeUnknownCommand)
+- [ ] **Code**: создать `analysis/values.go`; константу кода добавить в
+  существующий const-блок `analysis/analyzer.go`:
+  `CodeBadArgumentValue = "bad-argument-value"` (рядом с
+  CodeUnknownCommand)
 - [ ] **Code**: Algorithm:
   1. `spec.Kind == "percent"` && `kind ∈ {rms.KindNumber, rms.KindPercent}`:
      `s := strings.TrimSuffix(value, "%")`; `n, err :=
@@ -339,22 +337,17 @@ spec, kind, value, r)` — проверка одного значения про
      `n < 0 || n > 100` → Diagnostic{Range: r, Severity:
      common.SeverityError, Code: CodeBadArgumentValue, Message про
      диапазон 0..100}
-  2. `spec.Kind == "const"` && `kind ∈ {rms.KindConst, rms.KindIdent}`:
-     `_, found := store.Constant(value)`; !found → Diagnostic{Range: r,
-     Severity: common.SeverityWarning, Code: CodeUnknownConstant,
-     Message с оговоркой про #const скрипта}
-  3. прочее → (Diagnostic{}, false)
+  2. прочее (spec.Kind const/number/float/condition/filename/пусто; kind
+     binary/unary/const/ident) → (Diagnostic{}, false)
 - [ ] **Interface verification**: sandbox-запуск
   `go test ./analysis/... -count=1 -run "TestCheckRmsValue"`
 - [ ] **Logic tests**: позитив — `TestCheckRmsValue_PercentOutOfRange`
   (KindPercent "150" → error bad-argument-value; KindNumber "-1" → то же);
-  `TestCheckRmsValue_KnownConst` (KindConst "TERRAIN_GRASS" → reported
-  false); негатив — `TestCheckRmsValue_UnknownConst` (KindConst
-  "NOT_A_TERRAIN" → warning unknown-constant, сообщение содержит "#const");
-  `TestCheckRmsValue_ExpressionSkipped` (KindBinary "1 + 2" → false;
-  spec{const} + KindNumber "7" → false); edge —
-  `TestCheckRmsValue_PercentBoundaries` ("0", "100", "0%", "100%" →
-  reported false; границы включительно)
+  негатив — `TestCheckRmsValue_ExpressionSkipped` (KindBinary "1 + 2" →
+  false; spec{const} + KindConst "GRASS" → false; spec{number} +
+  KindNumber "7" → false); edge — `TestCheckRmsValue_PercentBoundaries`
+  ("0", "100", "0%", "100%" → reported false; границы включительно);
+  непарсимый литерал "12x" → false
 - [ ] **Debugging**: sandbox-запуск всех тестов пакета; чинить реализацию
   (НЕ тесты)
 - [ ] **Contract re-verification**: чистая функция, без IO, spec не
@@ -388,7 +381,7 @@ effect_percent, `declared`-map, `collectLocals`) НЕ переписывать �
   (Analyzer + 4 новых типа) разрешается (это и есть фасад-тест); запуск
   фиксируется как проверка в задаче
 - [ ] **Code**: const-блок analyzer.go: добавить `CodeBadType =
-  "bad-type"` (CodeBadArgumentValue/CodeUnknownConstant уже из Task 3)
+  "bad-type"` (CodeBadArgumentValue уже из Task 3)
 - [ ] **Code** (AnalyzeRms, шаг 4 контракта): в `checkCommand` —
   позиционные: `for j := range stmt.Args` при `j < len(cmd.Args)`, skip
   если `len(stmt.Args[j].Children) > 0` (leaf-guard: выражения и
@@ -422,7 +415,8 @@ effect_percent, `declared`-map, `collectLocals`) НЕ переписывать �
   diags отсортированы; `TestAnalyzeRms_HelperCallNotFlagged` — percent =
   rand_float(10, 20) → unknown-constant отсутствует;
   `TestAnalyzeXs_BadType_CallArgument` — `void f() {
-  xsSetWorldGravity("fast"); }` → bad-type на "fast" (параметр float);
+  sqrt("fast"); }` → bad-type на "fast" (параметр float; xsSetWorldGravity
+  в kb отсутствует — см. Facts);
   `TestAnalyzeXs_BadType_AssignmentTopLevel` — `int x = 1.5;` → bad-type;
   `TestAnalyzeXs_ReturnMismatch` — `int f() { return 1.5; }` → bad-type;
   `TestAnalyzeXs_UnknownInferTypeSilent` — вызов с аргументом-бестиповым
@@ -456,13 +450,14 @@ effect_percent, `declared`-map, `collectLocals`) НЕ переписывать �
   изменения; если базлайн-тест уже существует — расширить его сравнением
   по Code)
 - [ ] `TestAnalyzeRms_FixturesRegression`: все `rms/testdata/*.rms` →
-  Parse → AnalyzeRms — новые bad-argument-value/unknown-constant только на
-  реально нарушающих значениях; прочие коды не изменились против базлайна
+  Parse → AnalyzeRms — новые bad-argument-value только на реально
+  нарушающих значениях; прочие коды не изменились против базлайна
 - [ ] `TestPipeline_MergedDiagnostics`: для .rms с unknown-command +
-  percent=150 и inline-XS блока с xsSetWorldGravity("fast") — собрать
+  percent=150 и inline-XS блока с sqrt("fast") — собрать
   полный батч как в server (syntax diags парсера + AnalyzeRms +
   XsParse+AnalyzeXs со сдвигом диапазонов XsBlock.Range.Start) — батч
-  содержит все 4 кода, отсортирован по позиции
+  содержит все 3 кода (unknown-command, bad-argument-value, bad-type),
+  отсортирован по позиции
 - [ ] Run validation: sandbox-запуск `go test ./analysis/... -count=1`;
   затем полный `go test ./... -count=1` (sandbox)
 - [ ] Lint: `goimports -w . && golangci-lint run && goga lint`
@@ -490,8 +485,7 @@ effect_percent, `declared`-map, `collectLocals`) НЕ переписывать �
 - [ ] Properties and methods match the declared API (`goga contract
       analysis` pass)
 - [ ] Descriptions are reflected in behavior (severity/коды/сообщения
-      соответствуют контракту: bad-argument-value=error,
-      unknown-constant=warning c #const-оговоркой, bad-type=error)
+      соответствуют контракту: bad-argument-value=error, bad-type=error)
 - [ ] Contract dependencies are met (только импорт из common/kb/rms/xs)
 - [ ] Re-exports: отсутствуют по контракту — не добавлять
 - [ ] Every coding task followed the TDD workflow (contract tests → code →
