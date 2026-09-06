@@ -216,40 +216,40 @@
 
 **CRITICAL: `CODEMANIFEST` files — read-only contract definitions. Do NOT modify them. If implementation does not match the contract, fix the implementation — never fix the contract.**
 
-- [ ] **STEP 0 (DECLARATION)**: объявить задачу Task 1 — Coerce + TypeEnv
-- [ ] **Contract tests** (упадут — ожидаемо): в `analysis/types_test.go`:
+- [x] **STEP 0 (DECLARATION)**: объявить задачу Task 1 — Coerce + TypeEnv
+- [x] **Contract tests** (упадут — ожидаемо): в `analysis/types_test.go`:
   проверки фасада/формы — `analysis.Coerce` существует с сигнатурой
   `func(string, string) bool`; `analysis.NewTypeEnv(xs.XsFile) *TypeEnv`;
   методы `(*TypeEnv) Push()`, `Pop()`, `Declare(string, string)`,
   `Lookup(string) (string, bool)` — компиляция теста и есть контракт-тест
-- [ ] **Code**: создать `analysis/types.go` (package analysis) с
+- [x] **Code**: создать `analysis/types.go` (package analysis) с
   doc-комментарием файла
-- [ ] **Code**: `Coerce` — точная кодировка Algorithm: равны → true;
+- [x] **Code**: `Coerce` — точная кодировка Algorithm: равны → true;
   actual=="int" && expected=="float" → true; прочее → false
-- [ ] **Code**: `TypeEnv` — Algorithm построения из `xs.XsFile.Decls`:
+- [x] **Code**: `TypeEnv` — Algorithm построения из `xs.XsFile.Decls`:
   variable → Declare(name, Decl.Type); function/extern → Declare(name,
   Decl.Type) (тип возврата); rule/event → Declare(name, ""); верхний
   уровень — исходная область. Внутреннее хранилище — стек map
   `[]map[string]string` (деталь реализации, не контракт)
-- [ ] **Code**: методы `Push` (append пустой map), `Pop` (IF len>1 →
+- [x] **Code**: методы `Push` (append пустой map), `Pop` (IF len>1 →
   усечь; на корне — no-op), `Declare` (запись в самую внутреннюю),
   `Lookup` (изнутри наружу, первый found → (typ, true); иначе ("", false))
-- [ ] **Interface verification**: `systemd-run --user --scope -p
+- [x] **Interface verification**: `systemd-run --user --scope -p
   MemoryMax=1500M -p MemorySwapMax=0 bash -c 'go test ./analysis/...
   -count=1 -run "TestCoerce|TestTypeEnv"'` — контракт-тесты проходят
-- [ ] **Logic tests**: `TestCoerce_Table` — таблица пар (expected, actual):
+- [x] **Logic tests**: `TestCoerce_Table` — таблица пар (expected, actual):
   `(int,int)→t, (float,int)→t, (int,float)→f, (bool,int)→f, (int,bool)→f,
   (vector,vector)→t, (vector,float)→f, (string,string)→t, (string,int)→f`;
   `TestTypeEnv_ScopeShadowing` — NewTypeEnv(файл с `int x;` + функция с
   параметром `float x`): в теле f Lookup("x")=="float"; после Pop — "int";
   `TestTypeEnv_PopRootNoOp` — Pop() на корне, Lookup("x") → found=false
-- [ ] **Debugging**: тот же sandbox-запуск всех тестов пакета — чинить
+- [x] **Debugging**: тот же sandbox-запуск всех тестов пакета — чинить
   реализацию (НЕ тесты) до зелёного
-- [ ] **Contract re-verification**: фасад — `analysis.Coerce`,
+- [x] **Contract re-verification**: фасад — `analysis.Coerce`,
   `analysis.NewTypeEnv`, `analysis.TypeEnv` импортируемы; сигнатуры
   соответствуют CODEMANIFEST (Go-вид)
-- [ ] **Lint**: `goimports -w . && golangci-lint run && goga lint`
-- [ ] **STEP 8 (COMPLETION)**: отметить чекбоксы
+- [x] **Lint**: `goimports -w . && golangci-lint run && goga lint`
+- [x] **STEP 8 (COMPLETION)**: отметить чекбоксы
 
 ### Task 2: `InferType` — консервативный вывод типа XS-выражения (TDD coding)
 
