@@ -5,7 +5,10 @@ package analysis
 
 import (
 	"slices"
+	"strconv"
+	"strings"
 
+	"aoe2-lsp/kb"
 	"aoe2-lsp/xs"
 )
 
@@ -81,4 +84,155 @@ func (env *TypeEnv) Lookup(name string) (string, bool) {
 	}
 
 	return "", false
+}
+
+// inferBoolOps yield a bool result; inferArithOps widen their operands.
+var (
+	inferBoolOps = map[string]bool{
+		"==": true, "!=": true, "<": true, "<=": true, ">": true, ">=": true,
+		"&&": true, "||": true,
+	}
+	inferArithOps = map[string]bool{
+		"+": true, "-": true, "*": true, "/": true, "%": true,
+		"&": true, "|": true, "^": true, "<<": true, ">>": true,
+	}
+)
+
+// InferType returns the XS type of the expression, or "" when the type
+// cannot be determined. Conservative by contract: doubt means "" so the
+// caller skips the check instead of reporting a false bad-type.
+func InferType(store *kb.Store, env *TypeEnv, e xs.Expr) string {
+	switch e.Kind {
+	case xs.ExprVector:
+		return "vector"
+	case xs.ExprLiteral:
+		return literalType(e.Value)
+	case xs.ExprIdent:
+		return identType(env, e.Value)
+	case xs.ExprCall:
+		if fn, ok := store.Function(e.Callee); ok {
+			return fn.ReturnType
+		}
+
+		typ, found := env.Lookup(e.Callee)
+		if found {
+			return typ
+		}
+
+		return ""
+	case xs.ExprUnary:
+		return unaryType(store, env, e)
+	case xs.ExprBinary:
+		return binaryType(store, env, e)
+	}
+
+	return ""
+}
+
+// literalType classifies a literal lexeme: quoted → string, decimal/hex
+// integer → int, anything strconv reads as float → float.
+func literalType(value string) string {
+	if strings.HasPrefix(value, `"`) {
+		return "string"
+	}
+
+	if _, err := strconv.ParseInt(value, 0, 64); err == nil {
+		return "int"
+	}
+
+	if _, err := strconv.ParseFloat(value, 64); err == nil {
+		return "float"
+	}
+
+	return ""
+}
+
+// identType resolves a plain identifier: the boolean and vector builtins
+// are typed, null stays unknown, everything else comes from the symbol
+// table (missing → "").
+func identType(env *TypeEnv, name string) string {
+	switch name {
+	case "true", "false":
+		return "bool"
+	case "vector":
+		return "vector"
+	case "null":
+		return ""
+	}
+
+	typ, found := env.Lookup(name)
+	if !found {
+		return ""
+	}
+
+	return typ
+}
+
+// unaryType: ! always yields bool; the numeric prefix operators keep the
+// operand type.
+func unaryType(store *kb.Store, env *TypeEnv, e xs.Expr) string {
+	if e.Value == "!" {
+		return "bool"
+	}
+
+	if len(e.Children) == 0 {
+		return ""
+	}
+
+	return InferType(store, env, e.Children[0])
+}
+
+// binaryType types a binary operation: vector member access → float,
+// comparisons and logic → bool, arithmetic widens its operands (vector
+// stays vector for + - *); assignments and unrecognized operators stay
+// unknown.
+func binaryType(store *kb.Store, env *TypeEnv, e xs.Expr) string {
+	if len(e.Children) != 2 {
+		return ""
+	}
+
+	if e.Value == "." && e.Children[1].Kind == xs.ExprIdent {
+		switch e.Children[1].Value {
+		case "x", "y", "z":
+			return "float"
+		}
+
+		return ""
+	}
+
+	if e.Value == "=" {
+		return "" // assignments are checked by the analyzer, not typed
+	}
+
+	if inferBoolOps[e.Value] {
+		return "bool"
+	}
+
+	if !inferArithOps[e.Value] {
+		return ""
+	}
+
+	left := InferType(store, env, e.Children[0])
+	right := InferType(store, env, e.Children[1])
+	if left == "" || right == "" {
+		return ""
+	}
+
+	if left == "vector" || right == "vector" {
+		if e.Value == "+" || e.Value == "-" || e.Value == "*" {
+			return "vector"
+		}
+
+		return ""
+	}
+
+	if left == "float" || right == "float" {
+		return "float"
+	}
+
+	if left == "int" && right == "int" {
+		return "int"
+	}
+
+	return ""
 }

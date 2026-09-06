@@ -271,10 +271,10 @@
 
 **CRITICAL: `CODEMANIFEST` files — read-only contract definitions. Do NOT modify them. If implementation does not match the contract, fix the implementation — never fix the contract.**
 
-- [ ] **STEP 0 (DECLARATION)**: объявить задачу Task 2 — InferType
-- [ ] **Contract tests**: `analysis.InferType(*kb.Store, *TypeEnv, xs.Expr)
+- [x] **STEP 0 (DECLARATION)**: объявить задачу Task 2 — InferType
+- [x] **Contract tests**: `analysis.InferType(*kb.Store, *TypeEnv, xs.Expr)
   string` компилируется и вызывается (facade/shape)
-- [ ] **Code**: реализовать в `analysis/types.go` Algorithm:
+- [x] **Code**: реализовать в `analysis/types.go` Algorithm:
   1. literal `e.Value`: начинается с `"` → "string";
      `strconv.ParseInt(v, 0, 64)` ok (base 0 покрывает 0x-hex) → "int";
      иначе `strconv.ParseFloat` ok → "float"; иначе ""
@@ -292,21 +292,21 @@
      ` → тип операнда
   6. прочее (в т.ч. vector-литерал как типизация аргумента — kind vector →
      "vector") → по лексеме/детям; нераспознанное → ""
-- [ ] **Interface verification**: sandbox-запуск
+- [x] **Interface verification**: sandbox-запуск
   `go test ./analysis/... -count=1 -run "TestInferType"` — контракт-тесты
   проходят
-- [ ] **Logic tests**: `TestInferType_Literals` — "42"→"int"; "3.5"→
+- [x] **Logic tests**: `TestInferType_Literals` — "42"→"int"; "3.5"→
   "float"; "0x1F"→"int"; `"\"s\""`→"string"; ident true→"bool";
   vector-литерал→"vector"; `TestInferType_CallFromKb` — call
   xsGetMapSeed → "int"; доп. таблица: unknown ident → "", бинарное
   1+2.0 → "float", `1 == 2` → "bool", unary !true → "bool", доступ v.x →
   "float", пустые Children у binary → ""
-- [ ] **Debugging**: sandbox-запуск всех тестов пакета; чинить реализацию
+- [x] **Debugging**: sandbox-запуск всех тестов пакета; чинить реализацию
   (НЕ тесты) до зелёного
-- [ ] **Contract re-verification**: сигнатура и консервативность (""
+- [x] **Contract re-verification**: сигнатура и консервативность (""
   вместо ошибки) соответствуют CODEMANIFEST
-- [ ] **Lint**: `goimports -w . && golangci-lint run && goga lint`
-- [ ] **STEP 8 (COMPLETION)**: отметить чекбоксы
+- [x] **Lint**: `goimports -w . && golangci-lint run && goga lint`
+- [x] **STEP 8 (COMPLETION)**: отметить чекбоксы
 
 ### Task 3: `CheckRmsValue` — проверка значения RMS-аргумента (TDD coding)
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"aoe2-lsp/kb"
 	"aoe2-lsp/xs"
 )
 
@@ -17,6 +18,7 @@ var (
 	_ func(e *TypeEnv)                                       = (*TypeEnv).Pop
 	_ func(e *TypeEnv, name, typ string)                     = (*TypeEnv).Declare
 	_ func(e *TypeEnv, name string) (typ string, found bool) = (*TypeEnv).Lookup
+	_ func(store *kb.Store, env *TypeEnv, e xs.Expr) string  = InferType
 )
 
 func TestCoerce_Table(t *testing.T) {
@@ -123,4 +125,98 @@ func TestTypeEnv_Undeclared(t *testing.T) {
 	typ, found = env.Lookup("tmp")
 	require.True(t, found)
 	require.Equal(t, "int", typ)
+}
+
+func TestInferType_Literals(t *testing.T) {
+	env := NewTypeEnv(xs.XsFile{Decls: []xs.Decl{
+		{Kind: xs.DeclVariable, Name: "n", Type: "int"},
+	}})
+
+	tests := []struct {
+		name string
+		expr xs.Expr
+		want string
+	}{
+		{name: "decimal int", expr: xs.Expr{Kind: xs.ExprLiteral, Value: "42"}, want: "int"},
+		{name: "hex int", expr: xs.Expr{Kind: xs.ExprLiteral, Value: "0x1F"}, want: "int"},
+		{name: "float", expr: xs.Expr{Kind: xs.ExprLiteral, Value: "3.5"}, want: "float"},
+		{name: "string literal", expr: xs.Expr{Kind: xs.ExprLiteral, Value: `"s"`}, want: "string"},
+		{name: "true builtin", expr: xs.Expr{Kind: xs.ExprIdent, Value: "true"}, want: "bool"},
+		{name: "false builtin", expr: xs.Expr{Kind: xs.ExprIdent, Value: "false"}, want: "bool"},
+		{name: "vector literal", expr: xs.Expr{Kind: xs.ExprVector}, want: "vector"},
+		{name: "declared variable", expr: xs.Expr{Kind: xs.ExprIdent, Value: "n"}, want: "int"},
+		{name: "null builtin is unknown", expr: xs.Expr{Kind: xs.ExprIdent, Value: "null"}, want: ""},
+		{name: "undeclared ident is unknown", expr: xs.Expr{Kind: xs.ExprIdent, Value: "whatever"}, want: ""},
+		{name: "unparsable literal", expr: xs.Expr{Kind: xs.ExprLiteral, Value: "12abc"}, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, InferType(nil, env, tt.expr))
+		})
+	}
+}
+
+func TestInferType_CallFromKb(t *testing.T) {
+	store, err := kb.NewStore()
+	require.NoError(t, err)
+
+	env := NewTypeEnv(xs.XsFile{Decls: []xs.Decl{
+		{Kind: xs.DeclFunction, Name: "local", Type: "float"},
+	}})
+
+	tests := []struct {
+		name string
+		expr xs.Expr
+		want string
+	}{
+		{name: "kb function return", expr: xs.Expr{Kind: xs.ExprCall, Callee: "xsGetMapSeed"}, want: "int"},
+		{name: "local function return", expr: xs.Expr{Kind: xs.ExprCall, Callee: "local"}, want: "float"},
+		{name: "unknown callee", expr: xs.Expr{Kind: xs.ExprCall, Callee: "nope"}, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, InferType(store, env, tt.expr))
+		})
+	}
+}
+
+func TestInferType_Operators(t *testing.T) {
+	store, err := kb.NewStore()
+	require.NoError(t, err)
+
+	env := NewTypeEnv(xs.XsFile{})
+
+	lit := func(v string) xs.Expr { return xs.Expr{Kind: xs.ExprLiteral, Value: v} }
+	ident := func(v string) xs.Expr { return xs.Expr{Kind: xs.ExprIdent, Value: v} }
+	bin := func(op string, l, r xs.Expr) xs.Expr {
+		return xs.Expr{Kind: xs.ExprBinary, Value: op, Children: []xs.Expr{l, r}}
+	}
+
+	tests := []struct {
+		name string
+		expr xs.Expr
+		want string
+	}{
+		{name: "int plus float widens", expr: bin("+", lit("1"), lit("2.0")), want: "float"},
+		{name: "int plus int stays int", expr: bin("+", lit("1"), lit("2")), want: "int"},
+		{name: "comparison yields bool", expr: bin("==", lit("1"), lit("2")), want: "bool"},
+		{name: "logical yields bool", expr: bin("&&", ident("true"), ident("false")), want: "bool"},
+		{name: "vector member access", expr: bin(".", ident("v"), ident("x")), want: "float"},
+		{name: "assignment is untyped", expr: bin("=", ident("a"), lit("1")), want: ""},
+		{name: "vector plus vector", expr: bin("+", xs.Expr{Kind: xs.ExprVector}, xs.Expr{Kind: xs.ExprVector}), want: "vector"},
+		{name: "vector times scalar", expr: bin("*", xs.Expr{Kind: xs.ExprVector}, lit("2")), want: "vector"},
+		{name: "unknown operand stays unknown", expr: bin("+", ident("lost"), lit("1")), want: ""},
+		{name: "binary without operands", expr: xs.Expr{Kind: xs.ExprBinary, Value: "+"}, want: ""},
+		{name: "unary not yields bool", expr: xs.Expr{Kind: xs.ExprUnary, Value: "!", Children: []xs.Expr{ident("true")}}, want: "bool"},
+		{name: "unary minus keeps int", expr: xs.Expr{Kind: xs.ExprUnary, Value: "-", Children: []xs.Expr{lit("5")}}, want: "int"},
+		{name: "unary without operand", expr: xs.Expr{Kind: xs.ExprUnary, Value: "-"}, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, InferType(store, env, tt.expr))
+		})
+	}
 }
