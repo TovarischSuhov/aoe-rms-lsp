@@ -477,25 +477,25 @@ effect_percent, `declared`-map, `collectLocals`) НЕ переписывать �
 
 ## Completion Criteria
 
-- [ ] Every contract entity is implemented in the correct `location`
+- [x] Every contract entity is implemented in the correct `location`
       (`analyzer.go`, `values.go`, `types.go`)
-- [ ] Every contract entity is accessible from the facade
+- [x] Every contract entity is accessible from the facade
       (`analysis.CheckRmsValue`, `analysis.NewTypeEnv`/`TypeEnv`,
       `analysis.InferType`, `analysis.Coerce`, `analysis.NewAnalyzer`)
-- [ ] Properties and methods match the declared API (`goga contract
+- [x] Properties and methods match the declared API (`goga contract
       analysis` pass)
-- [ ] Descriptions are reflected in behavior (severity/коды/сообщения
+- [x] Descriptions are reflected in behavior (severity/коды/сообщения
       соответствуют контракту: bad-argument-value=error, bad-type=error)
-- [ ] Contract dependencies are met (только импорт из common/kb/rms/xs)
-- [ ] Re-exports: отсутствуют по контракту — не добавлять
-- [ ] Every coding task followed the TDD workflow (contract tests → code →
+- [x] Contract dependencies are met (только импорт из common/kb/rms/xs)
+- [x] Re-exports: отсутствуют по контракту — не добавлять
+- [x] Every coding task followed the TDD workflow (contract tests → code →
       verification → logic tests → debugging → re-verification → lint)
-- [ ] Contract tests and logic tests cover facade, API, and behavior within
+- [x] Contract tests and logic tests cover facade, API, and behavior within
       each coding task
-- [ ] Integration tests exist (prelude.xs, rms-фикстуры, merged pipeline)
-- [ ] No package boundary was expanded (новых ячеек/пакетов нет)
-- [ ] `CODEMANIFEST` files were not modified (contract is read-only)
-- [ ] All validation commands pass
-- [ ] Every Usages entry is mentioned in at least one task (conventions —
+- [x] Integration tests exist (prelude.xs, rms-фикстуры, merged pipeline)
+- [x] No package boundary was expanded (новых ячеек/пакетов нет)
+- [x] `CODEMANIFEST` files were not modified (contract is read-only)
+- [x] All validation commands pass
+- [x] Every Usages entry is mentioned in at least one task (conventions —
       все; rms_grammar — 3,4; xs_grammar — 1,2,4; xs_coercion — 1,2,4;
       lookups — 2,3,4; rms-parsing — 4,5; xs-parsing — 2,4,5)
