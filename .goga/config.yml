@@ -1,18 +1,69 @@
 language: golang
 image: qarium/goga-golang-1.26:1.3
+# dockerfile: .goga/Dockerfile     # optional — when set, `--update` builds from this Dockerfile instead of pulling
+
 build:
   task_executor:
     agent: claude
     env:
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: "off"
+
+  worktree: false
+  skip_finalize: false
+  session_timeout: 30m
+  idle_timeout: 10m
+  max_iterations: 10
+  # review_executor:              # optional review-phase control
+  #   skip: false                 # true → tasks-only run
+  #   agent: codex                # differing agent → two-pass run (tasks, then --review)
+  #   roles: [quality, testing]   # reviewer composition; absent/[] → full default set
+  #   env:                        # review-pass env layer (requires agent when non-empty)
+  #     ANTHROPIC_MODEL: reviewer
+  #   base_ref: origin/1.2.x      # review diff base — branch name or commit hash
+  #   patience: 3                 # stop the external review after N unchanged rounds
+  # proxy: http://corp:3123        # optional HTTP/HTTPS proxy URL for the build container
+  # hosts:                         # optional docker run --add-host entries
+  #   foo.local: 127.0.0.1
+
 pipeline:
   agent: claude
   env:
     GOPROXY: https://goproxy.cn,direct
     GOSUMDB: "off"
+  # proxy: http://corp:3123        # optional HTTP/HTTPS proxy URL for the pipeline container
+  # hosts:                         # optional docker run --add-host entries
+  #   foo.local: 127.0.0.1
+
 codemanifest:
   usages:
     conventions: .goga/usages/conventions.md
+
   annotations: |
     Use `conventions` for code writing rules and testing.
+
+# tools: optional — declared tools are installed together by `goga install`
+# tools:
+#   viewer: latest        # → no specifier (pip selects newest)
+#   mkdocs: 1.0.x         # → ~=1.0.0
+#   mypy: 1.x             # → ~=1.0
+#   go: 1.0.1             # → ==1.0.1
+
+# usages: optional — git dependencies whose cell-level .usages/ are synced by `goga usages sync` and status-checked by `goga usages status`
+# usages:
+#   libs:
+#     click:
+#       git: https://github.com/pallets/click.git
+#       ref: 8.1.7         # optional — branch, tag, or commit; omit for the default branch
+#       root: docs         # optional — subpath inside the repo to walk .usages from; omit for the clone root
+
+# lint: optional — directories ignored by `goga lint` (exact relative paths, no glob)
+# lint:
+#   ignore:
+#     - .venv/
+#     - build/dist
+
+# topics: optional — topic creation base and publication template (`goga topics create`)
+# topics:
+#   base_ref: origin/main                     # base of the created topic branches
+#   publish_commit: "goga: create topic {slug}"  # commit message template ({slug} optional)
