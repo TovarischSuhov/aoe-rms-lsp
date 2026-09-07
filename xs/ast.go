@@ -113,6 +113,13 @@ func (f XsFile) ReferencesAt(pos common.Pos) []common.Range {
 		return nil
 	}
 
+	return f.References(name)
+}
+
+// References returns every occurrence of the name — the declaration
+// included — sorted by position, without needing a position in this file
+// (cross-file searches over an include closure).
+func (f XsFile) References(name string) []common.Range {
 	var out []common.Range
 
 	for _, s := range f.symbols {

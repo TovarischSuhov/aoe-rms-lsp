@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"aoe2-lsp/common"
@@ -193,4 +194,24 @@ func TestXsSymbols_PreludeInvariantSweep(t *testing.T) {
 
 	require.Equal(t, 884, externs, "the prelude declares 884 externs")
 	require.Len(t, syms, len(file.Decls), "extern and function declarations alike")
+}
+
+// TestReferences_ByName checks the by-name form: every occurrence of the
+// name including the declaration, without needing a position in this file.
+func TestReferences_ByName(t *testing.T) {
+	src := "void f() {}\nvoid g() { f(); }\n"
+	file, diags := XsParse(src, "t.xs")
+	require.Empty(t, diags)
+
+	ranges := file.References("f")
+	require.Len(t, ranges, 2) // declaration + call
+	assert.Equal(t, uint32(0), ranges[0].Start.Line)
+	assert.Equal(t, uint32(1), ranges[1].Start.Line)
+
+	// Equivalence with ReferencesAt at each occurrence.
+	for _, r := range ranges {
+		assert.Equal(t, ranges, file.ReferencesAt(r.Start))
+	}
+
+	assert.Empty(t, file.References("missing"))
 }
