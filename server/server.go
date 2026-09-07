@@ -556,7 +556,7 @@ func (s *Server) analyzeRms(name string, text string) []common.Diagnostic {
 		base := block.Range.Start
 
 		diags = append(diags, shiftDiags(xsSyntax, base)...)
-		diags = append(diags, shiftDiags(s.analyzer.AnalyzeXs(xsFile), base)...)
+		diags = append(diags, shiftDiags(s.analyzer.AnalyzeXs(xsFile, nil), base)...)
 	}
 
 	return diags
@@ -566,7 +566,7 @@ func (s *Server) analyzeRms(name string, text string) []common.Diagnostic {
 func (s *Server) analyzeXs(name string, text string) []common.Diagnostic {
 	file, syntax := xs.XsParse(text, name)
 
-	return append(syntax, s.analyzer.AnalyzeXs(file)...)
+	return append(syntax, s.analyzer.AnalyzeXs(file, nil)...)
 }
 
 // shiftDiags moves block-relative diagnostics into document coordinates.

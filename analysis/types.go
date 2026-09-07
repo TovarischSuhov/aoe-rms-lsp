@@ -55,6 +55,29 @@ func NewTypeEnv(file xs.XsFile) *TypeEnv {
 	return &TypeEnv{scopes: []map[string]string{root}}
 }
 
+// seedExternals declares the include closure's external symbols in the
+// root scope, but only names the file itself does not declare anywhere —
+// local declarations (including params and locals) always win. Types
+// follow the NewTypeEnv rules: variables, functions and externs carry a
+// type, other kinds are name-only.
+func seedExternals(env *TypeEnv, declared map[string]bool, externals []xs.Decl) {
+	for i := range externals {
+		decl := &externals[i]
+		if decl.Name == "" || declared[decl.Name] {
+			continue
+		}
+
+		typ := ""
+		switch decl.Kind {
+		case xs.DeclFunction, xs.DeclExtern, xs.DeclVariable:
+			typ = decl.Type
+		}
+
+		declared[decl.Name] = true
+		env.Declare(decl.Name, typ)
+	}
+}
+
 // Push opens a nested scope (a function body or a block).
 func (env *TypeEnv) Push() {
 	env.scopes = append(env.scopes, make(map[string]string))

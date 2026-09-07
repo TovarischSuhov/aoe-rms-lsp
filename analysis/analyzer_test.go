@@ -304,7 +304,7 @@ void f() {
 		t.Run(tt.name, func(t *testing.T) {
 			file, _ := xs.XsParse(tt.src, "test.xs")
 
-			assert.Equal(t, tt.want, codes(a.AnalyzeXs(file)))
+			assert.Equal(t, tt.want, codes(a.AnalyzeXs(file, nil)))
 		})
 	}
 }
@@ -322,7 +322,7 @@ func TestAnalyzeXs_Invariants(t *testing.T) {
 	before, err := json.Marshal(file)
 	require.NoError(t, err)
 
-	diags := a.AnalyzeXs(file)
+	diags := a.AnalyzeXs(file, nil)
 
 	after, err := json.Marshal(file)
 	require.NoError(t, err)
@@ -348,4 +348,40 @@ func assertSorted(t *testing.T, diags []common.Diagnostic) {
 
 		require.Less(t, prev.Line, cur.Line)
 	}
+}
+
+// TestAnalyzeXs_ExternalsSuppressUndefinedAndLocalsWin checks that closure
+// declarations suppress undefined-symbol, provide types, and never
+// override the file's own declarations.
+func TestAnalyzeXs_ExternalsSuppressUndefinedAndLocalsWin(t *testing.T) {
+	a := newAnalyzer(t)
+
+	// the file calls an external function declared only in the closure
+	src := "void h() { extFn(1); }\n"
+	file, _ := xs.XsParse(src, "t.xs")
+
+	externals := []xs.Decl{{Kind: xs.DeclFunction, Name: "extFn", Type: "void"}}
+
+	withExt := a.AnalyzeXs(file, externals)
+	for _, d := range withExt {
+		assert.NotEqual(t, "undefined-symbol", d.Code)
+	}
+
+	withoutExt := a.AnalyzeXs(file, nil)
+	assert.Equal(t, []string{"undefined-symbol"}, codes(withoutExt))
+
+	// externals provide types for bad-type checks: float param, int arg
+	typed := []xs.Decl{{Kind: xs.DeclFunction, Name: "takeFloat", Type: "void",
+		Params: []xs.Param{{Name: "v", Type: "float"}}}}
+	tf, _ := xs.XsParse("void u() { takeFloat(1); }", "t.xs")
+	assert.Equal(t, []string{}, codes(a.AnalyzeXs(tf, typed)))
+
+	// a local declaration always wins: local extFn takes precedence
+	both, _ := xs.XsParse("void extFn() { }\nvoid c() { extFn(); }", "t.xs")
+	assert.Empty(t, codes(a.AnalyzeXs(both, externals)))
+
+	// empty-name externals are skipped
+	empty := []xs.Decl{{Kind: xs.DeclFunction, Name: ""}}
+	e, _ := xs.XsParse("void q() { ghost(); }", "t.xs")
+	assert.Equal(t, []string{"undefined-symbol"}, codes(a.AnalyzeXs(e, empty)))
 }

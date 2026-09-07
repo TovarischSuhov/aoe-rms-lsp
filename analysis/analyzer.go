@@ -191,10 +191,12 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 }
 
 // AnalyzeXs checks one XS file: identifiers that are neither declared in
-// the file nor known to the knowledge base, calls with a wrong number of
-// arguments and value types incompatible with the expected ones. The
-// result is sorted by position.
-func (a *Analyzer) AnalyzeXs(file xs.XsFile) []common.Diagnostic {
+// the file nor in externals (the include closure's declarations) nor
+// known to the knowledge base, calls with a wrong number of arguments and
+// value types incompatible with the expected ones. Local declarations
+// always win over externals; nil/empty externals keep the previous
+// behavior. The result is sorted by position.
+func (a *Analyzer) AnalyzeXs(file xs.XsFile, externals []xs.Decl) []common.Diagnostic {
 	declared := map[string]bool{}
 
 	for i := range file.Decls {
@@ -211,6 +213,7 @@ func (a *Analyzer) AnalyzeXs(file xs.XsFile) []common.Diagnostic {
 	}
 
 	env := NewTypeEnv(file)
+	seedExternals(env, declared, externals)
 
 	var diags []common.Diagnostic
 
