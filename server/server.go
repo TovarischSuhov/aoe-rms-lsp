@@ -342,6 +342,141 @@ func (s *Server) Definition(
 	}, nil
 }
 
+// References answers textDocument/references: every occurrence of the
+// word under the cursor. For .xs the declaration is dropped unless the
+// client includes it; RMS has no local declarations, nothing is
+// excluded. Empty results are empty slices, not nil.
+func (s *Server) References(
+	ctx context.Context,
+	params *protocol.ReferenceParams,
+) ([]protocol.Location, error) {
+	text, name, ok := s.openDocument(params.TextDocument.URI)
+	if !ok {
+		return []protocol.Location{}, nil
+	}
+
+	pos := fromProtocolPos(params.Position)
+
+	var ranges []common.Range
+
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		file, _ := rms.Parse(text, name)
+		ranges = file.ReferencesAt(pos)
+	case strings.HasSuffix(name, ".xs"):
+		file, _ := xs.XsParse(text, name)
+		ranges = file.ReferencesAt(pos)
+
+		if !params.Context.IncludeDeclaration {
+			ranges = excludeDeclaration(file, pos, ranges)
+		}
+	}
+
+	out := make([]protocol.Location, 0, len(ranges))
+
+	for _, r := range ranges {
+		out = append(out, protocol.Location{
+			URI:   params.TextDocument.URI,
+			Range: toProtocolRange(r),
+		})
+	}
+
+	return out, nil
+}
+
+// excludeDeclaration drops the declaration range of the symbol under
+// pos from the reference ranges.
+func excludeDeclaration(
+	file xs.XsFile,
+	pos common.Pos,
+	ranges []common.Range,
+) []common.Range {
+	decl, found := file.Definition(pos)
+	if !found {
+		return ranges
+	}
+
+	out := make([]common.Range, 0, len(ranges))
+
+	for _, r := range ranges {
+		if r != decl {
+			out = append(out, r)
+		}
+	}
+
+	return out
+}
+
+// DocumentSymbol answers textDocument/documentSymbol with the
+// hierarchical outline of the document.
+func (s *Server) DocumentSymbol(
+	ctx context.Context,
+	params *protocol.DocumentSymbolParams,
+) (protocol.DocumentSymbolResult, error) {
+	text, name, ok := s.openDocument(params.TextDocument.URI)
+	if !ok {
+		return protocol.DocumentSymbolSlice{}, nil
+	}
+
+	var syms []common.Symbol
+
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		file, _ := rms.Parse(text, name)
+		syms = file.Symbols()
+	case strings.HasSuffix(name, ".xs"):
+		file, _ := xs.XsParse(text, name)
+		syms = file.Symbols()
+	}
+
+	out := make(protocol.DocumentSymbolSlice, 0, len(syms))
+
+	for _, sym := range syms {
+		out = append(out, toDocumentSymbol(sym))
+	}
+
+	return out, nil
+}
+
+// symbolKindTable maps the producer kind vocabularies to protocol
+// symbol kinds; unknown kinds fall back to Field.
+var symbolKindTable = map[string]protocol.SymbolKind{
+	"function": protocol.SymbolKindFunction,
+	"extern":   protocol.SymbolKindFunction,
+	"variable": protocol.SymbolKindVariable,
+	"rule":     protocol.SymbolKindEvent,
+	"event":    protocol.SymbolKindEvent,
+	"section":  protocol.SymbolKindModule,
+	"command":  protocol.SymbolKindFunction,
+	"xs":       protocol.SymbolKindNamespace,
+}
+
+// toDocumentSymbol converts one outline node recursively, preserving
+// the Selection ⊆ Range invariant of the source tree.
+func toDocumentSymbol(sym common.Symbol) protocol.DocumentSymbol {
+	kind, ok := symbolKindTable[sym.Kind]
+	if !ok {
+		kind = protocol.SymbolKindField
+	}
+
+	out := protocol.DocumentSymbol{
+		Name:           sym.Name,
+		Kind:           kind,
+		Range:          toProtocolRange(sym.Range),
+		SelectionRange: toProtocolRange(sym.Selection),
+	}
+
+	if len(sym.Children) > 0 {
+		out.Children = make([]protocol.DocumentSymbol, 0, len(sym.Children))
+
+		for _, child := range sym.Children {
+			out.Children = append(out.Children, toDocumentSymbol(child))
+		}
+	}
+
+	return out
+}
+
 // Shutdown acknowledges a clean shutdown request.
 func (s *Server) Shutdown(ctx context.Context) error {
 	return nil

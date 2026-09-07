@@ -128,3 +128,141 @@ func TestServerDefinition_EmptyNotNil(t *testing.T) {
 		})
 	}
 }
+
+func TestServerReferences_APIShape(t *testing.T) {
+	s := newNavigationServer(t)
+
+	locs, err := s.References(context.Background(), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///closed.xs"},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, locs)
+	require.Empty(t, locs)
+}
+
+func TestServerReferences_ExcludesDeclarationOnFlag(t *testing.T) {
+	s := newNavigationServer(t)
+
+	src := "void f() {}\nvoid g() { f(); }"
+	s.docs.Put("file:///t.xs", src, 1)
+
+	callPos := protocol.Position{Line: 1, Character: uint32(strings.Index("void g() { f(); }", "f("))}
+
+	withoutDecl, err := s.References(context.Background(), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///t.xs"},
+			Position:     callPos,
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: false},
+	})
+	require.NoError(t, err)
+	require.Len(t, withoutDecl, 1, "only the call remains")
+	require.Equal(t, uint32(1), withoutDecl[0].Range.Start.Line)
+
+	withDecl, err := s.References(context.Background(), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///t.xs"},
+			Position:     callPos,
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	require.NoError(t, err)
+	require.Len(t, withDecl, 2, "declaration + call")
+}
+
+func TestServerDocumentSymbol_APIShape(t *testing.T) {
+	s := newNavigationServer(t)
+
+	res, err := s.DocumentSymbol(context.Background(), &protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///closed.xs"},
+	})
+	require.NoError(t, err)
+
+	empty, ok := res.(protocol.DocumentSymbolSlice)
+	require.True(t, ok)
+	require.Empty(t, empty)
+}
+
+func TestServerDocumentSymbol_KindTable(t *testing.T) {
+	s := newNavigationServer(t)
+
+	s.docs.Put("file:///t.xs", "void f() {}\nint x = 1;\nrule r { condition x }\n", 1)
+	s.docs.Put("file:///t.rms", "<LAND_GENERATION>\ncreate_player_lands {\n	land_percent 32\n}\n#includeXS\nvoid h() {}\n</LAND_GENERATION>\n", 1)
+
+	xsRes, err := s.DocumentSymbol(context.Background(), &protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///t.xs"},
+	})
+	require.NoError(t, err)
+
+	xsSymbols := xsRes.(protocol.DocumentSymbolSlice)
+	require.Len(t, xsSymbols, 3)
+	require.Equal(t, protocol.SymbolKindFunction, xsSymbols[0].Kind)
+	require.Equal(t, "f", xsSymbols[0].Name)
+	require.Equal(t, protocol.SymbolKindVariable, xsSymbols[1].Kind)
+	require.Equal(t, protocol.SymbolKindEvent, xsSymbols[2].Kind)
+
+	for _, sym := range xsSymbols {
+		require.True(t, symbolRangeContains(sym.Range, sym.SelectionRange),
+			"SelectionRange must stay inside Range: %s", sym.Name)
+	}
+
+	rmsRes, err := s.DocumentSymbol(context.Background(), &protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///t.rms"},
+	})
+	require.NoError(t, err)
+
+	rmsSymbols := rmsRes.(protocol.DocumentSymbolSlice)
+	require.Len(t, rmsSymbols, 1)
+
+	section := rmsSymbols[0]
+	require.Equal(t, protocol.SymbolKindModule, section.Kind)
+	require.Len(t, section.Children, 2, "command plus the xs block")
+
+	require.Equal(t, protocol.SymbolKindFunction, section.Children[0].Kind)
+	require.Equal(t, "create_player_lands", section.Children[0].Name)
+
+	require.Equal(t, protocol.SymbolKindNamespace, section.Children[1].Kind)
+	require.Equal(t, "#includeXS", section.Children[1].Name)
+
+	for _, sym := range append(rmsSymbols, section.Children...) {
+		require.True(t, symbolRangeContains(sym.Range, sym.SelectionRange),
+			"SelectionRange must stay inside Range: %s", sym.Name)
+	}
+}
+
+func TestServerDocumentSymbol_EmptyDoc(t *testing.T) {
+	s := newNavigationServer(t)
+
+	s.docs.Put("file:///e.rms", "\n", 1)
+
+	res, err := s.DocumentSymbol(context.Background(), &protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///e.rms"},
+	})
+	require.NoError(t, err)
+
+	empty, ok := res.(protocol.DocumentSymbolSlice)
+	require.True(t, ok)
+	require.Empty(t, empty)
+}
+
+// symbolRangeContains reports whether inner stays inside outer.
+func symbolRangeContains(outer protocol.Range, inner protocol.Range) bool {
+	if inner.Start.Line < outer.Start.Line || inner.Start.Line > outer.End.Line {
+		return false
+	}
+
+	if inner.Start.Line == outer.Start.Line && inner.Start.Character < outer.Start.Character {
+		return false
+	}
+
+	if inner.Start.Line == outer.End.Line && inner.Start.Character > outer.End.Character {
+		return false
+	}
+
+	return true
+}
