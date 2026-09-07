@@ -122,18 +122,23 @@
 
 ## Existing Architecture
 
-Затрагиваемые ячейки (см. `goga schema`):
+Утверждено brainstorm'ом 2026-09-07 (план: `docs/arch/cross-file-navigation.md`;
+верификация VERIFIED):
 
-- `rms` (leaf) — тип `RmsFile.Includes` меняет форму (контрактное изменение)
-- `server` (root) — `DocStore` обрастает дисковым слоем; хендлеры
-  Definition/References используют замыкание; `Imports`, вероятно,
-  расширяются
-- Возможно новая ячейка include-графа — решение за brainstorm
-- `xs`, `common`, `kb`, `analysis` не меняются (analysis исправляется
-  следовательно: видит подключённые источники)
+- `rms` (leaf) — `Includes []string` → `[]Include` (Path+Range аргумента);
+  +`XsIncludes`; +`RmsFile.References(name)`
+- `xs` (leaf) — +`XsFile.References(name)`
+- `include` — **новая ячейка**: `Source`/`Resolver`/`Closure`/`RmsEntry`/
+  `XsEntry`/`ResolvedInclude`/`MissingInclude`/`Target`; инверсия
+  editor-state через `Source`
+- `analysis` — `AnalyzeXs(file, externals []Decl)`: декларации замыкания
+  сеются в TypeEnv, локальные приоритетнее (ложные undefined-symbol уходят)
+- `server` (root) — `DocStore.Text` (удовлетворяет `Source`);
+  Definition/References через `Resolver`; missing-include диагностика;
+  inline-XS анализ с externals
+- `common`, `kb` — без изменений
 
-Интеграционные требования: изменения контрактов оформляются по процессу
-`goga` (brainstorm/изменение ячеек) до реализации.
+Порядок: rms ∥ xs → include ∥ analysis → server.
 
 ## Notes
 
