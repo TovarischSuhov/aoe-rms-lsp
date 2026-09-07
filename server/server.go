@@ -56,8 +56,11 @@ func (s *Server) Initialize(
 			OpenClose: &[]bool{true}[0],
 			Change:    &full,
 		},
-		HoverProvider:      protocol.Boolean(true),
-		CompletionProvider: &protocol.CompletionOptions{TriggerCharacters: []string{" ", "<"}},
+		HoverProvider:          protocol.Boolean(true),
+		CompletionProvider:     &protocol.CompletionOptions{TriggerCharacters: []string{" ", "<"}},
+		DefinitionProvider:     protocol.Boolean(true),
+		ReferencesProvider:     protocol.Boolean(true),
+		DocumentSymbolProvider: protocol.Boolean(true),
 	}
 
 	if enc, ok := negotiateEncoding(params); ok {
@@ -311,6 +314,32 @@ func (s *Server) completionsXs(text string, pos common.Pos) []protocol.Completio
 // comparing case-insensitively.
 func matchesPrefix(name string, prefix string) bool {
 	return strings.HasPrefix(strings.ToLower(name), prefix)
+}
+
+// Definition answers textDocument/definition: the declaration of the
+// symbol under the cursor in an .xs document. Not-found positions, .rms
+// documents and closed documents resolve to an empty LocationSlice
+// (not nil); an empty result is not an error.
+func (s *Server) Definition(
+	ctx context.Context,
+	params *protocol.DefinitionParams,
+) (protocol.DefinitionResult, error) {
+	text, name, ok := s.openDocument(params.TextDocument.URI)
+	if !ok || !strings.HasSuffix(name, ".xs") {
+		return protocol.LocationSlice{}, nil
+	}
+
+	file, _ := xs.XsParse(text, name)
+
+	r, found := file.Definition(fromProtocolPos(params.Position))
+	if !found {
+		return protocol.LocationSlice{}, nil
+	}
+
+	return &protocol.Location{
+		URI:   params.TextDocument.URI,
+		Range: toProtocolRange(r),
+	}, nil
 }
 
 // Shutdown acknowledges a clean shutdown request.
