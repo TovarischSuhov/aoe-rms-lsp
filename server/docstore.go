@@ -2,7 +2,10 @@
 // handlers over the kb, rms, xs and analysis cells, served over stdio.
 package server
 
-import "sync"
+import (
+	"slices"
+	"sync"
+)
 
 // document is one cached document: its full text and version.
 type document struct {
@@ -54,4 +57,28 @@ func (s *DocStore) Remove(uri string) {
 	defer s.mu.Unlock()
 
 	delete(s.documents, uri)
+}
+
+// Text returns the editor-state text without the version — the projection
+// of Get that structurally satisfies include.Source.
+func (s *DocStore) Text(uri string) (string, bool) {
+	text, _, found := s.Get(uri)
+
+	return text, found
+}
+
+// URIs lists every open document, sorted for determinism (the other half
+// of satisfying include.Source).
+func (s *DocStore) URIs() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	uris := make([]string, 0, len(s.documents))
+	for uri := range s.documents {
+		uris = append(uris, uri)
+	}
+
+	slices.Sort(uris)
+
+	return uris
 }
