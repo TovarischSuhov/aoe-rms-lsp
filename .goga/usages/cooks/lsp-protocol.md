@@ -118,6 +118,38 @@ func (s *Server) Completion(ctx context.Context, params *protocol.CompletionPara
 }
 ```
 
+## Navigation (Definition / References / DocumentSymbol)
+
+Advertise in `Initialize`: `DefinitionProvider`, `ReferencesProvider`,
+`DocumentSymbolProvider` — each `protocol.Boolean(true)`.
+
+`Definition` returns the sealed interface `DefinitionResult` — return
+`*protocol.Location` (single site) or `protocol.LocationSlice{}` when nothing
+resolves (empty slice, not nil).
+
+```go
+func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionParams) (protocol.DefinitionResult, error) {
+	loc, ok := s.definitionAt(params.TextDocument.URI, params.Position)
+	if !ok {
+		return protocol.LocationSlice{}, nil
+	}
+	return &loc, nil
+}
+```
+
+`References` returns plain `[]protocol.Location`; honor
+`params.Context.IncludeDeclaration` — prepend the declaration range when true.
+
+`DocumentSymbol` returns `DocumentSymbolResult` — arms: `DocumentSymbolSlice`
+(hierarchical, preferred) or `SymbolInformationSlice` (flat). With hierarchical
+`DocumentSymbol`:
+- `Range` encloses the whole construct (decl header + body);
+  `SelectionRange` points at the identifier name and **must be contained
+  in `Range`** (spec requirement, clients reject otherwise);
+- `Children` nests (RMS: section → statements; XS: nested where available);
+- map kinds via `protocol.SymbolKind` constants (`Function`, `Constant`,
+  `Variable`, ...).
+
 ## Union and Optional Types
 
 - Union ("or") types are sealed interfaces: discriminate with a type switch
