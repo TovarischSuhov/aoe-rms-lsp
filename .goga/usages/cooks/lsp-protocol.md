@@ -118,6 +118,41 @@ func (s *Server) Completion(ctx context.Context, params *protocol.CompletionPara
 }
 ```
 
+## Signature Help
+
+Advertise in `Initialize`: `SignatureHelpProvider: &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}}`.
+Trigger characters are `(` and `,` only — RMS value keystrokes must not spam the widget.
+
+Override `SignatureHelp(ctx, params *protocol.SignatureHelpParams) (*protocol.SignatureHelp, error)`.
+For no-hint situations return `nil, nil` (nullable result) — same silence convention as `Hover`.
+
+```go
+func (s *Server) SignatureHelp(ctx context.Context, params *protocol.SignatureHelpParams) (*protocol.SignatureHelp, error) {
+	hint, ok := s.docs.Get(params.TextDocument.URI).SignatureAt(params.Position)
+	if !ok {
+		return nil, nil // trust rule: silence, never a guessed hint
+	}
+
+	return &protocol.SignatureHelp{
+		Signatures:      []protocol.SignatureInformation{hint.Sig}, // exactly one
+		ActiveSignature: &[]uint32{0}[0],
+		ActiveParameter: hint.Active, // *uint32; nil when no argument is active
+	}, nil
+}
+```
+
+Rules:
+- **Single signature per call site**: `Signatures` has exactly one element; `ActiveSignature` is always 0.
+- **`ActiveParameter` is `*uint32`** — set it to the cursor's argument index; leave nil when the cursor
+  is off any argument or the index is beyond the declared parameters. **Never clamp** to the last
+  parameter — a wrong highlight is worse than none.
+- **`ParameterInformation.Label` is a plain string** (`"float x"`, `"%: percent 0..99"`);
+  optional parameters render in square brackets (`"[z: float]"`). Omit `Documentation` — extended
+  descriptions stay in hover (concise-hints rule).
+- `params.Context` (`TriggerKind`, `TriggerCharacter`, `IsRetrigger`, `ActiveSignatureHelp`) describes
+  why the request fired. The provider is **stateless**: the answer must depend only on
+  (document, position), never on the trigger context or previous answers.
+
 ## Navigation (Definition / References / DocumentSymbol)
 
 Advertise in `Initialize`: `DefinitionProvider`, `ReferencesProvider`,
