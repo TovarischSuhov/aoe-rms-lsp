@@ -27,6 +27,9 @@ Annotations: |
   (блок после директивы — в XsBlocks); bare #includeXS → только XsBlock.
   Путь без аргумента — синтаксическая Diagnostic, Include не создаётся.
 
+  Канонические значения Kind (Statement, Expr) экспортированы как
+  Go-константы Kind* (например KindCommand, KindBinary).
+
 ---
 
 "Parse(source: string, name: string) -> file: RmsFile, diags: []Diagnostic":
@@ -69,7 +72,9 @@ Annotations: |
     "Name -> string": |
       Имя файла.
     "Sections -> []Section": |
-      Секции скрипта.
+      Секции скрипта. Statements вне именованных секций собираются
+      в синтетическую секцию "global" (материализуется только если непуста);
+      в грамматике RMS такой секции нет.
     "Includes -> []Include": |
       Директивы #include (путь + диапазон аргумента).
     "XsIncludes -> []Include": |
@@ -79,6 +84,8 @@ Annotations: |
   methods:
     "SectionAt(pos: Pos) -> section: Section, found: bool": |
       Секция, содержащая позицию (для completion-контекста).
+      Для позиции вне именованных секций возвращает синтетическую
+      "global" (если она материализована), иначе found=false.
 
       `pos`: позиция в файле
     "StatementAt(pos: Pos) -> stmt: Statement, found: bool": |
@@ -232,7 +239,7 @@ Annotations: |
     "Value -> string": |
       Литерал, имя или оператор.
     "Children -> []Expr": |
-      Операнды.
+      Операнды; для ident-вызова хелпера — аргументы вызова.
     "Range -> Range": |
       Диапазон выражения.
 

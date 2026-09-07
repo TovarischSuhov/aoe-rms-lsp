@@ -10,6 +10,7 @@ Parse never fails: a partial File comes back alongside syntax diagnostics.
 ```go
 file, diags := rms.Parse(text, uri)
 // diags: syntax problems, sorted by position — merge with analyzer output
+```
 
 ## Position navigation (hover, completion context)
 
