@@ -8,6 +8,16 @@ build:
     env:
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: "off"
+      # Claude через Z.ai-прокси — те же переменные, что в env-блоке ~/.claude/settings.json.
+      # ANTHROPIC_AUTH_TOKEN сознательно НЕ здесь (репозиторий публичный) — передаётся при запуске:
+      #   goga build -e "ANTHROPIC_AUTH_TOKEN=$ANTHROPIC_AUTH_TOKEN"
+      ANTHROPIC_BASE_URL: https://api.z.ai/api/anthropic
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: glm-5.3-flash
+      ANTHROPIC_DEFAULT_SONNET_MODEL: glm-5.3
+      ANTHROPIC_DEFAULT_OPUS_MODEL: glm-5.3
+      API_TIMEOUT_MS: "3000000"
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: "1000000"
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
 
   worktree: false
   skip_finalize: false
@@ -31,6 +41,16 @@ pipeline:
   env:
     GOPROXY: https://goproxy.cn,direct
     GOSUMDB: "off"
+    # Claude через Z.ai-прокси — те же переменные, что в env-блоке ~/.claude/settings.json.
+    # ANTHROPIC_AUTH_TOKEN сознательно НЕ здесь (репозиторий публичный) — передаётся при запуске:
+    #   goga pipeline <name> -e "ANTHROPIC_AUTH_TOKEN=$ANTHROPIC_AUTH_TOKEN"
+    ANTHROPIC_BASE_URL: https://api.z.ai/api/anthropic
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: glm-5.3-flash
+    ANTHROPIC_DEFAULT_SONNET_MODEL: glm-5.3
+    ANTHROPIC_DEFAULT_OPUS_MODEL: glm-5.3
+    API_TIMEOUT_MS: "3000000"
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: "1000000"
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
   # proxy: http://corp:3123        # optional HTTP/HTTPS proxy URL for the pipeline container
   # hosts:                         # optional docker run --add-host entries
   #   foo.local: 127.0.0.1
