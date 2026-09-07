@@ -66,15 +66,21 @@ Studios; this project is not affiliated with or endorsed by them.
 
 ## Install & run
 
-Requires Go 1.23+.
+Prebuilt binaries (Windows, Linux, macOS Intel/Apple Silicon) are attached to
+[GitHub Releases](https://github.com/TovarischSuhov/aoe-rms-lsp/releases) —
+archives plus `SHA256SUMS`; each release tag is pushed by CI. Check the
+version with `aoe2-lsp --version`.
+
+Or build from source; requires Go 1.23+.
 
 ```sh
 go build -o aoe2-lsp ./cmd/aoe2-lsp
 ./aoe2-lsp   # speaks LSP over stdio; logs go to stderr
 ```
 
-No flags: capabilities are declared in `initialize`, full-text sync, hover and
-completion. Position encoding is negotiated per client (utf-8 preferred).
+No other flags: capabilities are declared in `initialize`, full-text sync,
+hover and completion. Position encoding is negotiated per client (utf-8
+preferred).
 
 ## Editor setup
 

@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: build & publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      # Single job instead of a matrix: sequential builds of a small module
+      # cost less than wiring artifact passing between parallel jobs, and
+      # one SHA256SUMS falls out naturally.
+      - name: Build & package
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          build() {
+            local goos="$1" goarch="$2" ext="$3" arc="$4"
+            local name="aoe2-lsp-${goos}-${goarch}"
+
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build \
+              -ldflags "-X main.version=${GITHUB_REF_NAME}" \
+              -trimpath \
+              -o "dist/${name}${ext}" ./cmd/aoe2-lsp
+
+            if [ "$arc" = "zip" ]; then
+              (cd dist && zip -q "${name}.zip" "${name}${ext}" && rm "${name}${ext}")
+            else
+              (cd dist && tar czf "${name}.tar.gz" "${name}${ext}" && rm "${name}${ext}")
+            fi
+          }
+
+          build windows amd64 .exe zip
+          build linux   amd64 ""   tar
+          build darwin  amd64 ""   tar
+          build darwin  arm64 ""   tar
+
+          (cd dist && sha256sum * > SHA256SUMS)
+          ls -l dist
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
