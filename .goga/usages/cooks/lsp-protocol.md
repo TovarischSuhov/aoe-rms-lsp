@@ -150,6 +150,34 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
 - map kinds via `protocol.SymbolKind` constants (`Function`, `Constant`,
   `Variable`, ...).
 
+## Cross-file Navigation Results
+
+Definition/References may return locations in files other than the queried
+document. Build `protocol.Location` with the target file's URI — the editor
+opens the file at the given range on demand; the target is NOT required to be
+an open document.
+
+```go
+loc := protocol.Location{
+	URI:   uri.File(targetPath), // filesystem path → URI (go.lsp.dev/uri)
+	Range: r,
+}
+```
+
+## Disk-backed Documents (include resolution)
+
+Documents referenced by the open file (e.g. `#include` closures) are read from
+disk on demand and cached by URI:
+
+- Convert the including document's URI via `URI.Filename()`; resolve relative
+  include paths with `filepath.Join(filepath.Dir(...), ...)`.
+- **Editor state wins**: if the URI is open in the doc store, its text is
+  authoritative — the disk copy never overrides it.
+- Missing or unreadable include files surface as publishDiagnostics errors
+  covering the directive's range; degrade without panicking.
+- Files changed outside the editor are not tracked (no file watcher); cache
+  refresh happens when the file itself changes via didChange.
+
 ## Union and Optional Types
 
 - Union ("or") types are sealed interfaces: discriminate with a type switch
