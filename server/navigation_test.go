@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -265,4 +267,113 @@ func symbolRangeContains(outer protocol.Range, inner protocol.Range) bool {
 	}
 
 	return true
+}
+
+// TestServerDefinition_CrossFileInclude checks the handler wiring: a
+// Definition on an include path returns a Location in another file.
+func TestServerDefinition_CrossFileInclude(t *testing.T) {
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	econPath := dir + "/econ.rms"
+	require.NoError(t, os.WriteFile(econPath, []byte("base_terrain GRASS\n"), 0o644))
+
+	main := "#include \"econ.rms\"\n"
+	s.docs.Put(uri.File(dir+"/main.rms").String(), main, 1)
+
+	res, err := s.Definition(context.Background(), &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.File(dir + "/main.rms")},
+			Position:     protocol.Position{Line: 0, Character: 13},
+		},
+	})
+	require.NoError(t, err)
+
+	loc, ok := res.(*protocol.Location)
+	require.True(t, ok, "an include target is a single Location")
+	require.Equal(t, uri.File(econPath), loc.URI)
+	require.Equal(t, protocol.Position{Line: 0, Character: 0}, loc.Range.Start)
+}
+
+// TestServerDefinition_ClosedDocFromDisk checks that a closed document
+// with a disk copy still answers (the open-document gate is gone).
+func TestServerDefinition_ClosedDocFromDisk(t *testing.T) {
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	xsPath := dir + "/lib.xs"
+	require.NoError(t, os.WriteFile(xsPath, []byte("void f() {}\n"), 0o644))
+
+	res, err := s.Definition(context.Background(), &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.File(xsPath)},
+			Position:     protocol.Position{Line: 0, Character: 5},
+		},
+	})
+	require.NoError(t, err)
+
+	loc, ok := res.(*protocol.Location)
+	require.True(t, ok)
+	require.Equal(t, uri.File(xsPath), loc.URI)
+}
+
+// TestAnalyze_MissingIncludeDiagnostic checks that a missing include
+// surfaces as one missing-include diagnostic on the path argument.
+func TestAnalyze_MissingIncludeDiagnostic(t *testing.T) {
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	mainURI := uri.File(dir + "/main.rms").String()
+
+	s.docs.Put(mainURI, "#include \"nope.rms\"\n", 1)
+
+	closure := s.resolver.Closure(context.Background(), mainURI)
+	diags := s.analyze(mainURI, "#include \"nope.rms\"\n", closure)
+
+	require.Len(t, diags, 1)
+	require.Equal(t, protocol.String("missing-include"), diags[0].Code)
+	require.Equal(t, uint32(0), diags[0].Range.Start.Line)
+}
+
+// TestAnalyze_InlineSeesClosureDeclarations checks that an inline XS call
+// resolves through the closure: no undefined-symbol for sharedFn.
+func TestAnalyze_InlineSeesClosureDeclarations(t *testing.T) {
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	libPath := dir + "/lib.xs"
+	require.NoError(t, os.WriteFile(libPath, []byte("void sharedFn(int n) { }\n"), 0o644))
+
+	mainURI := uri.File(dir + "/main.rms").String()
+	main := "#includeXS lib.xs\nvoid main() { sharedFn(1); }\n"
+	s.docs.Put(mainURI, main, 1)
+
+	closure := s.resolver.Closure(context.Background(), mainURI)
+	diags := s.analyze(mainURI, main, closure)
+
+	for _, d := range diags {
+		require.NotEqual(t, "undefined-symbol", d.Code,
+			"closure declarations must suppress undefined-symbol, got: %v", diags)
+	}
+}
+
+// TestAnalyze_XsRootExcludesItself checks the .xs pipeline: analyzing the
+// included file itself does not seed its own declarations as externals.
+func TestAnalyze_XsRootExcludesItself(t *testing.T) {
+	s := newNavigationServer(t)
+
+	libURI := "file:///lib.xs"
+	lib := "void sharedFn(int n) { }\nvoid bad() { ghost(); }\n"
+	s.docs.Put(libURI, lib, 1)
+
+	closure := s.resolver.Closure(context.Background(), libURI)
+	diags := s.analyze(libURI, lib, closure)
+
+	codes := make([]string, 0, len(diags))
+	for _, d := range diags {
+		codes = append(codes, fmt.Sprint(d.Code))
+	}
+
+	require.Contains(t, codes, "undefined-symbol", "ghost stays unknown")
+	require.NotContains(t, codes, "missing-include")
 }

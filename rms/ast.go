@@ -41,8 +41,12 @@ type RmsFile struct {
 	// Sections are the script sections in file order; an implicit
 	// "global" section holds statements outside any section.
 	Sections []Section
-	// Includes are the paths of #include directives.
-	Includes []string
+	// Includes are the #include directives: the path as written plus the
+	// range of the path argument.
+	Includes []Include
+	// XsIncludes are the external XS scripts (#includeXS with a file
+	// argument); the inline code after the directive stays in XsBlocks.
+	XsIncludes []Include
 	// XsBlocks are the embedded XS blocks started by #includeXS.
 	XsBlocks []XsBlock
 
@@ -256,6 +260,13 @@ func (f RmsFile) ReferencesAt(pos common.Pos) []common.Range {
 		return nil
 	}
 
+	return f.References(name)
+}
+
+// References returns every occurrence of the word equal to name — section,
+// command, attribute and identifier words — sorted by position, without
+// needing a position in this file (cross-file searches).
+func (f RmsFile) References(name string) []common.Range {
 	out := make([]common.Range, 0)
 
 	for _, w := range f.words {
@@ -285,6 +296,16 @@ type XsBlock struct {
 	// Code is the raw block text; positions are relative to the block.
 	Code string
 	// Range is the span of the block in the RMS file.
+	Range common.Range
+}
+
+// Include is one connection directive: the path as written and the range
+// of the path argument (not the whole directive line — hit-testing the
+// cursor and diagnostics point at the argument).
+type Include struct {
+	// Path is the include path verbatim (usually relative).
+	Path string
+	// Range is the span of the path argument in the source.
 	Range common.Range
 }
 

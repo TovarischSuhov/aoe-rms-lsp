@@ -9,6 +9,7 @@ import (
 
 	"aoe2-lsp/analysis"
 	"aoe2-lsp/common"
+	"aoe2-lsp/include"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
 	"aoe2-lsp/xs"
@@ -28,17 +29,22 @@ type Server struct {
 	store    *kb.Store
 	analyzer *analysis.Analyzer
 	docs     *DocStore
+	resolver *include.Resolver
 	exit     chan struct{}
 	exitOnce sync.Once
 }
 
 // NewServer builds the server from its knowledge base and analyzer (DI);
-// the document cache is created internally.
+// the document cache and the include resolver over it are created
+// internally (DocStore structurally satisfies include.Source).
 func NewServer(store *kb.Store, analyzer *analysis.Analyzer) *Server {
+	docs := NewDocStore()
+
 	return &Server{
 		store:    store,
 		analyzer: analyzer,
-		docs:     NewDocStore(),
+		docs:     docs,
+		resolver: include.NewResolver(docs),
 		exit:     make(chan struct{}),
 	}
 }
@@ -316,91 +322,76 @@ func matchesPrefix(name string, prefix string) bool {
 	return strings.HasPrefix(strings.ToLower(name), prefix)
 }
 
-// Definition answers textDocument/definition: the declaration of the
-// symbol under the cursor in an .xs document. Not-found positions, .rms
-// documents and closed documents resolve to an empty LocationSlice
-// (not nil); an empty result is not an error.
+// Definition answers textDocument/definition across the document's
+// include closure: include paths jump into the target file, XS names
+// resolve locally then through the closure. Not-found positions resolve
+// to an empty LocationSlice (not nil); an empty result is not an error.
 func (s *Server) Definition(
 	ctx context.Context,
 	params *protocol.DefinitionParams,
 ) (protocol.DefinitionResult, error) {
-	text, name, ok := s.openDocument(params.TextDocument.URI)
-	if !ok || !strings.HasSuffix(name, ".xs") {
-		return protocol.LocationSlice{}, nil
-	}
-
-	file, _ := xs.XsParse(text, name)
-
-	r, found := file.Definition(fromProtocolPos(params.Position))
+	target, found := s.resolver.Definition(
+		ctx,
+		string(params.TextDocument.URI),
+		fromProtocolPos(params.Position),
+	)
 	if !found {
 		return protocol.LocationSlice{}, nil
 	}
 
 	return &protocol.Location{
-		URI:   params.TextDocument.URI,
-		Range: toProtocolRange(r),
+		URI:   uri.URI(target.URI),
+		Range: toProtocolRange(target.Range),
 	}, nil
 }
 
-// References answers textDocument/references: every occurrence of the
-// word under the cursor. For .xs the declaration is dropped unless the
-// client includes it; RMS has no local declarations, nothing is
-// excluded. Empty results are empty slices, not nil.
+// References answers textDocument/references over the include closure
+// (plus open documents that include the queried one). The local
+// declaration is dropped unless the client includes it. Empty results
+// are empty slices, not nil.
 func (s *Server) References(
 	ctx context.Context,
 	params *protocol.ReferenceParams,
 ) ([]protocol.Location, error) {
-	text, name, ok := s.openDocument(params.TextDocument.URI)
-	if !ok {
-		return []protocol.Location{}, nil
-	}
-
+	docURI := string(params.TextDocument.URI)
 	pos := fromProtocolPos(params.Position)
 
-	var ranges []common.Range
+	targets := s.resolver.References(ctx, docURI, pos)
 
-	switch {
-	case strings.HasSuffix(name, ".rms"):
-		file, _ := rms.Parse(text, name)
-		ranges = file.ReferencesAt(pos)
-	case strings.HasSuffix(name, ".xs"):
-		file, _ := xs.XsParse(text, name)
-		ranges = file.ReferencesAt(pos)
-
-		if !params.Context.IncludeDeclaration {
-			ranges = excludeDeclaration(file, pos, ranges)
-		}
+	if !params.Context.IncludeDeclaration {
+		targets = s.excludeLocalDeclaration(ctx, docURI, pos, targets)
 	}
 
-	out := make([]protocol.Location, 0, len(ranges))
+	out := make([]protocol.Location, 0, len(targets))
 
-	for _, r := range ranges {
+	for _, t := range targets {
 		out = append(out, protocol.Location{
-			URI:   params.TextDocument.URI,
-			Range: toProtocolRange(r),
+			URI:   uri.URI(t.URI),
+			Range: toProtocolRange(t.Range),
 		})
 	}
 
 	return out, nil
 }
 
-// excludeDeclaration drops the declaration range of the symbol under
-// pos from the reference ranges.
-func excludeDeclaration(
-	file xs.XsFile,
+// excludeLocalDeclaration drops the declaration range of the symbol
+// under pos in the queried document (includeDeclaration=false).
+func (s *Server) excludeLocalDeclaration(
+	ctx context.Context,
+	docURI string,
 	pos common.Pos,
-	ranges []common.Range,
-) []common.Range {
-	decl, found := file.Definition(pos)
-	if !found {
-		return ranges
+	targets []include.Target,
+) []include.Target {
+	decl, found := s.resolver.Definition(ctx, docURI, pos)
+	if !found || decl.URI != docURI {
+		return targets
 	}
 
-	out := make([]common.Range, 0, len(ranges))
+	out := make([]include.Target, 0, len(targets))
 
-	for _, r := range ranges {
-		if r != decl {
-			out = append(out, r)
+	for _, t := range targets {
+		if t.URI != decl.URI || t.Range != decl.Range {
+			out = append(out, t)
 		}
 	}
 
@@ -505,7 +496,10 @@ func (s *Server) publishDiagnostics(ctx context.Context, docURI uri.URI) {
 		return
 	}
 
-	s.publish(ctx, docURI, s.analyze(string(docURI), text))
+	uriArg := string(docURI)
+	closure := s.resolver.Closure(ctx, uriArg)
+
+	s.publish(ctx, docURI, s.analyze(uriArg, text, closure))
 }
 
 // publish pushes a diagnostics batch for docURI via the client dispatcher
@@ -527,15 +521,16 @@ func (s *Server) publish(
 }
 
 // analyze runs the diagnostics pipeline for one document version: parse,
-// semantic checks and inline XS blocks (for .rms), merged and sorted.
-func (s *Server) analyze(name string, text string) []protocol.Diagnostic {
+// semantic checks, missing includes and inline XS blocks (for .rms) with
+// the closure's external declarations, merged and sorted.
+func (s *Server) analyze(uriArg string, text string, closure include.Closure) []protocol.Diagnostic {
 	var diags []common.Diagnostic
 
 	switch {
-	case strings.HasSuffix(name, ".rms"):
-		diags = s.analyzeRms(name, text)
-	case strings.HasSuffix(name, ".xs"):
-		diags = s.analyzeXs(name, text)
+	case strings.HasSuffix(uriArg, ".rms"):
+		diags = s.analyzeRms(uriArg, text, closure)
+	case strings.HasSuffix(uriArg, ".xs"):
+		diags = s.analyzeXs(uriArg, text, closure)
 	}
 
 	sortDiags(diags)
@@ -543,30 +538,55 @@ func (s *Server) analyze(name string, text string) []protocol.Diagnostic {
 	return toProtocolDiags(diags)
 }
 
-// analyzeRms parses the RMS source, runs semantic checks and delegates each
-// inline XS block to the XS pipeline with ranges shifted into document
-// coordinates.
-func (s *Server) analyzeRms(name string, text string) []common.Diagnostic {
-	file, syntax := rms.Parse(text, name)
+// analyzeRms parses the RMS source, runs semantic checks, reports the
+// missing includes owned by the document and delegates each inline XS
+// block to the XS pipeline with ranges shifted into document coordinates.
+// External declarations come from the whole closure (inline blocks are
+// not closure members, nothing to exclude).
+func (s *Server) analyzeRms(uriArg string, text string, closure include.Closure) []common.Diagnostic {
+	file, syntax := rms.Parse(text, uriArg)
 
 	diags := append(syntax, s.analyzer.AnalyzeRms(file)...)
+	diags = append(diags, missingDiags(uriArg, closure)...)
 
 	for _, block := range file.XsBlocks {
-		xsFile, xsSyntax := xs.XsParse(block.Code, "inline:"+name)
+		xsFile, xsSyntax := xs.XsParse(block.Code, "inline:"+uriArg)
 		base := block.Range.Start
 
 		diags = append(diags, shiftDiags(xsSyntax, base)...)
-		diags = append(diags, shiftDiags(s.analyzer.AnalyzeXs(xsFile), base)...)
+		diags = append(diags, shiftDiags(s.analyzer.AnalyzeXs(xsFile, closure.ExternalDecls("")), base)...)
 	}
 
 	return diags
 }
 
-// analyzeXs parses the XS source and runs semantic checks.
-func (s *Server) analyzeXs(name string, text string) []common.Diagnostic {
-	file, syntax := xs.XsParse(text, name)
+// analyzeXs parses the XS source and runs semantic checks with the
+// closure's external declarations; the analyzed file itself is excluded.
+func (s *Server) analyzeXs(uriArg string, text string, closure include.Closure) []common.Diagnostic {
+	file, syntax := xs.XsParse(text, uriArg)
 
-	return append(syntax, s.analyzer.AnalyzeXs(file)...)
+	return append(syntax, s.analyzer.AnalyzeXs(file, closure.ExternalDecls(uriArg))...)
+}
+
+// missingDiags converts the closure's missing includes owned by the
+// document into diagnostics on the path argument's range.
+func missingDiags(uriArg string, closure include.Closure) []common.Diagnostic {
+	var out []common.Diagnostic
+
+	for _, m := range closure.Missing {
+		if m.Owner != uriArg {
+			continue
+		}
+
+		out = append(out, common.Diagnostic{
+			Range:    m.Range,
+			Severity: common.SeverityError,
+			Message:  "include not found: " + m.Path,
+			Code:     "missing-include",
+		})
+	}
+
+	return out
 }
 
 // shiftDiags moves block-relative diagnostics into document coordinates.

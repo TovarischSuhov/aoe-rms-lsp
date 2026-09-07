@@ -26,7 +26,7 @@ func TestAnalyzeXs_PreludeNoFalsePositives(t *testing.T) {
 
 	a := newAnalyzer(t)
 
-	diags := a.AnalyzeXs(file)
+	diags := a.AnalyzeXs(file, nil)
 
 	require.Empty(t, diags, "prelude.xs must not trigger analyzer diagnostics: %v", messagesWithPos(diags))
 }
@@ -92,7 +92,7 @@ void f() {
 		xfile, xdiags := xs.XsParse(block.Code, "inline:map.rms")
 
 		diags = append(diags, shiftDiags(xdiags, block.Range.Start)...)
-		diags = append(diags, shiftDiags(a.AnalyzeXs(xfile), block.Range.Start)...)
+		diags = append(diags, shiftDiags(a.AnalyzeXs(xfile, nil), block.Range.Start)...)
 	}
 
 	sortDiags(diags) // the server sorts the merged batch the same way
