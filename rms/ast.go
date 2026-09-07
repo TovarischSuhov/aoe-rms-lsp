@@ -260,6 +260,13 @@ func (f RmsFile) ReferencesAt(pos common.Pos) []common.Range {
 		return nil
 	}
 
+	return f.References(name)
+}
+
+// References returns every occurrence of the word equal to name — section,
+// command, attribute and identifier words — sorted by position, without
+// needing a position in this file (cross-file searches).
+func (f RmsFile) References(name string) []common.Range {
 	out := make([]common.Range, 0)
 
 	for _, w := range f.words {

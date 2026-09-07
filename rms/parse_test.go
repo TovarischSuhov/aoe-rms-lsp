@@ -472,3 +472,25 @@ func TestParse_IncludeWithoutPath(t *testing.T) {
 	require.Len(t, diags, 1)
 	assert.Equal(t, "syntax", diags[0].Code)
 }
+
+// TestReferences_ByName checks the by-name form: same occurrences as
+// ReferencesAt, without needing a position in this file.
+func TestReferences_ByName(t *testing.T) {
+	src := "create_elevator 7\ncreate_elevator 3\nbase_terrain GRASS\n"
+	file, diags := Parse(src, "main.rms")
+	require.Empty(t, diags)
+
+	ranges := file.References("create_elevator")
+	require.Len(t, ranges, 2)
+	assert.Equal(t, uint32(0), ranges[0].Start.Line)
+	assert.Equal(t, uint32(1), ranges[1].Start.Line)
+
+	// Equivalence: ReferencesAt at any occurrence yields the same set.
+	for _, r := range ranges {
+		mid := common.Pos{Line: r.Start.Line, Column: r.Start.Column + 2, Offset: r.Start.Offset + 2}
+		assert.Equal(t, ranges, file.ReferencesAt(mid))
+	}
+
+	// Unknown name: empty result.
+	assert.Empty(t, file.References("no_such_command"))
+}
