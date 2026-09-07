@@ -483,3 +483,78 @@ func TestServe_ShutdownExit(t *testing.T) {
 
 	require.NoError(t, h.awaitExit())
 }
+
+func TestServerNavigation_IntegrationStdio(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	initRes, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	require.Equal(t, protocol.Boolean(true), initRes.Capabilities.DefinitionProvider)
+	require.Equal(t, protocol.Boolean(true), initRes.Capabilities.ReferencesProvider)
+	require.Equal(t, protocol.Boolean(true), initRes.Capabilities.DocumentSymbolProvider)
+
+	xsURI := uri.URI("file:///work/nav.xs")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        xsURI,
+			LanguageID: "aoe2xs",
+			Version:    1,
+			Text:       "void f() {}\nvoid g() { f(); }\n",
+		},
+	}))
+	h.waitDiagnostics(xsURI)
+
+	callPos := protocol.Position{Line: 1, Character: uint32(len("void g() { "))}
+
+	defRes, err := h.disp.Definition(ctx, &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: xsURI},
+			Position:     callPos,
+		},
+	})
+	require.NoError(t, err)
+
+	loc, ok := defRes.(*protocol.Location)
+	require.True(t, ok, "definition resolves to a single Location")
+	require.Equal(t, xsURI, loc.URI)
+	require.Equal(t, uint32(0), loc.Range.Start.Line)
+	require.Equal(t, uint32(len("void ")), loc.Range.Start.Character)
+
+	refRes, err := h.disp.References(ctx, &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: xsURI},
+			Position:     callPos,
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	require.NoError(t, err)
+	require.Len(t, refRes, 2, "declaration plus call")
+
+	rmsURI := uri.URI("file:///work/nav.rms")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        rmsURI,
+			LanguageID: "aoe2rms",
+			Version:    1,
+			Text:       "<LAND_GENERATION>\ncreate_player_lands {\n	land_percent 32\n}\n</LAND_GENERATION>\n",
+		},
+	}))
+	h.waitDiagnostics(rmsURI)
+
+	symRes, err := h.disp.DocumentSymbol(ctx, &protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: rmsURI},
+	})
+	require.NoError(t, err)
+
+	tree, ok := symRes.(protocol.DocumentSymbolSlice)
+	require.True(t, ok, "hierarchical documentSymbol arm")
+	require.Len(t, tree, 1)
+	require.Equal(t, "land_generation", tree[0].Name)
+	require.Equal(t, protocol.SymbolKindModule, tree[0].Kind)
+	require.Len(t, tree[0].Children, 1)
+	require.Equal(t, "create_player_lands", tree[0].Children[0].Name)
+}

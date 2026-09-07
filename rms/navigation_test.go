@@ -1,6 +1,7 @@
 package rms
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -184,4 +185,43 @@ func symbolsNamed(nodes []common.Symbol, name string) []common.Symbol {
 	}
 
 	return out
+}
+
+func TestRmsSymbols_FixturesInvariantSweep(t *testing.T) {
+	entries, err := os.ReadDir("testdata")
+	require.NoError(t, err)
+
+	var check func(n common.Symbol)
+
+	check = func(n common.Symbol) {
+		require.True(t, rangeWithin(n.Selection, n.Range),
+			"Selection must stay inside Range: %s", n.Name)
+		require.NotEqual(t, "global", n.Name, "no global section node")
+
+		for _, child := range n.Children {
+			require.True(t, rangeWithin(child.Range, n.Range),
+				"children must stay inside the parent Range: %s", n.Name)
+			check(child)
+		}
+	}
+
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".rms") {
+			continue
+		}
+
+		raw, err := os.ReadFile("testdata/" + entry.Name())
+		require.NoError(t, err)
+
+		file, _ := Parse(string(raw), entry.Name())
+
+		for _, root := range file.Symbols() {
+			check(root)
+		}
+	}
+}
+
+// rangeWithin reports whether inner lies inside outer.
+func rangeWithin(inner common.Range, outer common.Range) bool {
+	return !inner.Start.Before(outer.Start) && !outer.End.Before(inner.End)
 }

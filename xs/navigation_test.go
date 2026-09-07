@@ -1,6 +1,7 @@
 package xs
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -167,4 +168,29 @@ func TestXsDefinition_LocalShadowsOuterLocal(t *testing.T) {
 	require.True(t, found)
 	require.Equal(t, uint32(3), r.Start.Line, "the inner block local wins")
 	require.Equal(t, uint32(strings.Index(lines[3], "x")), r.Start.Column)
+}
+
+func TestXsSymbols_PreludeInvariantSweep(t *testing.T) {
+	raw, err := os.ReadFile("../docs/ref/ugc-guide/xs/prelude.xs")
+	require.NoError(t, err)
+
+	file, parseDiags := XsParse(string(raw), "prelude.xs")
+	require.Empty(t, parseDiags, "prelude.xs must parse without false errors")
+
+	syms := file.Symbols()
+
+	externs := 0
+
+	for _, sym := range syms {
+		if sym.Kind == DeclExtern {
+			externs++
+		}
+
+		require.True(t, rangeWithin(sym.Selection, sym.Range),
+			"Selection must stay inside Range: %s", sym.Name)
+		require.Nil(t, sym.Children, "flat outline")
+	}
+
+	require.Equal(t, 884, externs, "the prelude declares 884 externs")
+	require.Len(t, syms, len(file.Decls), "extern and function declarations alike")
 }
