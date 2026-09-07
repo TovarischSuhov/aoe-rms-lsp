@@ -20,3 +20,11 @@ func main() {
 Preconditions:
 - Single binary, no flags required for MVP; positionEncoding negotiated
   in Initialize (prefer utf-8 when offered, per `lsp-protocol`).
+
+## Advertised capabilities
+
+Initialize advertises: diagnostics (Full sync + OpenClose), hover,
+completion, and navigation — definition, references, documentSymbol.
+Editor configs need no extra flags; positionEncoding is negotiated
+(prefer utf-8 when the client offers it).
+

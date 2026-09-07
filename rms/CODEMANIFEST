@@ -3,8 +3,10 @@ Imports:
       - Pos
       - Range
       - Diagnostic
+      - Symbol
     Usages:
       - positions-and-diagnostics
+      - symbols
     From: common
 
 Usages:
@@ -15,6 +17,7 @@ Annotations: |
   Use `conventions` for code writing rules and testing.
   Use `rms_grammar` for the RMS language structure being parsed.
   Use `positions-and-diagnostics` from Imports for building positions and diagnostics.
+  Use `symbols` from Imports for building outline nodes in Symbols.
 
   Parser never fails hard: every problem becomes a Diagnostic; recovery
   resynchronizes to the next statement/section. Every AST node carries a Range.
@@ -75,6 +78,43 @@ Annotations: |
 
       Requirements:
       - для позиции на атрибуте возвращает команду-владельца
+
+    "Symbols() -> symbols: []Symbol": |
+      Outline-дерево файла (LSP textDocument/documentSymbol).
+
+      `symbols`: узлы секций и глобальные узлы вне секций
+
+      Algorithm:
+      1. Каждая Section → `Symbol` по `symbols` из Imports: kind=section,
+         Name без угловых скобок, Range=Range секции,
+         Selection=диапазон токена заголовка
+      2. Дети секции — Statements в исходном порядке: kind=command,
+         Name=имя команды, Range=statement с атрибутами,
+         Selection=токен имени; блоки random/conditional рекурсивно
+         в Children
+      3. Каждый XsBlock → узел kind=xs, Name="#includeXS",
+         Range=Selection=Range блока; поместить в содержащую его
+         Section, иначе в корень, по позиции среди детей
+      4. Statements вне секций — узлы корня
+
+      Requirements:
+      - Selection ⊆ Range для каждого узла; дети внутри Range родителя
+
+    "ReferencesAt(pos: Pos) -> ranges: []Range": |
+      Все вхождения имени под позицией (LSP textDocument/references).
+
+      `pos`: позиция в файле
+      `ranges`: диапазоны одноимённых слов-токенов, по позиции
+
+      Algorithm:
+      1. Слово-токен, содержащий `pos`, из внутреннего индекса токенов;
+         нет — пустой список
+      2. Собрать все одноимённые слова-токены (имена констант и команд)
+      3. Отсортировать по позиции
+
+      Requirements:
+      - локальных деклараций в RMS нет: все вхождения равнозначны
+        (вызывающая сторона не отбрасывает декларацию)
 
 "XsBlock()":
   location: ast.go

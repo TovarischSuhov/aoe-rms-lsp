@@ -22,6 +22,11 @@ Imports:
     Usages:
       - checks
     From: analysis
+  - Types:
+      - Symbol
+    Usages:
+      - symbols
+    From: common
 
 Usages:
   conventions: .goga/usages/conventions.md
@@ -40,6 +45,9 @@ Annotations: |
   Protocol types (InitializeParams, Hover, CompletionList, ...) belong to
   go.lsp.dev/protocol — follow `lsp-protocol` for their construction.
 
+  Навигационные хендлеры (Definition/References/DocumentSymbol) следуют
+  секции Navigation `lsp-protocol`: пустой результат — пустой slice, не nil.
+
 ---
 
 "Server(store: Store, analyzer: Analyzer)":
@@ -54,8 +62,9 @@ Annotations: |
   methods:
     "Initialize(ctx: Context, params: InitializeParams) -> result: InitializeResult, err: error": |
       Заявить возможности: TextDocumentSync Full+OpenClose, HoverProvider
-      Boolean(true), CompletionProvider с триггерами; согласовать
-      positionEncoding (utf-8 при поддержке клиентом).
+      Boolean(true), CompletionProvider с триггерами; DefinitionProvider,
+      ReferencesProvider, DocumentSymbolProvider — Boolean(true);
+      согласовать positionEncoding (utf-8 при поддержке клиентом).
     "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |
       Algorithm:
       1. DocStore.Put(uri, text, version)
@@ -77,6 +86,44 @@ Annotations: |
       1. .rms: SectionAt → Store.Commands(section) + константы;
          .xs: префикс слова → Store.Functions + Store.Constants
       2. CompletionList: label, kind, detail=сигнатура, documentation=desc
+    "Definition(ctx: Context, params: DefinitionParams) -> result: DefinitionResult, err: error": |
+      Переход к определению символа под позицией.
+
+      Algorithm:
+      1. Открыть документ; .xs → `XsParse` → Definition(pos) по
+         `xs-parsing`: found → Location{URI, Range}
+      2. Не найдено (builtin/неизвестное), .rms или документ закрыт —
+         пустая LocationSlice (не nil) по `lsp-protocol`
+      3. Пустой результат ошибкой не считать
+
+      Requirements:
+      - конвертация позиций — с учётом согласованного positionEncoding
+
+    "References(ctx: Context, params: ReferenceParams) -> locations: []Location, err: error": |
+      Ссылки на символ под позицией.
+
+      Algorithm:
+      1. ReferencesAt(pos) по языку (`xs-parsing` / `rms-parsing`)
+      2. Каждый Range → Location
+      3. IncludeDeclaration=false и язык .xs → исключить range из
+         Definition(pos) (декларация); для .rms исключений нет —
+         локальных деклараций нет
+      4. Пустой результат — пустой список, не nil
+
+    "DocumentSymbol(ctx: Context, params: DocumentSymbolParams) -> result: DocumentSymbolResult, err: error": |
+      Outline документа.
+
+      Algorithm:
+      1. Symbols() по языку (`xs-parsing` / `rms-parsing`)
+      2. Рекурсивно `Symbol` → protocol.DocumentSymbol по `symbols`:
+         Kind по таблице (xs: function/extern→Function, variable→Variable,
+         rule/event→Event; rms: section→Module, command→Function,
+         xs→Namespace; неизвестный kind → Field);
+         Range/Selection напрямую, Children рекурсивно
+      3. Вернуть DocumentSymbolSlice (иерархическая форма)
+
+      Requirements:
+      - Selection ⊆ Range сохраняется при маппинге (инвариант `symbols`)
     "Shutdown(ctx: Context) -> err: error": |
       Вернуть nil (default Unimplemented возвращает not-implemented).
     "Exit(ctx: Context) -> err: error": |

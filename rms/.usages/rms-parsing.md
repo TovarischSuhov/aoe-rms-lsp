@@ -36,3 +36,22 @@ Preconditions:
 - StatementAt on an attribute position returns the owning command —
   do not re-walk Attributes yourself.
 - XsBlock.Code positions are relative to the block, not the document.
+
+## Navigation (outline, references)
+
+```go
+// outline: section tree with command children and #includeXS nodes;
+// Selection ⊆ Range on every node; nested random/conditional blocks
+// become Children.
+syms := file.Symbols() // []common.Symbol, kinds: section/command/xs
+
+// references: every word-token matching the name under pos (constants
+// and command names), sorted by position. RMS has no local
+// declarations — all occurrences are equal.
+for _, r := range file.ReferencesAt(pos) { ... }
+```
+
+Preconditions:
+- Navigation answers from the token/occurrence index recorded at parse
+  time — reparse before querying after text changes.
+

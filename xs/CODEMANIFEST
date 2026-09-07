@@ -3,8 +3,10 @@ Imports:
       - Pos
       - Range
       - Diagnostic
+      - Symbol
     Usages:
       - positions-and-diagnostics
+      - symbols
     From: common
 
 Usages:
@@ -15,6 +17,7 @@ Annotations: |
   Use `conventions` for code writing rules and testing.
   Use `xs_grammar` for the XS language structure being parsed.
   Use `positions-and-diagnostics` from Imports for building positions and diagnostics.
+  Use `symbols` from Imports for building outline nodes in Symbols.
 
   Parser never fails hard: every problem becomes a Diagnostic; recovery
   resynchronizes to the next statement/declaration. Every AST node carries a Range.
@@ -61,6 +64,56 @@ Annotations: |
 
       Requirements:
       - для позиции на call возвращает имя вызываемой функции
+
+    "Definition(pos: Pos) -> r: Range, found: bool": |
+      Определение символа под позицией: вхождение → name-range декларирующего
+      объявления (LSP textDocument/definition).
+
+      `pos`: позиция в файле
+      `r`: диапазон имени декларации (не всей декларации)
+      `found`: локальная декларация существует
+
+      Algorithm:
+      1. Найти вхождение идентификатора, содержащее `pos` (как SymbolAt);
+         нет вхождения — found=false
+      2. Среди деклараций файла, объявляющих это имя, взять самую внутреннюю,
+         чья область (тело функции/блока) объемлет позицию вхождения;
+         при равной вложенности — ближайшую, предшествующую вхождению
+         (параметр/локаль затеняют топ-левел)
+      3. Позиция на имени декларации — вернуть её собственный name-range
+      4. Локальной декларации нет (builtin/неизвестное) — found=false
+
+      Requirements:
+      - детерминированность: одинаковый вход → одинаковый результат
+
+    "ReferencesAt(pos: Pos) -> ranges: []Range": |
+      Все вхождения имени под позицией (LSP textDocument/references).
+
+      `pos`: позиция в файле
+      `ranges`: все вхождения имени, включая декларацию, по позиции
+
+      Algorithm:
+      1. Имя под `pos` (как SymbolAt); нет — пустой список
+      2. Собрать диапазоны вхождений имени из индекса вхождений
+      3. Отсортировать по позиции
+
+      Requirements:
+      - совпадение синтаксическое, по имени: одноимённые символы разных
+        областей видимости не различаются
+
+    "Symbols() -> symbols: []Symbol": |
+      Outline файла: декларации верхнего уровня (LSP documentSymbol).
+
+      `symbols`: узлы топ-деклараций в исходном порядке
+
+      Algorithm:
+      1. Каждый Decl из Decls → `Symbol` по `symbols` из Imports:
+         Kind и Name из декларации, Range=Range декларации,
+         Selection=name-range из внутреннего индекса, Children пусты
+
+      Requirements:
+      - Selection ⊆ Range для каждого узла
+      - плоский список: тела деклараций не раскрываются
 
 "Decl()":
   location: ast.go

@@ -82,9 +82,40 @@ Annotations: |
     "Code -> string": |
       Стабильный код правила.
 
+"Symbol(kind: string, name: string, r: Range, selection: Range)":
+  location: symbol.go
+  annotations: |
+    Узел outline-дерева документа: единая форма для xs.Symbols и
+    rms.Symbols; потребитель (server) мапит в LSP DocumentSymbol.
+
+    `kind`: вид узла — набор значений у ячейки-производителя
+    (xs: function/variable/rule/event/extern; rms: section/command/xs)
+    `name`: отображаемое имя узла
+    `r`: диапазон узла целиком
+    `selection`: диапазон имени узла
+
+    Requirements:
+    - Selection ⊆ Range — инвариант LSP SelectionRange, нарушение
+      клиенты отбрасывают
+    - диапазоны Children лежат внутри Range родителя
+
+    Constraints:
+    - чистый тип данных: construct-and-use, без методов
+  properties:
+    "Kind -> string": |
+      Вид узла; словарь значений — у ячейки-производителя.
+    "Name -> string": |
+      Отображаемое имя.
+    "Range -> Range": |
+      Диапазон узла целиком.
+    "Selection -> Range": |
+      Диапазон имени (⊆ Range).
+    "Children -> []Symbol": |
+      Вложенные узлы (пусто для листа).
+
 ---
 
 Author: Goga
 CreatedAt: 04/09/26
 Description: |
-  Общие позиционные типы и диагностика для LSP-сервера aoe2-lsp.
+  Общие позиционные типы, диагностика и outline-узлы для LSP-сервера aoe2-lsp.
