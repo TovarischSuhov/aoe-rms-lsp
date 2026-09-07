@@ -169,8 +169,9 @@ loc := protocol.Location{
 Documents referenced by the open file (e.g. `#include` closures) are read from
 disk on demand and cached by URI:
 
-- Convert the including document's URI via `URI.Filename()`; resolve relative
-  include paths with `filepath.Join(filepath.Dir(...), ...)`.
+- Convert the including document's URI via `URI.FsPath()` (guard non-file
+  schemes with `URI.IsFile()`); resolve relative include paths with
+  `filepath.Join(filepath.Dir(...), ...)`.
 - **Editor state wins**: if the URI is open in the doc store, its text is
   authoritative — the disk copy never overrides it.
 - Missing or unreadable include files surface as publishDiagnostics errors
