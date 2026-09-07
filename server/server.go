@@ -9,6 +9,7 @@ import (
 
 	"aoe2-lsp/analysis"
 	"aoe2-lsp/common"
+	"aoe2-lsp/include"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
 	"aoe2-lsp/xs"
@@ -28,17 +29,22 @@ type Server struct {
 	store    *kb.Store
 	analyzer *analysis.Analyzer
 	docs     *DocStore
+	resolver *include.Resolver
 	exit     chan struct{}
 	exitOnce sync.Once
 }
 
 // NewServer builds the server from its knowledge base and analyzer (DI);
-// the document cache is created internally.
+// the document cache and the include resolver over it are created
+// internally (DocStore structurally satisfies include.Source).
 func NewServer(store *kb.Store, analyzer *analysis.Analyzer) *Server {
+	docs := NewDocStore()
+
 	return &Server{
 		store:    store,
 		analyzer: analyzer,
-		docs:     NewDocStore(),
+		docs:     docs,
+		resolver: include.NewResolver(docs),
 		exit:     make(chan struct{}),
 	}
 }
@@ -316,91 +322,76 @@ func matchesPrefix(name string, prefix string) bool {
 	return strings.HasPrefix(strings.ToLower(name), prefix)
 }
 
-// Definition answers textDocument/definition: the declaration of the
-// symbol under the cursor in an .xs document. Not-found positions, .rms
-// documents and closed documents resolve to an empty LocationSlice
-// (not nil); an empty result is not an error.
+// Definition answers textDocument/definition across the document's
+// include closure: include paths jump into the target file, XS names
+// resolve locally then through the closure. Not-found positions resolve
+// to an empty LocationSlice (not nil); an empty result is not an error.
 func (s *Server) Definition(
 	ctx context.Context,
 	params *protocol.DefinitionParams,
 ) (protocol.DefinitionResult, error) {
-	text, name, ok := s.openDocument(params.TextDocument.URI)
-	if !ok || !strings.HasSuffix(name, ".xs") {
-		return protocol.LocationSlice{}, nil
-	}
-
-	file, _ := xs.XsParse(text, name)
-
-	r, found := file.Definition(fromProtocolPos(params.Position))
+	target, found := s.resolver.Definition(
+		ctx,
+		string(params.TextDocument.URI),
+		fromProtocolPos(params.Position),
+	)
 	if !found {
 		return protocol.LocationSlice{}, nil
 	}
 
 	return &protocol.Location{
-		URI:   params.TextDocument.URI,
-		Range: toProtocolRange(r),
+		URI:   uri.URI(target.URI),
+		Range: toProtocolRange(target.Range),
 	}, nil
 }
 
-// References answers textDocument/references: every occurrence of the
-// word under the cursor. For .xs the declaration is dropped unless the
-// client includes it; RMS has no local declarations, nothing is
-// excluded. Empty results are empty slices, not nil.
+// References answers textDocument/references over the include closure
+// (plus open documents that include the queried one). The local
+// declaration is dropped unless the client includes it. Empty results
+// are empty slices, not nil.
 func (s *Server) References(
 	ctx context.Context,
 	params *protocol.ReferenceParams,
 ) ([]protocol.Location, error) {
-	text, name, ok := s.openDocument(params.TextDocument.URI)
-	if !ok {
-		return []protocol.Location{}, nil
-	}
-
+	docURI := string(params.TextDocument.URI)
 	pos := fromProtocolPos(params.Position)
 
-	var ranges []common.Range
+	targets := s.resolver.References(ctx, docURI, pos)
 
-	switch {
-	case strings.HasSuffix(name, ".rms"):
-		file, _ := rms.Parse(text, name)
-		ranges = file.ReferencesAt(pos)
-	case strings.HasSuffix(name, ".xs"):
-		file, _ := xs.XsParse(text, name)
-		ranges = file.ReferencesAt(pos)
-
-		if !params.Context.IncludeDeclaration {
-			ranges = excludeDeclaration(file, pos, ranges)
-		}
+	if !params.Context.IncludeDeclaration {
+		targets = s.excludeLocalDeclaration(ctx, docURI, pos, targets)
 	}
 
-	out := make([]protocol.Location, 0, len(ranges))
+	out := make([]protocol.Location, 0, len(targets))
 
-	for _, r := range ranges {
+	for _, t := range targets {
 		out = append(out, protocol.Location{
-			URI:   params.TextDocument.URI,
-			Range: toProtocolRange(r),
+			URI:   uri.URI(t.URI),
+			Range: toProtocolRange(t.Range),
 		})
 	}
 
 	return out, nil
 }
 
-// excludeDeclaration drops the declaration range of the symbol under
-// pos from the reference ranges.
-func excludeDeclaration(
-	file xs.XsFile,
+// excludeLocalDeclaration drops the declaration range of the symbol
+// under pos in the queried document (includeDeclaration=false).
+func (s *Server) excludeLocalDeclaration(
+	ctx context.Context,
+	docURI string,
 	pos common.Pos,
-	ranges []common.Range,
-) []common.Range {
-	decl, found := file.Definition(pos)
-	if !found {
-		return ranges
+	targets []include.Target,
+) []include.Target {
+	decl, found := s.resolver.Definition(ctx, docURI, pos)
+	if !found || decl.URI != docURI {
+		return targets
 	}
 
-	out := make([]common.Range, 0, len(ranges))
+	out := make([]include.Target, 0, len(targets))
 
-	for _, r := range ranges {
-		if r != decl {
-			out = append(out, r)
+	for _, t := range targets {
+		if t.URI != decl.URI || t.Range != decl.Range {
+			out = append(out, t)
 		}
 	}
 

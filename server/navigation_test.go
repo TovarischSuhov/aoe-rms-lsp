@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -265,4 +266,52 @@ func symbolRangeContains(outer protocol.Range, inner protocol.Range) bool {
 	}
 
 	return true
+}
+
+// TestServerDefinition_CrossFileInclude checks the handler wiring: a
+// Definition on an include path returns a Location in another file.
+func TestServerDefinition_CrossFileInclude(t *testing.T) {
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	econPath := dir + "/econ.rms"
+	require.NoError(t, os.WriteFile(econPath, []byte("base_terrain GRASS\n"), 0o644))
+
+	main := "#include \"econ.rms\"\n"
+	s.docs.Put(uri.File(dir+"/main.rms").String(), main, 1)
+
+	res, err := s.Definition(context.Background(), &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.File(dir + "/main.rms")},
+			Position:     protocol.Position{Line: 0, Character: 13},
+		},
+	})
+	require.NoError(t, err)
+
+	loc, ok := res.(*protocol.Location)
+	require.True(t, ok, "an include target is a single Location")
+	require.Equal(t, uri.File(econPath), loc.URI)
+	require.Equal(t, protocol.Position{Line: 0, Character: 0}, loc.Range.Start)
+}
+
+// TestServerDefinition_ClosedDocFromDisk checks that a closed document
+// with a disk copy still answers (the open-document gate is gone).
+func TestServerDefinition_ClosedDocFromDisk(t *testing.T) {
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	xsPath := dir + "/lib.xs"
+	require.NoError(t, os.WriteFile(xsPath, []byte("void f() {}\n"), 0o644))
+
+	res, err := s.Definition(context.Background(), &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.File(xsPath)},
+			Position:     protocol.Position{Line: 0, Character: 5},
+		},
+	})
+	require.NoError(t, err)
+
+	loc, ok := res.(*protocol.Location)
+	require.True(t, ok)
+	require.Equal(t, uri.File(xsPath), loc.URI)
 }
