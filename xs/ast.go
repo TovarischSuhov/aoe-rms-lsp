@@ -3,6 +3,8 @@
 package xs
 
 import (
+	"slices"
+
 	"aoe2-lsp/common"
 )
 
@@ -98,6 +100,81 @@ func (f XsFile) SymbolAt(pos common.Pos) (string, bool) {
 	}
 
 	return "", false
+}
+
+// ReferencesAt returns every occurrence of the name under pos — the
+// declaration included — sorted by position (LSP textDocument/references).
+// Matching is syntactic, by name: same-name symbols from different
+// scopes are not distinguished.
+func (f XsFile) ReferencesAt(pos common.Pos) []common.Range {
+	name, ok := f.SymbolAt(pos)
+	if !ok {
+		return nil
+	}
+
+	var out []common.Range
+
+	for _, s := range f.symbols {
+		if s.name == name {
+			out = append(out, s.at)
+		}
+	}
+
+	slices.SortFunc(out, func(a, b common.Range) int {
+		switch {
+		case a.Start.Before(b.Start):
+			return -1
+		case b.Start.Before(a.Start):
+			return 1
+		default:
+			return 0
+		}
+	})
+
+	return out
+}
+
+// Symbols returns the flat outline of the top-level declarations (LSP
+// documentSymbol) in source order; include declarations are skipped —
+// the kind vocabulary has no entry for them, and their names are string
+// paths, not identifiers.
+func (f XsFile) Symbols() []common.Symbol {
+	out := make([]common.Symbol, 0, len(f.Decls))
+
+	for _, decl := range f.Decls {
+		if decl.Kind == DeclInclude {
+			continue
+		}
+
+		out = append(out, common.Symbol{
+			Kind:      decl.Kind,
+			Name:      decl.Name,
+			Range:     decl.Range,
+			Selection: f.declNameRange(decl),
+		})
+	}
+
+	return out
+}
+
+// declNameRange returns the name token range of the declaration: the
+// first recorded occurrence of the name inside the declaration span
+// (the parser records declaration names before any body occurrence).
+// The whole span is the fallback for recovered declarations.
+func (f XsFile) declNameRange(decl Decl) common.Range {
+	for _, s := range f.symbols {
+		if s.name == decl.Name && rangeWithin(s.at, decl.Range) {
+			return s.at
+		}
+	}
+
+	return decl.Range
+}
+
+// rangeWithin reports whether inner lies inside outer (both bounds
+// inclusive on the outer side of the half-open spans).
+func rangeWithin(inner common.Range, outer common.Range) bool {
+	return !inner.Start.Before(outer.Start) && !outer.End.Before(inner.End)
 }
 
 // Decl is one top-level declaration.
