@@ -8,7 +8,6 @@ build:
     env:
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: "off"
-
   worktree: false
   skip_finalize: false
   session_timeout: 30m
