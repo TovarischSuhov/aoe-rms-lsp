@@ -159,7 +159,7 @@ testdata/
 |---|----------|-----------|
 | 1 | Definition на `parts/econ.rms` в include-директиве `main.rms` | Location в `econ.rms` |
 | 2 | Definition на `sharedFn` в inline-XS `main.rms` | Location объявления `sharedFn` в `lib.xs` |
-| 3 | References на `sharedFn` (в `lib.xs`) | вхождение в `main.rms` + объявление/вызовы в `lib.xs` |
+| 3 | References на `sharedFn` (в `lib.xs`; `main.rms` открыт) | вхождение в `main.rms` + объявление/вызовы в `lib.xs` (обратное направление — по открытым документам, чьё замыкание содержит запрошенный файл) |
 | 4 | didOpen `broken.rms` | диагностика missing-include с range директивы |
 | 5 | didOpen `main.rms` при уже открытой вкладке `econ.rms` (изменённой) | Definition/References используют редакторную версию `econ.rms` |
 

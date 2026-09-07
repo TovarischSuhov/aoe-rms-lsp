@@ -52,6 +52,8 @@ Annotations: |
       `uri`: идентификатор документа
       `text`: текст editor-state
       `found`: документ открыт (false — сигнал «смотреть на диск»)
+    "URIs() -> uris: []string": |
+      URI всех открытых документов (для обратного поиска включающих).
 
 "Resolver(source: Source)":
   location: resolver.go
@@ -123,11 +125,14 @@ Annotations: |
       2. Имя под pos: .xs — SymbolAt по `xs-parsing`; .rms —
          ReferencesAt(pos) запрошенного файла, имя = текст первого range;
          пусто — пустой результат
-      3. По всем файлам замыкания References(name) (.rms и .xs) →
+      3. Корни поиска: запрошенный uri плюс каждый открытый uri из
+         URIs() `Source`, чьё замыкание содержит запрошенный файл
+         (обратное направление — кто включает меня)
+      4. По всем файлам замыканий корней References(name) (.rms и .xs) →
          Target{URI, Range}
-      4. Inline-блоки корня: XsParse(block.Code) + вхождения с
+      5. Inline-блоки корней: XsParse(block.Code) + вхождения с
          трансляцией координат блока
-      5. Сортировка: URI, затем позиция
+      6. Дедуп по (URI, Range); сортировка: URI, затем позиция
 
       Requirements:
       - запрошенный файл входит в результат

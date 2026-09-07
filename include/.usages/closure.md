@@ -42,6 +42,10 @@ for _, t := range resolver.References(ctx, uri, pos) { /* []Location */ }
 ```
 
 Preconditions:
+- References search the closure of the queried file PLUS the closures of
+  open documents whose closure contains it (reverse direction: who
+  includes me — Source.URIs). Occurrences are deduplicated by
+  (URI, Range).
 - References include the declaration occurrence — filter the local
   declaration range yourself when the client sends
   includeDeclaration=false.
