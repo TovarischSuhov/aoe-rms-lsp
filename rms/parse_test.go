@@ -236,7 +236,10 @@ func TestParse_IncludesAndXs(t *testing.T) {
 	file, diags := Parse(loadFixture(t, "includes.rms"), "includes.rms")
 	require.Empty(t, diags)
 
-	assert.Equal(t, []string{"Team_Islands_lands.rms"}, file.Includes)
+	require.Len(t, file.Includes, 1)
+	assert.Equal(t, "Team_Islands_lands.rms", file.Includes[0].Path)
+	assert.Equal(t, uint32(1), file.Includes[0].Range.Start.Line)
+	assert.Equal(t, uint32(9), file.Includes[0].Range.Start.Column)
 
 	require.Len(t, file.XsBlocks, 1)
 	block := file.XsBlocks[0]
@@ -415,4 +418,57 @@ func TestParse_WordIndexRecordsAllKinds(t *testing.T) {
 	require.Equal(t, 1, counts["FOREST"], "const argument value")
 	require.Equal(t, 1, counts["land_percent"], "attribute name")
 	require.NotContains(t, counts, "12", "numbers are not words")
+}
+
+// TestParse_IncludeRecordsPathArgumentRange checks that include directives
+// record the path argument with its own range — quoted and bare forms.
+func TestParse_IncludeRecordsPathArgumentRange(t *testing.T) {
+	src := "#include \"parts/econ.rms\"\n#include parts/bare.inc\n"
+
+	file, diags := Parse(src, "main.rms")
+	require.Empty(t, diags)
+
+	require.Len(t, file.Includes, 2)
+
+	first := file.Includes[0]
+	assert.Equal(t, "parts/econ.rms", first.Path)
+	assert.Equal(t, common.Pos{Line: 0, Column: 9, Offset: 9}, first.Range.Start)
+	assert.Equal(t, common.Pos{Line: 0, Column: 25, Offset: 25}, first.Range.End)
+
+	second := file.Includes[1]
+	assert.Equal(t, "parts/bare.inc", second.Path)
+	assert.Equal(t, common.Pos{Line: 1, Column: 9, Offset: 35}, second.Range.Start)
+	assert.Equal(t, common.Pos{Line: 1, Column: 23, Offset: 49}, second.Range.End)
+
+	assert.Empty(t, file.XsIncludes)
+}
+
+// TestParse_IncludeXSArgumentAndInlineBlock checks the dual mode of
+// #includeXS with a file argument: the external path is recorded while the
+// region after the directive stays an inline XsBlock.
+func TestParse_IncludeXSArgumentAndInlineBlock(t *testing.T) {
+	src := "#includeXS lib/helpers.xs\nvoid sharedFn(int n) { }\n"
+
+	file, diags := Parse(src, "main.rms")
+	require.Empty(t, diags)
+
+	require.Len(t, file.XsIncludes, 1)
+	assert.Equal(t, "lib/helpers.xs", file.XsIncludes[0].Path)
+	assert.Equal(t, common.Pos{Line: 0, Column: 11, Offset: 11}, file.XsIncludes[0].Range.Start)
+	assert.Equal(t, common.Pos{Line: 0, Column: 25, Offset: 25}, file.XsIncludes[0].Range.End)
+	assert.Empty(t, file.Includes)
+
+	require.Len(t, file.XsBlocks, 1)
+	assert.Equal(t, "void sharedFn(int n) { }", file.XsBlocks[0].Code)
+}
+
+// TestParse_IncludeWithoutPath checks the missing-argument syntax error:
+// a diagnostic is reported and no Include is created.
+func TestParse_IncludeWithoutPath(t *testing.T) {
+	file, diags := Parse("#include\n", "main.rms")
+
+	assert.Empty(t, file.Includes)
+	assert.Empty(t, file.XsIncludes)
+	require.Len(t, diags, 1)
+	assert.Equal(t, "syntax", diags[0].Code)
 }

@@ -427,20 +427,54 @@ func (p *parser) directive(line string, idx int) {
 
 	switch directive.text {
 	case "#include":
-		name := strings.Trim(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "#include")), `"`)
-		if name == "" {
-			p.reportf(directive.at, common.SeverityError, "syntax", "#include needs a file name")
-
+		inc, ok := p.includeArg(directive, line, idx)
+		if !ok {
 			return
 		}
 
-		p.file.Includes = append(p.file.Includes, name)
+		p.file.Includes = append(p.file.Includes, inc)
 	case "#includeXS":
+		if inc, ok := p.includeArg(directive, line, idx); ok {
+			p.file.XsIncludes = append(p.file.XsIncludes, inc)
+		}
+
 		p.inXs = true
 		p.xsStart = idx + 1
 	default:
 		// #const / #define / #include_drs stay visible as statements.
 		p.commandLine(directive, args)
+	}
+}
+
+// includeArg extracts the path argument of an include directive with its
+// source range. ok=false reports the missing-argument syntax error (no
+// Include is created in that case). Quoted arguments keep the quotes in
+// the range; bare arguments span to the end of the trimmed line.
+func (p *parser) includeArg(directive token, line string, idx int) (inc Include, ok bool) {
+	argLex := newLexer(line, p.starts[idx], idx)
+	argLex.next() // the directive token itself
+	arg := argLex.next()
+
+	switch arg.kind {
+	case tokEOF:
+		// A bare #includeXS is legal (inline mode only); #include requires
+		// a file name.
+		if directive.text == "#include" {
+			p.reportf(directive.at, common.SeverityError, "syntax", "%s needs a file name", directive.text)
+		}
+
+		return Include{}, false
+	case tokString:
+		return Include{Path: strings.Trim(arg.text, `"`), Range: arg.at}, true
+	default:
+		rest := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), directive.text))
+		end := len(strings.TrimRight(line, " \t\r"))
+		endPos := common.Pos{Line: uint32(idx), Column: uint32(end), Offset: argLex.base + end}
+
+		return Include{
+			Path:  strings.Trim(rest, `"`),
+			Range: common.Range{Start: arg.at.Start, End: endPos},
+		}, true
 	}
 }
 
