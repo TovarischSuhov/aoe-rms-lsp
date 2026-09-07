@@ -43,6 +43,17 @@ type RmsFile struct {
 	Includes []string
 	// XsBlocks are the embedded XS blocks started by #includeXS.
 	XsBlocks []XsBlock
+
+	// words are all word-token occurrences (section, command and
+	// attribute names, identifier/constant values) recorded at parse
+	// time; ReferencesAt answers from here.
+	words []wordOcc
+}
+
+// wordOcc is one word-token occurrence.
+type wordOcc struct {
+	name string
+	at   common.Range
 }
 
 // SectionAt returns the section containing pos (for the completion
