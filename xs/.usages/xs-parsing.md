@@ -42,7 +42,8 @@ if r, ok := xsFile.Definition(pos); ok {
 // same-name symbols from different scopes are not distinguished.
 for _, r := range xsFile.ReferencesAt(pos) { ... }
 
-// outline: top-level declarations as Symbol nodes (flat).
+// outline: top-level declarations as Symbol nodes (flat); include
+// directives are skipped — the kind vocabulary has no entry for them.
 syms := xsFile.Symbols() // []common.Symbol
 ```
 

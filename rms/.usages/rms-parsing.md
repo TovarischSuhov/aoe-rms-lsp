@@ -45,9 +45,9 @@ Preconditions:
 // become Children.
 syms := file.Symbols() // []common.Symbol, kinds: section/command/xs
 
-// references: every word-token matching the name under pos (constants
-// and command names), sorted by position. RMS has no local
-// declarations — all occurrences are equal.
+// references: every word-token matching the name under pos (section,
+// command, attribute and identifier words), sorted by position. RMS has
+// no local declarations — all occurrences are equal.
 for _, r := range file.ReferencesAt(pos) { ... }
 ```
 

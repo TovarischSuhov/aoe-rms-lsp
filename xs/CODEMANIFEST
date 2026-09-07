@@ -107,13 +107,14 @@ Annotations: |
       `symbols`: узлы топ-деклараций в исходном порядке
 
       Algorithm:
-      1. Каждый Decl из Decls → `Symbol` по `symbols` из Imports:
-         Kind и Name из декларации, Range=Range декларации,
+      1. Каждый Decl из Decls, кроме include, → `Symbol` по `symbols`
+         из Imports: Kind и Name из декларации, Range=Range декларации,
          Selection=name-range из внутреннего индекса, Children пусты
 
       Requirements:
       - Selection ⊆ Range для каждого узла
       - плоский список: тела деклараций не раскрываются
+      - include-декларации пропускаются: словарь kind их не содержит
 
 "Decl()":
   location: ast.go
