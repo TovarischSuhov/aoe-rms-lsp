@@ -3,6 +3,9 @@
 package xs
 
 import (
+	"math"
+	"slices"
+
 	"aoe2-lsp/common"
 )
 
@@ -98,6 +101,264 @@ func (f XsFile) SymbolAt(pos common.Pos) (string, bool) {
 	}
 
 	return "", false
+}
+
+// ReferencesAt returns every occurrence of the name under pos — the
+// declaration included — sorted by position (LSP textDocument/references).
+// Matching is syntactic, by name: same-name symbols from different
+// scopes are not distinguished.
+func (f XsFile) ReferencesAt(pos common.Pos) []common.Range {
+	name, ok := f.SymbolAt(pos)
+	if !ok {
+		return nil
+	}
+
+	var out []common.Range
+
+	for _, s := range f.symbols {
+		if s.name == name {
+			out = append(out, s.at)
+		}
+	}
+
+	slices.SortFunc(out, func(a, b common.Range) int {
+		switch {
+		case a.Start.Before(b.Start):
+			return -1
+		case b.Start.Before(a.Start):
+			return 1
+		default:
+			return 0
+		}
+	})
+
+	return out
+}
+
+// Symbols returns the flat outline of the top-level declarations (LSP
+// documentSymbol) in source order; include declarations are skipped —
+// the kind vocabulary has no entry for them, and their names are string
+// paths, not identifiers.
+func (f XsFile) Symbols() []common.Symbol {
+	out := make([]common.Symbol, 0, len(f.Decls))
+
+	for _, decl := range f.Decls {
+		if decl.Kind == DeclInclude {
+			continue
+		}
+
+		out = append(out, common.Symbol{
+			Kind:      decl.Kind,
+			Name:      decl.Name,
+			Range:     decl.Range,
+			Selection: f.declNameRange(decl),
+		})
+	}
+
+	return out
+}
+
+// declNameRange returns the name token range of the declaration: the
+// first recorded occurrence of the name inside the declaration span
+// (the parser records declaration names before any body occurrence).
+// The whole span is the fallback for recovered declarations.
+func (f XsFile) declNameRange(decl Decl) common.Range {
+	if r, ok := f.firstOccurrence(decl.Name, decl.Range, nil); ok {
+		return r
+	}
+
+	return decl.Range
+}
+
+// firstOccurrence returns the first recorded occurrence of name inside
+// within, optionally skipping one start position (the declaration's own
+// name token when a parameter repeats it).
+func (f XsFile) firstOccurrence(
+	name string,
+	within common.Range,
+	skip *common.Pos,
+) (common.Range, bool) {
+	for i := range f.symbols {
+		s := f.symbols[i]
+
+		if s.name != name || !rangeWithin(s.at, within) {
+			continue
+		}
+
+		if skip != nil && s.at.Start == *skip {
+			continue
+		}
+
+		return s.at, true
+	}
+
+	return common.Range{}, false
+}
+
+// rangeWithin reports whether inner lies inside outer (both bounds
+// inclusive on the outer side of the half-open spans).
+func rangeWithin(inner common.Range, outer common.Range) bool {
+	return !inner.Start.Before(outer.Start) && !outer.End.Before(inner.End)
+}
+
+// eofPos closes top-level scopes: it compares after every real position.
+var eofPos = common.Pos{
+	Line:   ^uint32(0),
+	Column: ^uint32(0),
+	Offset: math.MaxInt,
+}
+
+// Definition returns the declaration of the symbol under pos: the name
+// range of the innermost enclosing declarer (LSP textDocument/definition).
+// Parameters and locals shadow top-level declarations; builtins and
+// unknown names report found=false.
+func (f XsFile) Definition(pos common.Pos) (common.Range, bool) {
+	occ, ok := f.occurrenceAt(pos)
+	if !ok {
+		return common.Range{}, false
+	}
+
+	return f.bestDeclarer(occ)
+}
+
+// occurrenceAt returns the identifier occurrence containing pos.
+func (f XsFile) occurrenceAt(pos common.Pos) (symbol, bool) {
+	for i := range f.symbols {
+		if f.symbols[i].at.Contains(pos) {
+			return f.symbols[i], true
+		}
+	}
+
+	return symbol{}, false
+}
+
+// declCandidate is one declaration site of a name together with its
+// scope: [nameRange.Start, scopeEnd).
+type declCandidate struct {
+	nameRange common.Range
+	scopeEnd  common.Pos
+	depth     int
+}
+
+// covers reports whether the candidate scope contains at.
+func (c declCandidate) covers(at common.Pos) bool {
+	return !at.Before(c.nameRange.Start) && at.Before(c.scopeEnd)
+}
+
+// better reports whether c wins over other: the deeper scope first,
+// then the nearest preceding declarer.
+func (c declCandidate) better(other declCandidate) bool {
+	if c.depth != other.depth {
+		return c.depth > other.depth
+	}
+
+	return c.nameRange.Start.After(other.nameRange.Start)
+}
+
+// bestDeclarer picks the winning declaration of the occurrence name:
+// the innermost scope covering the occurrence, ties broken by the
+// nearest preceding declarer.
+func (f XsFile) bestDeclarer(occ symbol) (common.Range, bool) {
+	var best declCandidate
+	found := false
+
+	consider := func(cand declCandidate) {
+		if cand.covers(occ.at.Start) && (!found || cand.better(best)) {
+			best = cand
+			found = true
+		}
+	}
+
+	for _, decl := range f.Decls {
+		if decl.Kind != DeclInclude && decl.Name == occ.name {
+			consider(declCandidate{
+				nameRange: f.declNameRange(decl),
+				scopeEnd:  eofPos,
+			})
+		}
+
+		for _, p := range decl.Params {
+			if p.Name != occ.name {
+				continue
+			}
+
+			if r, ok := f.paramNameRange(decl, occ.name); ok {
+				consider(declCandidate{nameRange: r, scopeEnd: decl.Range.End, depth: 1})
+			}
+		}
+
+		var locals []declCandidate
+
+		f.collectLocals(occ.name, decl.Body, decl.Range.End, 1, &locals)
+		for _, cand := range locals {
+			consider(cand)
+		}
+	}
+
+	if !found {
+		return common.Range{}, false
+	}
+
+	return best.nameRange, true
+}
+
+// paramNameRange returns the parameter-list token of name: the first
+// occurrence inside the declaration span, skipping the function's own
+// name token when a parameter repeats it.
+func (f XsFile) paramNameRange(decl Decl, name string) (common.Range, bool) {
+	var skip *common.Pos
+
+	if decl.Name == name {
+		if r, ok := f.firstOccurrence(decl.Name, decl.Range, nil); ok {
+			start := r.Start
+			skip = &start
+		}
+	}
+
+	return f.firstOccurrence(name, decl.Range, skip)
+}
+
+// collectLocals appends local-declaration candidates of name found in
+// stmts, recursing into nested blocks; blockEnd closes the block scope.
+func (f XsFile) collectLocals(
+	name string,
+	stmts []Stmt,
+	blockEnd common.Pos,
+	depth int,
+	out *[]declCandidate,
+) {
+	for i := range stmts {
+		if stmts[i].Kind == StmtDecl {
+			for _, item := range stmts[i].Exprs {
+				if r, ok := declaredLocal(item, name); ok {
+					*out = append(*out, declCandidate{
+						nameRange: r,
+						scopeEnd:  blockEnd,
+						depth:     depth,
+					})
+				}
+			}
+		}
+
+		f.collectLocals(name, stmts[i].Body, stmts[i].Range.End, depth+1, out)
+	}
+}
+
+// declaredLocal extracts the name range of a declared local when the
+// declaration item matches name: items are bare identifiers or
+// name = initializer binary nodes.
+func declaredLocal(item Expr, name string) (common.Range, bool) {
+	if item.Kind == ExprIdent && item.Value == name {
+		return item.Range, true
+	}
+
+	if item.Kind == ExprBinary && item.Value == "=" &&
+		len(item.Children) > 0 && item.Children[0].Kind == ExprIdent &&
+		item.Children[0].Value == name {
+		return item.Children[0].Range, true
+	}
+
+	return common.Range{}, false
 }
 
 // Decl is one top-level declaration.

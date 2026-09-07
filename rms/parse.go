@@ -99,7 +99,16 @@ func (p *parser) run(source string) {
 
 		if name, ok := sectionHeader(trimmed); ok {
 			p.closeSection(p.pos(i, 0))
-			p.cur = &sect{name: name, start: p.pos(i, 0)}
+			p.recordSectionWord(name, line, i)
+
+			if strings.HasPrefix(trimmed, "</") {
+				// a closing tag ends the section: following statements
+				// are global (rms_grammar), the section is not reopened
+				p.cur = &sect{name: "global", start: p.pos(i, 0)}
+			} else {
+				p.cur = &sect{name: name, start: p.pos(i, 0)}
+			}
+
 			continue
 		}
 
@@ -170,6 +179,8 @@ func (p *parser) statementLine(line string, idx int) {
 // multi-line attribute block; "{ attrs... }" on the same line is parsed
 // inline.
 func (p *parser) commandLine(first token, rest []token) {
+	p.recordWord(first.text, first.at)
+
 	stmt := &node{kind: KindCommand, name: first.text, start: first.at.Start, end: first.at.End}
 
 	args, block, open := splitArgsBlock(rest)
@@ -269,6 +280,8 @@ func (p *parser) attributeLine(owner *node, first token, rest []token) {
 // buildAttribute parses one attribute: a name and its (first) value
 // expression.
 func (p *parser) buildAttribute(first token, rest []token) Attribute {
+	p.recordWord(first.text, first.at)
+
 	attr := Attribute{
 		Name:  first.text,
 		Range: common.Range{Start: first.at.Start, End: first.at.End},
@@ -889,7 +902,43 @@ func (p *parser) expressions(toks []token) []Expr {
 		}
 	}
 
+	p.recordExprWords(out)
+
 	return out
+}
+
+// recordWord appends one word occurrence to the index.
+func (p *parser) recordWord(name string, at common.Range) {
+	p.file.words = append(p.file.words, wordOcc{name: name, at: at})
+}
+
+// recordExprWords collects the identifier/constant leaves of built
+// expressions (helper-call names included) into the word index.
+func (p *parser) recordExprWords(exprs []Expr) {
+	for _, e := range exprs {
+		switch e.Kind {
+		case KindConst, KindIdent:
+			p.recordWord(e.Value, e.Range)
+		}
+
+		p.recordExprWords(e.Children)
+	}
+}
+
+// recordSectionWord records the section name token inside the angle
+// brackets of a header line (opening or closing).
+func (p *parser) recordSectionWord(name string, line string, idx int) {
+	lead := len(line) - len(strings.TrimLeft(line, " \t"))
+	col := lead + 1
+
+	if strings.HasPrefix(strings.TrimSpace(line), "</") {
+		col = lead + 2
+	}
+
+	start := p.pos(idx, col)
+	end := p.pos(idx, col+len(name))
+
+	p.recordWord(name, common.Range{Start: start, End: end})
 }
 
 // tokenReader iterates a fixed token slice.

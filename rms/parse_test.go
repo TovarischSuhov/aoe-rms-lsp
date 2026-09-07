@@ -352,3 +352,67 @@ func messages(diags []common.Diagnostic) []string {
 
 	return out
 }
+
+func TestParse_ClosingTag_NoPhantomSection(t *testing.T) {
+	src := "<PLAYER_SETUP>\n" +
+		"random_placement\n" +
+		"</PLAYER_SETUP>\n" +
+		"<LAND_GENERATION>\n" +
+		"base_terrain GRASS\n" +
+		"</LAND_GENERATION>\n"
+
+	file, diags := Parse(src, "closing.rms")
+
+	require.Empty(t, diags)
+
+	names := make([]string, 0, len(file.Sections))
+	for _, sec := range file.Sections {
+		names = append(names, sec.Name)
+	}
+
+	require.Equal(t, []string{"player_setup", "land_generation"}, names,
+		"a closing tag must not reopen the section it closes")
+	require.NotEmpty(t, file.Sections[0].Statements)
+	require.NotEmpty(t, file.Sections[1].Statements)
+}
+
+func TestParse_ClosingTag_PostCloseGlobal(t *testing.T) {
+	src := "<CLIFF_GENERATION>\n" +
+		"</CLIFF_GENERATION>\n" +
+		"create_land TERRAIN_GRASS\n"
+
+	file, _ := Parse(src, "post.rms")
+
+	names := make([]string, 0, len(file.Sections))
+	for _, sec := range file.Sections {
+		names = append(names, sec.Name)
+	}
+
+	require.Equal(t, []string{"cliff_generation", "global"}, names,
+		"statements after a closing tag are global")
+
+	global := file.Sections[len(file.Sections)-1]
+	require.Len(t, global.Statements, 1)
+	require.Equal(t, "create_land", global.Statements[0].Name)
+}
+
+func TestParse_WordIndexRecordsAllKinds(t *testing.T) {
+	src := "<LAND_GENERATION>\n" +
+		"create_terrain FOREST {\n" +
+		"	land_percent 12\n" +
+		"}\n" +
+		"</LAND_GENERATION>\n"
+
+	file, _ := Parse(src, "words.rms")
+
+	counts := make(map[string]int)
+	for _, w := range file.words {
+		counts[w.name]++
+	}
+
+	require.Equal(t, 2, counts["land_generation"], "opening and closing headers")
+	require.Equal(t, 1, counts["create_terrain"], "command name")
+	require.Equal(t, 1, counts["FOREST"], "const argument value")
+	require.Equal(t, 1, counts["land_percent"], "attribute name")
+	require.NotContains(t, counts, "12", "numbers are not words")
+}
