@@ -37,13 +37,21 @@ func TestSymbol_FieldsAndShape(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.sym, tt.sym)
+			clone := tt.sym
+			if tt.sym.Children != nil {
+				clone.Children = append([]Symbol{}, tt.sym.Children...)
+			}
+			require.Equal(t, tt.sym, clone)
 
 			require.IsType(t, "", tt.sym.Kind)
 			require.IsType(t, "", tt.sym.Name)
 			require.IsType(t, Range{}, tt.sym.Range)
 			require.IsType(t, Range{}, tt.sym.Selection)
 			require.IsType(t, []Symbol{}, tt.sym.Children)
+
+			if len(tt.sym.Children) > 0 {
+				require.Equal(t, "command", tt.sym.Children[0].Kind)
+			}
 		})
 	}
 }
