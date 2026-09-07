@@ -37,7 +37,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: 2.13.2
+          version: v2.13.2
 
       - name: Vulnerability scan
         run: |

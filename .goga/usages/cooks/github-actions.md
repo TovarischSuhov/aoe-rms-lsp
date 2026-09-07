@@ -56,7 +56,7 @@ jobs:
       - run: go test -race ./...
       - uses: golangci/golangci-lint-action@v8
         with:
-          version: 2.13.2                     # keep in sync with local dev
+          version: v2.13.2                    # v-prefix required by the action; keep in sync with local dev
       - run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
