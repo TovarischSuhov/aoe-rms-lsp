@@ -90,3 +90,81 @@ func TestXsReferencesAt_NoIdentEmpty(t *testing.T) {
 
 	require.Empty(t, file.ReferencesAt(common.Pos{Line: 0, Column: uint32(literal)}))
 }
+
+func TestXsDefinition_APIShape(t *testing.T) {
+	file, _ := XsParse("void f() {}", "shape.xs")
+
+	r, found := file.Definition(common.Pos{Line: 0, Column: 5})
+
+	require.True(t, found)
+	require.IsType(t, common.Range{}, r)
+}
+
+func TestXsDefinition_ParamShadowsTopLevel(t *testing.T) {
+	line := "void f(float x) { x = 2; }"
+
+	file, _ := XsParse("int x = 1;\n"+line, "shadow.xs")
+
+	r, found := file.Definition(common.Pos{Line: 1, Column: uint32(strings.Index(line, "x = 2"))})
+
+	require.True(t, found)
+	require.Equal(t, uint32(1), r.Start.Line)
+	require.Equal(t, uint32(strings.Index(line, "x)")), r.Start.Column,
+		"the parameter token wins over the top-level variable")
+}
+
+func TestXsDefinition_OnDeclarationReturnsItself(t *testing.T) {
+	src := "void f() {}"
+
+	file, _ := XsParse(src, "self.xs")
+
+	r, found := file.Definition(common.Pos{Line: 0, Column: uint32(strings.Index(src, "f("))})
+
+	require.True(t, found)
+	require.Equal(t, uint32(strings.Index(src, "f(")), r.Start.Column)
+	require.Equal(t, uint32(len("f")), r.End.Column-r.Start.Column)
+}
+
+func TestXsDefinition_TopLevelVariable(t *testing.T) {
+	line := "void f() { x = 2; }"
+
+	file, _ := XsParse("int x = 1;\n"+line, "top.xs")
+
+	r, found := file.Definition(common.Pos{Line: 1, Column: uint32(strings.Index(line, "x = 2"))})
+
+	require.True(t, found)
+	require.Equal(t, uint32(0), r.Start.Line)
+	require.Equal(t, uint32(strings.Index("int x = 1;", "x")), r.Start.Column)
+}
+
+func TestXsDefinition_BuiltinNotFound(t *testing.T) {
+	line := "void f() { xsSetWorldGravity(1.0); }"
+
+	file, _ := XsParse(line, "builtin.xs")
+
+	_, found := file.Definition(common.Pos{Line: 0, Column: uint32(strings.Index(line, "xsSetWorldGravity("))})
+
+	require.False(t, found, "builtins have no local declaration")
+}
+
+func TestXsDefinition_LocalShadowsOuterLocal(t *testing.T) {
+	src := "void f() {\n" +
+		"\tint x = 1;\n" +
+		"\tif (1) {\n" +
+		"\t\tint x = 2;\n" +
+		"\t\tx = 3;\n" +
+		"\t}\n" +
+		"}\n"
+
+	lines := strings.Split(src, "\n")
+	file, _ := XsParse(src, "locals.xs")
+
+	r, found := file.Definition(common.Pos{
+		Line:   4,
+		Column: uint32(strings.Index(lines[4], "x")),
+	})
+
+	require.True(t, found)
+	require.Equal(t, uint32(3), r.Start.Line, "the inner block local wins")
+	require.Equal(t, uint32(strings.Index(lines[3], "x")), r.Start.Column)
+}

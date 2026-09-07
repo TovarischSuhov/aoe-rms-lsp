@@ -117,7 +117,7 @@ func (p *xparser) parseTypedDecl() {
 
 		if p.atOp("{") {
 			decl.Body = p.parseBlock()
-			decl.Range.End = p.blockEnd(start, decl.Body)
+			decl.Range.End = p.blockEnd(decl.Range.End, decl.Body)
 		} else {
 			p.expect(";")
 		}
@@ -231,7 +231,7 @@ func (p *xparser) parseRule() {
 
 	if p.atOp("{") {
 		decl.Body = p.parseBlock()
-		decl.Range.End = p.blockEnd(start, decl.Body)
+		decl.Range.End = p.blockEnd(decl.Range.End, decl.Body)
 	} else {
 		p.reportf(decl.Range, common.SeverityError, "syntax", "rule without a body")
 	}
@@ -262,7 +262,7 @@ func (p *xparser) parseEvent() {
 
 	if p.atOp("{") {
 		decl.Body = p.parseBlock()
-		decl.Range.End = p.blockEnd(start, decl.Body)
+		decl.Range.End = p.blockEnd(decl.Range.End, decl.Body)
 	} else {
 		decl.Range.End = p.expectSemi(decl.Range.End)
 	}
