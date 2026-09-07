@@ -4,12 +4,14 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"go.lsp.dev/uri"
 
+	"aoe2-lsp/common"
 	"aoe2-lsp/rms"
 	"aoe2-lsp/xs"
 )
@@ -203,4 +205,298 @@ func canonicalPath(uriArg string) string {
 	}
 
 	return filepath.Clean(u.FsPath())
+}
+
+// Definition resolves the cross-file definition under pos: an include
+// path argument jumps to the target file start; an XS identifier resolves
+// locally first, then through the closure's declarations. Builtins and
+// unknown names yield found=false.
+func (r *Resolver) Definition(
+	ctx context.Context,
+	uriArg string,
+	pos common.Pos,
+) (Target, bool) {
+	if ctx.Err() != nil {
+		return Target{}, false
+	}
+
+	path := canonicalPath(uriArg)
+	if path == "" {
+		return Target{}, false
+	}
+
+	f, ok := r.load(uriArg, path)
+	if !ok {
+		return Target{}, false
+	}
+
+	if f.rms != nil {
+		if t, found := r.definitionInRms(f, path, pos); found {
+			return t, true
+		}
+	} else if rr, found := f.xs.Definition(pos); found {
+		return Target{URI: uriArg, Range: rr}, true
+	}
+
+	// closure-wide declaration lookup by the name under pos
+	name := r.symbolNameAt(f, pos)
+	if name == "" {
+		return Target{}, false
+	}
+
+	for _, e := range r.Closure(ctx, uriArg).Xs {
+		for _, sym := range e.File.Symbols() {
+			if sym.Name == name {
+				return Target{URI: e.URI, Range: sym.Selection}, true
+			}
+		}
+	}
+
+	return Target{}, false
+}
+
+// definitionInRms answers Definition inside an RMS file: the include
+// directive hit-test, then the inline XS blocks.
+func (r *Resolver) definitionInRms(f file, path string, pos common.Pos) (Target, bool) {
+	directives := make([]rms.Include, 0, len(f.rms.Includes)+len(f.rms.XsIncludes))
+	directives = append(directives, f.rms.Includes...)
+	directives = append(directives, f.rms.XsIncludes...)
+
+	for _, inc := range directives {
+		if !inc.Range.Contains(pos) {
+			continue
+		}
+
+		target := filepath.Join(filepath.Dir(path), inc.Path)
+		if _, err := os.Stat(target); err != nil {
+			return Target{}, false
+		}
+
+		return Target{URI: string(uri.File(target)), Range: common.Range{}}, true
+	}
+
+	for _, block := range f.rms.XsBlocks {
+		if !block.Range.Contains(pos) {
+			continue
+		}
+
+		xsFile, _ := xs.XsParse(block.Code, f.uri)
+
+		if rr, found := xsFile.Definition(unshiftPos(pos, block.Range.Start)); found {
+			return Target{URI: f.uri, Range: shiftRange(rr, block.Range.Start)}, true
+		}
+
+		return Target{}, false
+	}
+
+	return Target{}, false
+}
+
+// References returns every occurrence of the name under pos across the
+// closure of the queried document plus the closures of open documents
+// that include it (reverse direction). The declaration occurrence is
+// included; the result is deduplicated and sorted by (URI, position).
+func (r *Resolver) References(ctx context.Context, uriArg string, pos common.Pos) []Target {
+	out := make([]Target, 0)
+
+	if ctx.Err() != nil {
+		return out
+	}
+
+	path := canonicalPath(uriArg)
+	if path == "" {
+		return out
+	}
+
+	f, ok := r.load(uriArg, path)
+	if !ok {
+		return out
+	}
+
+	name := r.nameAt(f, pos)
+	if name == "" {
+		return out
+	}
+
+	closures := []Closure{r.Closure(ctx, uriArg)}
+
+	for _, u := range r.source.URIs() {
+		if u == uriArg {
+			continue
+		}
+
+		if r.closureContains(ctx, u, uriArg) {
+			closures = append(closures, r.Closure(ctx, u))
+		}
+	}
+
+	seen := make(map[targetKey]bool)
+
+	for _, c := range closures {
+		for _, e := range c.Rms {
+			r.addReferences(seen, &out, e.URI, e.File.References(name))
+
+			for _, block := range e.File.XsBlocks {
+				xsFile, _ := xs.XsParse(block.Code, e.URI)
+
+				r.addShifted(seen, &out, e.URI, xsFile.References(name), block.Range.Start)
+			}
+		}
+
+		for _, e := range c.Xs {
+			r.addReferences(seen, &out, e.URI, e.File.References(name))
+		}
+	}
+
+	slices.SortFunc(out, func(a, b Target) int {
+		switch {
+		case a.URI != b.URI:
+			return strings.Compare(a.URI, b.URI)
+		case a.Range.Start.Before(b.Range.Start):
+			return -1
+		case b.Range.Start.Before(a.Range.Start):
+			return 1
+		default:
+			return 0
+		}
+	})
+
+	return out
+}
+
+// targetKey deduplicates occurrences by (URI, Range).
+type targetKey struct {
+	uri string
+	r   common.Range
+}
+
+// addReferences appends occurrences unless already seen.
+func (r *Resolver) addReferences(seen map[targetKey]bool, out *[]Target, uriArg string, ranges []common.Range) {
+	for _, rr := range ranges {
+		key := targetKey{uri: uriArg, r: rr}
+		if seen[key] {
+			continue
+		}
+
+		seen[key] = true
+		*out = append(*out, Target{URI: uriArg, Range: rr})
+	}
+}
+
+// addShifted appends block-relative occurrences translated into file
+// coordinates (mirrors the server's shiftPos semantics).
+func (r *Resolver) addShifted(
+	seen map[targetKey]bool,
+	out *[]Target,
+	uriArg string,
+	ranges []common.Range,
+	base common.Pos,
+) {
+	for _, rr := range ranges {
+		shifted := shiftRange(rr, base)
+
+		key := targetKey{uri: uriArg, r: shifted}
+		if seen[key] {
+			continue
+		}
+
+		seen[key] = true
+		*out = append(*out, Target{URI: uriArg, Range: shifted})
+	}
+}
+
+// closureContains reports whether root's closure has target among its
+// entries (canonical path comparison).
+func (r *Resolver) closureContains(ctx context.Context, root string, target string) bool {
+	tgt := canonicalPath(target)
+	if tgt == "" {
+		return false
+	}
+
+	c := r.Closure(ctx, root)
+
+	for _, e := range c.Rms {
+		if canonicalPath(e.URI) == tgt {
+			return true
+		}
+	}
+
+	for _, e := range c.Xs {
+		if canonicalPath(e.URI) == tgt {
+			return true
+		}
+	}
+
+	return false
+}
+
+// nameAt resolves the name under pos: XS identifiers via SymbolAt (inline
+// blocks translated), RMS words via ReferencesAt plus the file text.
+func (r *Resolver) nameAt(f file, pos common.Pos) string {
+	if f.xs != nil {
+		name, _ := f.xs.SymbolAt(pos)
+
+		return name
+	}
+
+	for _, block := range f.rms.XsBlocks {
+		if !block.Range.Contains(pos) {
+			continue
+		}
+
+		xsFile, _ := xs.XsParse(block.Code, f.uri)
+		name, _ := xsFile.SymbolAt(unshiftPos(pos, block.Range.Start))
+
+		return name
+	}
+
+	ranges := f.rms.ReferencesAt(pos)
+	if len(ranges) == 0 {
+		return ""
+	}
+
+	return f.text[ranges[0].Start.Offset:ranges[0].End.Offset]
+}
+
+// symbolNameAt resolves the identifier name under pos for the closure-wide
+// declaration lookup (XS files and inline blocks only).
+func (r *Resolver) symbolNameAt(f file, pos common.Pos) string {
+	return r.nameAt(f, pos)
+}
+
+// shiftRange translates a block-relative range into file coordinates.
+func shiftRange(rr common.Range, base common.Pos) common.Range {
+	return common.Range{Start: shiftPos(rr.Start, base), End: shiftPos(rr.End, base)}
+}
+
+// shiftPos maps a block-relative position into file coordinates; only the
+// first block line also gains the start column.
+func shiftPos(p common.Pos, base common.Pos) common.Pos {
+	shifted := common.Pos{
+		Line:   p.Line + base.Line,
+		Column: p.Column,
+		Offset: p.Offset + base.Offset,
+	}
+
+	if p.Line == 0 {
+		shifted.Column += base.Column
+	}
+
+	return shifted
+}
+
+// unshiftPos maps a file position into block coordinates (the inverse of
+// shiftPos); the caller guarantees p lies within the block.
+func unshiftPos(p common.Pos, base common.Pos) common.Pos {
+	unshifted := common.Pos{
+		Line:   p.Line - base.Line,
+		Column: p.Column,
+		Offset: p.Offset - base.Offset,
+	}
+
+	if p.Line == base.Line {
+		unshifted.Column -= base.Column
+	}
+
+	return unshifted
 }
