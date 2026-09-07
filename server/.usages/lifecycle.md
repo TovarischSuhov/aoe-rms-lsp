@@ -28,3 +28,17 @@ completion, and navigation — definition, references, documentSymbol.
 Editor configs need no extra flags; positionEncoding is negotiated
 (prefer utf-8 when the client offers it).
 
+## Cross-file navigation
+
+Definition and references resolve across the document's include closure:
+targets may live in files that are not open in the editor — the server
+loads them from disk on demand (editor state always wins for open files).
+Missing #include / #includeXS targets surface as "missing-include"
+diagnostics on the directive's path range.
+
+Preconditions:
+- Include paths resolve relative to the including file's directory; the
+  game's installation root is not searched.
+- Files changed outside the editor without a size/mtime change are not
+  reloaded (no file watcher).
+

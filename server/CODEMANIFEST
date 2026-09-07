@@ -14,6 +14,7 @@ Imports:
   - Types:
       - XsParse
       - XsFile
+      - Decl
     Usages:
       - xs-parsing
     From: xs
@@ -27,6 +28,15 @@ Imports:
     Usages:
       - symbols
     From: common
+  - Types:
+      - Source
+      - Resolver
+      - Closure
+      - Target
+      - MissingInclude
+    Usages:
+      - closure
+    From: include
 
 Usages:
   conventions: .goga/usages/conventions.md
@@ -36,8 +46,8 @@ Annotations: |
   Use `conventions` for code writing rules and testing.
   Use `lsp-protocol` for go.lsp.dev patterns (NewServer bootstrap, Full sync,
   PublishDiagnostics, Hover/Completion result shapes, Boolean/Optional arms).
-  Use `lookups`, `rms-parsing`, `xs-parsing`, `checks` from Imports for the
-  provider APIs wired into handlers.
+  Use `lookups`, `rms-parsing`, `xs-parsing`, `checks`, `closure` from
+  Imports for the provider APIs wired into handlers.
 
   Language selection by URI extension: .rms → `Parse` → `RmsFile`
   (+ inline `XsBlock` → `XsParse` with range shift), .xs → `XsParse` →
@@ -47,6 +57,13 @@ Annotations: |
 
   Навигационные хендлеры (Definition/References/DocumentSymbol) следуют
   секции Navigation `lsp-protocol`: пустой результат — пустой slice, не nil.
+  Definition/References резолвятся через `Resolver` по include-замыканию
+  (Cross-file Navigation Results): цели могут жить в неоткрытых файлах.
+
+  `Resolver` создаётся в конструкторе `Server` над собственным `DocStore`
+  (NewResolver(docs): DocStore структурно удовлетворяет `Source`).
+  Внешние декларации (`Decl` из ExternalDecls по `closure`) передаются в
+  AnalyzeXs — тип `Decl` импортирован из xs.
 
 ---
 
@@ -59,6 +76,7 @@ Annotations: |
 
     Requirements:
     - паттерны протокола строго по `lsp-protocol` (UnimplementedServer, Full sync)
+    - Resolver над собственным DocStore (по `closure`)
   methods:
     "Initialize(ctx: Context, params: InitializeParams) -> result: InitializeResult, err: error": |
       Заявить возможности: TextDocumentSync Full+OpenClose, HoverProvider
@@ -68,12 +86,16 @@ Annotations: |
     "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |
       Algorithm:
       1. DocStore.Put(uri, text, version)
-      2. Пересчитать диагностики (общая функция с DidChange)
-      3. PublishDiagnostics по `lsp-protocol`
+      2. Пересчитать диагностики (общая функция с DidChange):
+         вычислить `Closure` для uri; записи `MissingInclude` с Owner==uri →
+         Diagnostic (code="missing-include", range директивы); RMS:
+         синтаксис + AnalyzeRms; inline XsBlock: XsParse + AnalyzeXs(xsFile,
+         ExternalDecls("")); .xs: AnalyzeXs(file, ExternalDecls(uri))
+      3. PublishDiagnostics по `lsp-protocol` (одна пачка)
     "DidChange(ctx: Context, params: DidChangeTextDocumentParams) -> err: error": |
       Algorithm:
       1. Взять весь текст из ContentChanges (WholeDocument)
-      2. DocStore.Put; пересчитать; PublishDiagnostics
+      2. DocStore.Put; пересчитать (как в DidOpen); PublishDiagnostics
     "DidClose(ctx: Context, params: DidCloseTextDocumentParams) -> err: error": |
       DocStore.Remove(uri); опубликовать пустой список диагностик.
     "Hover(ctx: Context, params: HoverParams) -> hover: Hover, err: error": |
@@ -87,28 +109,26 @@ Annotations: |
          .xs: префикс слова → Store.Functions + Store.Constants
       2. CompletionList: label, kind, detail=сигнатура, documentation=desc
     "Definition(ctx: Context, params: DefinitionParams) -> result: DefinitionResult, err: error": |
-      Переход к определению символа под позицией.
+      Кросс-файловый переход к определению.
 
       Algorithm:
-      1. Открыть документ; .xs → `XsParse` → Definition(pos) по
-         `xs-parsing`: found → Location{URI, Range}
-      2. Не найдено (builtin/неизвестное), .rms или документ закрыт —
-         пустая LocationSlice (не nil) по `lsp-protocol`
-      3. Пустой результат ошибкой не считать
+      1. Resolver.Definition(ctx, uri, pos) по `closure`
+      2. Найденный `Target` → protocol.Location (URI может отличаться
+         от запрошенного — Cross-file Navigation Results в `lsp-protocol`)
+      3. Промах → пустая LocationSlice (не nil); ошибкой не считать
 
       Requirements:
       - конвертация позиций — с учётом согласованного positionEncoding
 
     "References(ctx: Context, params: ReferenceParams) -> locations: []Location, err: error": |
-      Ссылки на символ под позицией.
+      Ссылки на символ по include-замыканию.
 
       Algorithm:
-      1. ReferencesAt(pos) по языку (`xs-parsing` / `rms-parsing`)
-      2. Каждый Range → Location
-      3. IncludeDeclaration=false и язык .xs → исключить range из
-         Definition(pos) (декларация); для .rms исключений нет —
-         локальных деклараций нет
-      4. Пустой результат — пустой список, не nil
+      1. Resolver.References(ctx, uri, pos) по `closure`; каждый `Target` →
+         Location
+      2. IncludeDeclaration=false → исключить range локальной декларации
+         (range Definition в запрошенном файле)
+      3. Пустой результат — пустой список, не nil
 
     "DocumentSymbol(ctx: Context, params: DocumentSymbolParams) -> result: DocumentSymbolResult, err: error": |
       Outline документа.
@@ -136,11 +156,16 @@ Annotations: |
 
     Requirements:
     - Put со stale version (меньше текущей) игнорируется
+    - структурно удовлетворяет Source из Imports (метод Text)
   methods:
     "Put(uri: string, text: string, version: int)": |
       Сохранить текст документа с версией.
     "Get(uri: string) -> text: string, version: int, found: bool": |
       Текст и версия документа; found=false если документ не открыт.
+    "Text(uri: string) -> text: string, found: bool": |
+      Editor-state текст без версии (проекция Get для `Source`).
+
+      `uri`: идентификатор документа; `found`: документ открыт
     "Remove(uri: string)": |
       Удалить документ из кэша.
 
@@ -160,4 +185,5 @@ Annotations: |
 Author: Goga
 CreatedAt: 04/09/26
 Description: |
-  Корневая ячейка: LSP-сервер (stdio) над kb/rms/xs/analysis для редакторов.
+  Корневая ячейка: LSP-сервер (stdio) над kb/rms/xs/analysis/include
+  для редакторов.

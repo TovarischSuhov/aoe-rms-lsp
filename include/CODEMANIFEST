@@ -1,0 +1,220 @@
+Imports:
+  - Types:
+      - Pos
+      - Range
+    Usages:
+      - positions-and-diagnostics
+    From: common
+  - Types:
+      - Parse
+      - RmsFile
+      - Include
+    Usages:
+      - rms-parsing
+      - includes
+    From: rms
+  - Types:
+      - XsParse
+      - XsFile
+      - Decl
+    Usages:
+      - xs-parsing
+    From: xs
+
+Usages:
+  conventions: .goga/usages/conventions.md
+  lsp-protocol: .goga/usages/cooks/lsp-protocol.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing (DI-конструктор,
+  ctx-first, %w).
+  Use `lsp-protocol` (Disk-backed Documents) для дисковых документов,
+  editor-state приоритета и uri.File/Filename конверсий.
+  Use `positions-and-diagnostics` from Imports для Pos/Range.
+  Use `rms-parsing`, `includes`, `xs-parsing` from Imports для парсов и
+  навигационных API провайдеров.
+
+  Ячейка потокобезопасна (мьютекс кэша; запросы interleaved). Зависимость
+  от editor-state инвертирована через Source; про server/protocol ячейка
+  не знает. IO — stdlib + go.lsp.dev/uri.
+
+---
+
+"Source()":
+  location: source.go
+  annotations: |
+    Поставщик editor-state текста документов; инверсия зависимости —
+    ячейка не знает про DocStore сервера.
+  methods:
+    "Text(uri: string) -> text: string, found: bool": |
+      Текст открытого в редакторе документа.
+
+      `uri`: идентификатор документа
+      `text`: текст editor-state
+      `found`: документ открыт (false — сигнал «смотреть на диск»)
+
+"Resolver(source: Source)":
+  location: resolver.go
+  annotations: |
+    Include-замыкание документа и кросс-файловая навигация над ним.
+
+    `source`: поставщик editor-state текста (DI)
+
+    Requirements:
+    - потокобезопасность: внутренняя синхронизация кэша
+    - ctx уважает отмену
+  methods:
+    "Closure(ctx: Context, uri: string) -> closure: Closure": |
+      Замыкание #include/#includeXS от корня.
+
+      `ctx`: контекст отмены; `uri`: корневой документ
+
+      Algorithm:
+      1. Текст корня: Text из `Source`; found=false → диск по `lsp-protocol`
+         (Filename + чтение); недоступен → Closure с Root=uri и пустыми
+         списками
+      2. Расширение → парс: .rms → `Parse` по `rms-parsing`, .xs →
+         `XsParse` по `xs-parsing`; entry в visit-set по каноническому пути
+      3. Для каждого RmsEntry: Includes и XsIncludes по `includes` — резолв
+         относительно директории owner-файла по `lsp-protocol`; файл
+         существует → ResolvedInclude и target в очередь; нет →
+         MissingInclude
+      4. Повторный канонический путь не разворачивается (циклы A→B→A
+         безопасны); лимит глубины 64 и лимит файлов 1024: при превышении
+         разворот останавливается, ошибкой не считать
+      5. Вернуть Closure
+
+      Requirements:
+      - DFS-порядок файлов детерминирован (порядок директив)
+      - каждая ненайденная директива — своя MissingInclude (повторы путей
+        не дедуплицировать)
+
+      Constraints:
+      - inline XsBlocks в замыкание не входят (часть owner-парза)
+      - XS include-декларации не разворачиваются
+    "Definition(ctx: Context, uri: string, pos: Pos) -> target: Target, found: bool": |
+      Кросс-файловое определение символа/директивы под позицией.
+
+      `uri`: документ; `pos`: позиция; `target`: точка перехода;
+      `found`: цель найдена
+
+      Algorithm:
+      1. Include.Range.Contains(pos) в Includes/XsIncludes запрошенного
+         файла → резолв → Target{URI цели, Range 0:0 нулевой длины};
+         не резолвится — found=false
+      2. Позиция в inline XsBlock — транслировать в координаты блока,
+         локальная Definition по `xs-parsing`, результат транслировать
+         обратно
+      3. .xs: локальная Definition(pos)
+      4. Имя под позицией → поиск Symbols() XS-файлов замыкания
+         (Selection = name-range), первый в DFS-порядке → Target
+      5. Не найдено (builtin/неизвестное) — found=false
+
+      Requirements:
+      - детерминированность: одинаковый вход → одинаковый результат
+    "References(ctx: Context, uri: string, pos: Pos) -> refs: []Target": |
+      Вхождения имени под позицией по всему замыканию.
+
+      `uri`: документ; `pos`: позиция; `refs`: вхождения (декларация
+      включается; фильтрация — вызывающая сторона)
+
+      Algorithm:
+      1. Closure(uri)
+      2. Имя под pos: .xs — SymbolAt по `xs-parsing`; .rms —
+         ReferencesAt(pos) запрошенного файла, имя = текст первого range;
+         пусто — пустой результат
+      3. По всем файлам замыкания References(name) (.rms и .xs) →
+         Target{URI, Range}
+      4. Inline-блоки корня: XsParse(block.Code) + вхождения с
+         трансляцией координат блока
+      5. Сортировка: URI, затем позиция
+
+      Requirements:
+      - запрошенный файл входит в результат
+
+"Closure(root: string)":
+  location: closure.go
+  annotations: |
+    Результат замыкания: файлы с AST, резолвы, пропуски.
+  properties:
+    "Root -> string": |
+      URI корневого документа запроса.
+    "Rms -> []RmsEntry": |
+      RMS-файлы замыкания (DFS-порядок).
+    "Xs -> []XsEntry": |
+      XS-файлы замыкания (DFS-порядок).
+    "Resolved -> []ResolvedInclude": |
+      Успешно резолвленные директивы.
+    "Missing -> []MissingInclude": |
+      Ненайденные подключения.
+  methods:
+    "ExternalDecls(exclude: string) -> decls: []Decl": |
+      Декларации XS-файлов замыкания для анализа.
+
+      `exclude`: URI исключаемого файла ("" — не исключать)
+      `decls`: топ-декларации, DFS-порядок
+
+"RmsEntry(uri: string, file: RmsFile)":
+  location: closure.go
+  annotations: |
+    RMS-файл замыкания.
+  properties:
+    "URI -> string": |
+      URI файла.
+    "File -> RmsFile": |
+      AST файла.
+
+"XsEntry(uri: string, file: XsFile)":
+  location: closure.go
+  annotations: |
+    XS-файл замыкания.
+  properties:
+    "URI -> string": |
+      URI файла.
+    "File -> XsFile": |
+      AST файла.
+
+"ResolvedInclude(owner: string, inc: Include, target: string)":
+  location: closure.go
+  annotations: |
+    Успешно резолвленная директива-подключение.
+  properties:
+    "Owner -> string": |
+      URI файла, содержащего директиву.
+    "Inc -> Include": |
+      Директива.
+    "Target -> string": |
+      URI цели.
+
+"MissingInclude(owner: string, path: string, r: Range)":
+  location: closure.go
+  annotations: |
+    Ненайденное подключение.
+
+    Requirements:
+    - Range — координаты owner-файла
+  properties:
+    "Owner -> string": |
+      URI файла, содержащего директиву.
+    "Path -> string": |
+      Путь как записан.
+    "Range -> Range": |
+      Диапазон аргумента-пути.
+
+"Target(uri: string, r: Range)":
+  location: closure.go
+  annotations: |
+    Точка кросс-файловой навигации.
+  properties:
+    "URI -> string": |
+      URI файла-цели.
+    "Range -> Range": |
+      Диапазон в целевом файле.
+
+---
+
+Author: Goga
+CreatedAt: 07/09/26
+Description: |
+  Include-замыкание документов: резолв #include/#includeXS, дисковая загрузка,
+  кросс-файловая навигация.

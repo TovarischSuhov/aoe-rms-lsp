@@ -15,8 +15,18 @@ analyzer := analysis.NewAnalyzer(store)
 rmsFile, syntaxDiags := rms.Parse(text, uri)
 all := append(syntaxDiags, analyzer.AnalyzeRms(rmsFile)...)
 xsFile, xsDiags := xs.XsParse(block.Code, "inline:"+uri)
-all = append(all, analyzer.AnalyzeXs(xsFile)...)
+all = append(all, analyzer.AnalyzeXs(xsFile, nil)...)
 // both sorted by position; publish as one batch
+```
+
+## XS with an include closure
+
+```go
+// XS with an include closure behind it: pass the closure's declarations —
+// names declared in included .xs files no longer fire undefined-symbol.
+externals := closure.ExternalDecls(uri) // exclude the analyzed file itself
+diags := analyzer.AnalyzeXs(xsFile, externals)
+// nil externals — same behavior as before the parameter existed
 ```
 
 ## Diagnostic codes

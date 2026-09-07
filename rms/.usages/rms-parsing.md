@@ -49,6 +49,10 @@ syms := file.Symbols() // []common.Symbol, kinds: section/command/xs
 // command, attribute and identifier words), sorted by position. RMS has
 // no local declarations — all occurrences are equal.
 for _, r := range file.ReferencesAt(pos) { ... }
+
+// by-name form for cross-file searches: same occurrences without a
+// position in this file.
+for _, r := range file.References(name) { ... }
 ```
 
 Preconditions:

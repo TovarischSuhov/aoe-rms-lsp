@@ -42,6 +42,18 @@ if r, ok := xsFile.Definition(pos); ok {
 // same-name symbols from different scopes are not distinguished.
 for _, r := range xsFile.ReferencesAt(pos) { ... }
 
+// by-name references: for files where no position is known (cross-file
+// searches over an include closure). Includes the declaration occurrence;
+// ReferencesAt(pos) ≡ References(name under pos).
+for _, r := range xsFile.References(name) { ... }
+
+// cross-file definition lookup: Symbols() carries each top-level decl's
+// name range in Selection — match by Name to find the jump target when
+// the declaring file is not the queried one.
+for _, sym := range xsFile.Symbols() {
+    if sym.Name == name { /* target: sym.Selection */ }
+}
+
 // outline: top-level declarations as Symbol nodes (flat); include
 // directives are skipped — the kind vocabulary has no entry for them.
 syms := xsFile.Symbols() // []common.Symbol

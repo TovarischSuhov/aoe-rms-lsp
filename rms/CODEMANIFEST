@@ -22,6 +22,11 @@ Annotations: |
   Parser never fails hard: every problem becomes a Diagnostic; recovery
   resynchronizes to the next statement/section. Every AST node carries a Range.
 
+  Директивы подключений по `rms_grammar` (Directives): #include → Includes;
+  #includeXS с аргументом → XsIncludes + переключение в inline-XS режим
+  (блок после директивы — в XsBlocks); bare #includeXS → только XsBlock.
+  Путь без аргумента — синтаксическая Diagnostic, Include не создаётся.
+
 ---
 
 "Parse(source: string, name: string) -> file: RmsFile, diags: []Diagnostic":
@@ -39,7 +44,10 @@ Annotations: |
     3. Для каждого statement: команда + позиционные аргументы (Expr),
        последующие атрибуты прикреплять к текущей команде (позиционная семантика)
     4. Блоки start_random/percent_chance и if/elseif/else вкладывать в Children
-    5. #includeXS — начать XsBlock; собирать строки до следующей директивы/секции
+    5. Директивы: #include с аргументом-путём → Include в Includes
+       (Range = аргумент-путь); #includeXS с аргументом → Include в XsIncludes
+       и начало XsBlock; bare #includeXS → только XsBlock; собирать строки
+       блока до следующей директивы/секции
     6. При ошибке: Diagnostic с диапазоном токена, sync на следующий
        statement/секцию, продолжить разбор
 
@@ -62,8 +70,10 @@ Annotations: |
       Имя файла.
     "Sections -> []Section": |
       Секции скрипта.
-    "Includes -> []string": |
-      Пути #include.
+    "Includes -> []Include": |
+      Директивы #include (путь + диапазон аргумента).
+    "XsIncludes -> []Include": |
+      Внешние XS-скрипты (#includeXS с аргументом); inline-код — в XsBlocks.
     "XsBlocks -> []XsBlock": |
       Встроенные XS-блоки (#includeXS).
   methods:
@@ -117,6 +127,22 @@ Annotations: |
       - локальных деклараций в RMS нет: все вхождения равнозначны
         (вызывающая сторона не отбрасывает декларацию)
 
+    "References(name: string) -> ranges: []Range": |
+      Вхождения имени без позиции (кросс-файловые references: у вызывающей
+      стороны нет позиции в чужом файле).
+
+      `name`: имя (слово-токен)
+      `ranges`: все вхождения имени, по позиции
+
+      Algorithm:
+      1. Собрать все слова-токены, равные `name` (имена секций, команд,
+         атрибутов и значения ident/const)
+      2. Отсортировать по позиции
+
+      Requirements:
+      - ReferencesAt(pos) эквивалентен References(слово под pos)
+      - отсутствие имени — пустой список
+
 "XsBlock()":
   location: ast.go
   annotations: |
@@ -129,6 +155,23 @@ Annotations: |
       Исходный текст блока (позиции — относительно блока).
     "Range -> Range": |
       Диапазон блока в RMS-файле.
+
+"Include(path: string, r: Range)":
+  location: ast.go
+  annotations: |
+    Директива-подключение: путь и диапазон аргумента-пути.
+
+    `path`: путь как записан (относительный)
+    `r`: диапазон аргумента-пути (не всей директивы — hit-test курсора
+    и диагностика точнее)
+
+    Constraints:
+    - чистый тип данных: construct-and-use, без методов
+  properties:
+    "Path -> string": |
+      Путь подключения (как записан в исходнике).
+    "Range -> Range": |
+      Диапазон аргумента-пути.
 
 "Section()":
   location: ast.go

@@ -88,13 +88,17 @@ Annotations: |
       Constraints:
       - не изменять входной AST
 
-    "AnalyzeXs(file: XsFile) -> diags: []Diagnostic": |
-      Проверки XS-файла.
+    "AnalyzeXs(file: XsFile, externals: []Decl) -> diags: []Diagnostic": |
+      Проверки XS-файла с учётом внешних деклараций замыкания.
 
-      `file`: AST из xs.Parse
+      `file`: анализируемый AST
+      `externals`: декларации включённых .xs-источников (например,
+      Closure.ExternalDecls); nil/пусто — поведение прежнее
 
       Algorithm:
-      1. Построить `TypeEnv` из Decls файла
+      1. Построить `TypeEnv` из Decls файла; затем каждую external-декларацию
+         объявить в топ-левел области (Declare), только если имя ещё не
+         объявлено файлом
       2. Собрать объявленные имена (functions, variables, params, rules)
       3. Обойти объявления: при входе в тело функции — Push, объявить
          параметры (`XsParam`) и локальные переменные через Declare; при
@@ -110,10 +114,12 @@ Annotations: |
       7. Отсортировать diags
 
       Requirements:
+      - externals подавляют undefined-symbol и предоставляют типы для
+        InferType; локальные декларации file всегда приоритетнее внешних
       - не дублировать синтаксические diags парсера
 
       Constraints:
-      - не изменять входной AST
+      - не изменять входной AST и externals
 
 "CheckRmsValue(spec: CommandArg, kind: string, value: string, r: Range) -> diag: Diagnostic, reported: bool":
   location: values.go
