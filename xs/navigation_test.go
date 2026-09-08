@@ -11,6 +11,7 @@ import (
 )
 
 func TestXsSymbols_APIShape(t *testing.T) {
+	t.Parallel()
 	file, _ := XsParse("void f() {}", "shape.xs")
 
 	syms := file.Symbols()
@@ -25,6 +26,7 @@ func TestXsSymbols_APIShape(t *testing.T) {
 }
 
 func TestXsReferencesAt_APIShape(t *testing.T) {
+	t.Parallel()
 	file, _ := XsParse("void g() {}", "shape.xs")
 
 	ranges := file.ReferencesAt(common.Pos{Line: 0, Column: 5})
@@ -33,6 +35,7 @@ func TestXsReferencesAt_APIShape(t *testing.T) {
 }
 
 func TestXsSymbols_FlatOutline(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g(); }\n" +
 		"int x = 1;\n" +
 		"rule r { condition x }\n" +
@@ -60,6 +63,7 @@ func TestXsSymbols_FlatOutline(t *testing.T) {
 }
 
 func TestXsReferencesAt_IncludesDeclarationSorted(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g(); g(); }\nvoid g() {}"
 
 	call1 := strings.Index(src, "g(")
@@ -83,6 +87,7 @@ func TestXsReferencesAt_IncludesDeclarationSorted(t *testing.T) {
 }
 
 func TestXsReferencesAt_NoIdentEmpty(t *testing.T) {
+	t.Parallel()
 	src := "int x = 1;"
 
 	file, _ := XsParse(src, "empty.xs")
@@ -93,6 +98,7 @@ func TestXsReferencesAt_NoIdentEmpty(t *testing.T) {
 }
 
 func TestXsDefinition_APIShape(t *testing.T) {
+	t.Parallel()
 	file, _ := XsParse("void f() {}", "shape.xs")
 
 	r, found := file.Definition(common.Pos{Line: 0, Column: 5})
@@ -104,6 +110,7 @@ func TestXsDefinition_APIShape(t *testing.T) {
 // TestXsCallAt_APIShape pins the call-context contract surface: the
 // CallAt method on XsFile returning the exported CallSite.
 func TestXsCallAt_APIShape(t *testing.T) {
+	t.Parallel()
 	file, _ := XsParse("void f() { g(a, b); }", "shape.xs")
 
 	site, found := file.CallAt(common.Pos{Line: 0, Column: uint32(strings.Index("void f() { g(a, b); }", "a"))})
@@ -130,6 +137,7 @@ func posOf(src string, needle string, offset int) common.Pos {
 // TestCallAt_ClosedCallArgIndex covers baseline comma counting on a
 // closed call.
 func TestCallAt_ClosedCallArgIndex(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g(a, b); }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -146,6 +154,7 @@ func TestCallAt_ClosedCallArgIndex(t *testing.T) {
 // "(" is the feature's key moment: the exact state an editor sends after
 // the trigger keystroke, on an unterminated list.
 func TestCallAt_JustAfterOpenParen(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g("
 	file, _ := XsParse(src, "t.xs")
 
@@ -158,6 +167,7 @@ func TestCallAt_JustAfterOpenParen(t *testing.T) {
 // TestCallAt_OnCalleeName covers the cursor on the callee token:
 // signature renders with no active argument.
 func TestCallAt_OnCalleeName(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g(a); }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -170,6 +180,7 @@ func TestCallAt_OnCalleeName(t *testing.T) {
 // TestCallAt_NestedInnerWins covers innermost-call selection:
 // f(g(x| → g, аргумент 0.
 func TestCallAt_NestedInnerWins(t *testing.T) {
+	t.Parallel()
 	src := "void f() { h(g(x)); }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -182,6 +193,7 @@ func TestCallAt_NestedInnerWins(t *testing.T) {
 // TestCallAt_UnclosedToEOF covers doubly-nested in-progress calls at the
 // exact end of input — the eofPos recovery frontier contains the cursor.
 func TestCallAt_UnclosedToEOF(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g(h("
 	file, _ := XsParse(src, "t.xs")
 
@@ -197,6 +209,7 @@ func TestCallAt_UnclosedToEOF(t *testing.T) {
 // the callee-side and argument-side steps: the "(" character itself is
 // callee-side; one column later flips to onArg=true.
 func TestCallAt_PositionOnOpenParenChar(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g(a); }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -209,6 +222,7 @@ func TestCallAt_PositionOnOpenParenChar(t *testing.T) {
 // TestCallAt_PositionOnCommaChar covers comma-character ownership: the
 // previous-argument region (the comma's end is one column further).
 func TestCallAt_PositionOnCommaChar(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g(a, b); }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -222,6 +236,7 @@ func TestCallAt_PositionOnCommaChar(t *testing.T) {
 // navigation reports the true ordinal even beyond any declared
 // parameter count.
 func TestCallAt_ArgIndexNeverClamped(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g(a, b, c "
 	file, _ := XsParse(src, "t.xs")
 
@@ -235,6 +250,7 @@ func TestCallAt_ArgIndexNeverClamped(t *testing.T) {
 // TestCallAt_Deterministic covers the determinism requirement: pure
 // index lookup, same question — same answer.
 func TestCallAt_Deterministic(t *testing.T) {
+	t.Parallel()
 	src := "void f() { g(a, b); }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -251,6 +267,7 @@ func TestCallAt_Deterministic(t *testing.T) {
 // TestCallAt_InString covers string exclusion: positions inside a string
 // token never resolve to a call, even inside a call's argument span.
 func TestCallAt_InString(t *testing.T) {
+	t.Parallel()
 	src := `void f() { g("abc"); }`
 	file, _ := XsParse(src, "t.xs")
 
@@ -261,6 +278,7 @@ func TestCallAt_InString(t *testing.T) {
 
 // TestCallAt_InComment covers line-comment exclusion.
 func TestCallAt_InComment(t *testing.T) {
+	t.Parallel()
 	src := "// g(a, b)\nvoid f() { g(a, b); }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -272,6 +290,7 @@ func TestCallAt_InComment(t *testing.T) {
 // TestCallAt_InBlockComment covers multi-line block-comment spans — the
 // only comment form whose span crosses lines (from "/*" past "*/").
 func TestCallAt_InBlockComment(t *testing.T) {
+	t.Parallel()
 	src := "void f() { /* open\nstill comment */ g(a); }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -283,6 +302,7 @@ func TestCallAt_InBlockComment(t *testing.T) {
 // TestCallAt_VectorLiteralNotCall covers the Kind=call rule: vector
 // literals are not call contexts.
 func TestCallAt_VectorLiteralNotCall(t *testing.T) {
+	t.Parallel()
 	src := "void f() { vector v = (1, 2, 3); }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -294,6 +314,7 @@ func TestCallAt_VectorLiteralNotCall(t *testing.T) {
 // TestCallAt_ParamListNotCall covers the Kind=call rule: declaration
 // parameter lists are not call contexts.
 func TestCallAt_ParamListNotCall(t *testing.T) {
+	t.Parallel()
 	src := "int f(int a, int b) { return 0; }"
 	file, _ := XsParse(src, "t.xs")
 
@@ -303,6 +324,7 @@ func TestCallAt_ParamListNotCall(t *testing.T) {
 }
 
 func TestXsDefinition_ParamShadowsTopLevel(t *testing.T) {
+	t.Parallel()
 	line := "void f(float x) { x = 2; }"
 
 	file, _ := XsParse("int x = 1;\n"+line, "shadow.xs")
@@ -316,6 +338,7 @@ func TestXsDefinition_ParamShadowsTopLevel(t *testing.T) {
 }
 
 func TestXsDefinition_OnDeclarationReturnsItself(t *testing.T) {
+	t.Parallel()
 	src := "void f() {}"
 
 	file, _ := XsParse(src, "self.xs")
@@ -328,6 +351,7 @@ func TestXsDefinition_OnDeclarationReturnsItself(t *testing.T) {
 }
 
 func TestXsDefinition_TopLevelVariable(t *testing.T) {
+	t.Parallel()
 	line := "void f() { x = 2; }"
 
 	file, _ := XsParse("int x = 1;\n"+line, "top.xs")
@@ -340,6 +364,7 @@ func TestXsDefinition_TopLevelVariable(t *testing.T) {
 }
 
 func TestXsDefinition_BuiltinNotFound(t *testing.T) {
+	t.Parallel()
 	line := "void f() { xsSetWorldGravity(1.0); }"
 
 	file, _ := XsParse(line, "builtin.xs")
@@ -350,6 +375,7 @@ func TestXsDefinition_BuiltinNotFound(t *testing.T) {
 }
 
 func TestXsDefinition_LocalShadowsOuterLocal(t *testing.T) {
+	t.Parallel()
 	src := "void f() {\n" +
 		"\tint x = 1;\n" +
 		"\tif (1) {\n" +
@@ -372,6 +398,7 @@ func TestXsDefinition_LocalShadowsOuterLocal(t *testing.T) {
 }
 
 func TestXsSymbols_PreludeInvariantSweep(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("../docs/ref/ugc-guide/xs/prelude.xs")
 	require.NoError(t, err)
 
@@ -399,6 +426,7 @@ func TestXsSymbols_PreludeInvariantSweep(t *testing.T) {
 // TestReferences_ByName checks the by-name form: every occurrence of the
 // name including the declaration, without needing a position in this file.
 func TestReferences_ByName(t *testing.T) {
+	t.Parallel()
 	src := "void f() {}\nvoid g() { f(); }\n"
 	file, diags := XsParse(src, "t.xs")
 	require.Empty(t, diags)
@@ -417,6 +445,7 @@ func TestReferences_ByName(t *testing.T) {
 }
 
 func TestVisibleAt_APIShape(t *testing.T) {
+	t.Parallel()
 	file, _ := XsParse("void f() {}", "shape.xs")
 
 	syms, found := file.VisibleAt(common.Pos{Line: 0, Column: 6})
@@ -430,6 +459,7 @@ func TestVisibleAt_APIShape(t *testing.T) {
 }
 
 func TestVisibleAt_TopLevelDecls(t *testing.T) {
+	t.Parallel()
 	src := "int g = 1;\n" +
 		"void f(float a) { a = 2; }\n" +
 		"extern int e();\n" +
@@ -457,6 +487,7 @@ func TestVisibleAt_TopLevelDecls(t *testing.T) {
 }
 
 func TestVisibleAt_ParamAndLocalScopes(t *testing.T) {
+	t.Parallel()
 	src := "void f(int p) {\n" +
 		"  int a1 = 1;\n" +
 		"  {\n" +
@@ -483,6 +514,7 @@ func TestVisibleAt_ParamAndLocalScopes(t *testing.T) {
 }
 
 func TestVisibleAt_InStringAndComment(t *testing.T) {
+	t.Parallel()
 	src := "void f() {\n" +
 		"  string s = \"abcd\";\n" +
 		"}\n" +
@@ -501,6 +533,7 @@ func TestVisibleAt_InStringAndComment(t *testing.T) {
 }
 
 func TestVisibleAt_EmptyFile_TrueEmpty(t *testing.T) {
+	t.Parallel()
 	file, _ := XsParse("", "empty.xs")
 
 	syms, found := file.VisibleAt(common.Pos{Line: 0, Column: 0})
@@ -510,6 +543,7 @@ func TestVisibleAt_EmptyFile_TrueEmpty(t *testing.T) {
 }
 
 func TestVisibleAt_ShadowingBothKept(t *testing.T) {
+	t.Parallel()
 	src := "int x = 1;\n" +
 		"void f() {\n" +
 		"  float x = 2;\n" +
@@ -533,6 +567,7 @@ func TestVisibleAt_ShadowingBothKept(t *testing.T) {
 }
 
 func TestVisibleAt_ForInitVisible(t *testing.T) {
+	t.Parallel()
 	src := "void main() {\n" +
 		"  for (int i = 0; i < 10; i++) {\n" +
 		"    int j = i + 1;\n" +
@@ -558,6 +593,7 @@ func TestVisibleAt_ForInitVisible(t *testing.T) {
 }
 
 func TestVisibleAt_ForInitNotVisibleAfter(t *testing.T) {
+	t.Parallel()
 	src := "void main() {\n" +
 		"  for (int i = 0; i < 3; i++) {\n" +
 		"    int j = 1;\n" +
@@ -587,6 +623,7 @@ func TestVisibleAt_ForInitNotVisibleAfter(t *testing.T) {
 }
 
 func TestDefinition_ForInit(t *testing.T) {
+	t.Parallel()
 	src := "void main() {\n" +
 		"  for (int i = 0; i < 10; i++) {\n" +
 		"    int j = i + 1;\n" +
@@ -604,6 +641,7 @@ func TestDefinition_ForInit(t *testing.T) {
 }
 
 func TestXsParse_ForAssignFormNoPhantomLocal(t *testing.T) {
+	t.Parallel()
 	src := "int i = 0;\n" +
 		"void main() {\n" +
 		"  for (i = 0; i < 3; i++) {\n" +
@@ -630,6 +668,7 @@ func TestXsParse_ForAssignFormNoPhantomLocal(t *testing.T) {
 }
 
 func TestXsParse_MultiVarForInit(t *testing.T) {
+	t.Parallel()
 	src := "void main() {\n" +
 		"  for (int i = 0, j = 5; i < j; i++) {\n" +
 		"    j = j - 1;\n" +
@@ -653,6 +692,7 @@ func TestXsParse_MultiVarForInit(t *testing.T) {
 }
 
 func TestXsParse_ForBodyWithoutBraces(t *testing.T) {
+	t.Parallel()
 	src := "void main() {\n" +
 		"  for (int i = 0; i < 3; i++)\n" +
 		"    i = i + 1;\n" +

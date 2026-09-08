@@ -15,6 +15,7 @@ const zetnusGuide = "../docs/ref/zetnus-rms-guide.txt"
 // TestExtractRmsCommands_RealGuide extracts from the committed Zetnus
 // export and checks structure, metadata and changelog enrichment.
 func TestExtractRmsCommands_RealGuide(t *testing.T) {
+	t.Parallel()
 	commands, err := ExtractRmsCommands(zetnusGuide, nil)
 	require.NoError(t, err)
 	require.Greater(t, len(commands), 50)
@@ -60,6 +61,7 @@ func TestExtractRmsCommands_RealGuide(t *testing.T) {
 
 // TestExtractRmsCommands_MissingFile checks the read error path.
 func TestExtractRmsCommands_MissingFile(t *testing.T) {
+	t.Parallel()
 	_, err := ExtractRmsCommands("no/such/file.txt", nil)
 
 	require.ErrorContains(t, err, "zetnus")
@@ -69,6 +71,7 @@ func TestExtractRmsCommands_MissingFile(t *testing.T) {
 // extraction pipeline: create_elevation's MaxHeight arg carries the
 // mined range from the real guide.
 func TestExtractRmsCommands_APIShape(t *testing.T) {
+	t.Parallel()
 	commands, err := ExtractRmsCommands(zetnusGuide, nil)
 	require.NoError(t, err)
 
@@ -88,6 +91,7 @@ func TestExtractRmsCommands_APIShape(t *testing.T) {
 // TestExtractRmsCommands_MinesRange covers the mining pass over the real
 // guide: skeleton kind wins, mined range fills the empty field.
 func TestExtractRmsCommands_MinesRange(t *testing.T) {
+	t.Parallel()
 	commands, err := ExtractRmsCommands(zetnusGuide, nil)
 	require.NoError(t, err)
 
@@ -115,6 +119,7 @@ func TestExtractRmsCommands_MinesRange(t *testing.T) {
 // (range included) re-decodes through indexCommands with no drift —
 // regeneration and load-time mining agree.
 func TestStore_MiningIdempotentWithExtraction(t *testing.T) {
+	t.Parallel()
 	commands, err := ExtractRmsCommands(zetnusGuide, nil)
 	require.NoError(t, err)
 

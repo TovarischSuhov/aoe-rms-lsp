@@ -10,6 +10,7 @@ import (
 )
 
 func TestRmsSymbols_APIShape(t *testing.T) {
+	t.Parallel()
 	file, _ := Parse("<LAND_GENERATION>\n</LAND_GENERATION>\n", "shape.rms")
 
 	syms := file.Symbols()
@@ -21,6 +22,7 @@ func TestRmsSymbols_APIShape(t *testing.T) {
 }
 
 func TestRmsReferencesAt_APIShape(t *testing.T) {
+	t.Parallel()
 	file, _ := Parse("create_terrain FOREST\n", "shape.rms")
 
 	ranges := file.ReferencesAt(common.Pos{Line: 0, Column: 15})
@@ -29,6 +31,7 @@ func TestRmsReferencesAt_APIShape(t *testing.T) {
 }
 
 func TestRmsSymbols_SectionTreeWithNestedBlocks(t *testing.T) {
+	t.Parallel()
 	src := "<LAND_GENERATION>\n" +
 		"create_player_lands {\n" +
 		"	terrain_type DIRT\n" +
@@ -66,6 +69,7 @@ func TestRmsSymbols_SectionTreeWithNestedBlocks(t *testing.T) {
 }
 
 func TestRmsSymbols_GlobalStatementsAtRoot(t *testing.T) {
+	t.Parallel()
 	src := "create_land TERRAIN_GRASS\n" +
 		"<LAND_GENERATION>\n" +
 		"base_terrain GRASS\n" +
@@ -86,6 +90,7 @@ func TestRmsSymbols_GlobalStatementsAtRoot(t *testing.T) {
 }
 
 func TestRmsSymbols_XsBlockPlacement(t *testing.T) {
+	t.Parallel()
 	src := "<OBJECTS_GENERATION>\n" +
 		"create_object VILLAGER\n" +
 		"#includeXS\n" +
@@ -124,6 +129,7 @@ func TestRmsSymbols_XsBlockPlacement(t *testing.T) {
 }
 
 func TestRmsSymbols_OutsideSectionXsBlockAtRoot(t *testing.T) {
+	t.Parallel()
 	src := "<OBJECTS_GENERATION>\n" +
 		"</OBJECTS_GENERATION>\n" +
 		"#includeXS\n" +
@@ -140,6 +146,7 @@ func TestRmsSymbols_OutsideSectionXsBlockAtRoot(t *testing.T) {
 }
 
 func TestRmsReferencesAt_AllWordKinds(t *testing.T) {
+	t.Parallel()
 	src := "<LAND_GENERATION>\n" +
 		"create_terrain FOREST\n" +
 		"create_terrain FOREST\n" +
@@ -166,6 +173,7 @@ func TestRmsReferencesAt_AllWordKinds(t *testing.T) {
 }
 
 func TestRmsReferencesAt_NumberEmpty(t *testing.T) {
+	t.Parallel()
 	src := "land_percent 12\n"
 
 	file, _ := Parse(src, "number.rms")
@@ -187,6 +195,7 @@ func symbolsNamed(nodes []common.Symbol, name string) []common.Symbol {
 }
 
 func TestRmsSymbols_FixturesInvariantSweep(t *testing.T) {
+	t.Parallel()
 	entries, err := os.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -229,6 +238,7 @@ func rangeWithin(inner common.Range, outer common.Range) bool {
 // ArgAt method on RmsFile returning the exported ArgSite with the Kind*
 // vocabulary.
 func TestRmsArgAt_APIShape(t *testing.T) {
+	t.Parallel()
 	src := "create_elevator PLAYER_1 5"
 	file, _ := Parse(src, "shape.rms")
 
@@ -257,6 +267,7 @@ func linePos(src string, line int, needle string, offset int) common.Pos {
 // TestArgAt_OnPositionalArg covers baseline positional-argument
 // discrimination.
 func TestArgAt_OnPositionalArg(t *testing.T) {
+	t.Parallel()
 	src := "create_elevator PLAYER_1 5"
 	file, _ := Parse(src, "t.rms")
 
@@ -272,6 +283,7 @@ func TestArgAt_OnPositionalArg(t *testing.T) {
 // the value and on the name (name-match identity; flag attributes work
 // through the name branch).
 func TestArgAt_OnAttributeValueAndName(t *testing.T) {
+	t.Parallel()
 	src := "create_elevator A {\n  number_of_objects 5\n}\n"
 	file, _ := Parse(src, "t.rms")
 
@@ -291,6 +303,7 @@ func TestArgAt_OnAttributeValueAndName(t *testing.T) {
 // last argument of a command — the primary RMS hint moment — is owned by
 // its own statement, not an earlier one.
 func TestArgAt_TrailingSameLine(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 7 "
 	file, _ := Parse(src, "t.rms")
 
@@ -304,6 +317,7 @@ func TestArgAt_TrailingSameLine(t *testing.T) {
 // TestArgAt_BraceAndGapPositions covers step 6: braces and inter-token
 // gaps never guess a label (SC6).
 func TestArgAt_BraceAndGapPositions(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3 {\n  spacing 5\n}\n"
 	file, _ := Parse(src, "t.rms")
 
@@ -325,6 +339,7 @@ func TestArgAt_BraceAndGapPositions(t *testing.T) {
 // exists: header, include-path and #-comment cursors answer silence,
 // not the previous command with kind=none.
 func TestArgAt_NonStatementLinesAfterCommand(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3\n" +
 		"<LAND_GENERATION>\n" +
 		"#include \"other.rms\"\n" +
@@ -350,6 +365,7 @@ func TestArgAt_NonStatementLinesAfterCommand(t *testing.T) {
 // leading configuration: #const statements are filtered by the
 // #-prefix owner rule.
 func TestArgAt_OnDirectiveAndSectionHeader(t *testing.T) {
+	t.Parallel()
 	src := "#include other.rms\n" +
 		"<LAND_GENERATION>\n" +
 		"#const TERRAIN 7\n" +
@@ -369,6 +385,7 @@ func TestArgAt_OnDirectiveAndSectionHeader(t *testing.T) {
 // TestArgAt_InComment covers comment exclusion through the recorded
 // blankComments extents.
 func TestArgAt_InComment(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3 /* hill */"
 	file, _ := Parse(src, "t.rms")
 
@@ -380,6 +397,7 @@ func TestArgAt_InComment(t *testing.T) {
 // TestArgAt_InString covers string exclusion on statement lines: editing
 // a quoted attribute value renders no hint.
 func TestArgAt_InString(t *testing.T) {
+	t.Parallel()
 	src := "create_object GOLF_BALL {\n  object_name \"grassland\"\n}\n"
 	file, _ := Parse(src, "t.rms")
 
@@ -391,6 +409,7 @@ func TestArgAt_InString(t *testing.T) {
 // TestArgAt_NestedBlockInnermost covers «владеет самый внутренний
 // statement» for nested random blocks.
 func TestArgAt_NestedBlockInnermost(t *testing.T) {
+	t.Parallel()
 	src := "start_random\n" +
 		"  percent_chance 50\n" +
 		"    create_elevation 3\n" +
@@ -408,6 +427,7 @@ func TestArgAt_NestedBlockInnermost(t *testing.T) {
 
 // TestArgAt_Deterministic covers the determinism requirement.
 func TestArgAt_Deterministic(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3 {\n  spacing 5\n}\n"
 	file, _ := Parse(src, "t.rms")
 

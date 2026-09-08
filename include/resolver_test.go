@@ -32,6 +32,7 @@ func writeTree(t *testing.T, dir string, tree map[string]string) map[string]stri
 // TestResolver_APIShape checks the contract surface: NewResolver builds a
 // *Resolver over a Source and Closure answers with a Closure value.
 func TestResolver_APIShape(t *testing.T) {
+	t.Parallel()
 	r := NewResolver(fakeSource{})
 	require.NotNil(t, r)
 
@@ -42,6 +43,7 @@ func TestResolver_APIShape(t *testing.T) {
 // TestResolver_ClosureDFSAndMissing checks the core closure: DFS order,
 // resolved directives and one MissingInclude per missing directive.
 func TestResolver_ClosureDFSAndMissing(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	// missing.rms is deliberately NOT written
 	uris := writeTree(t, dir, map[string]string{
@@ -78,6 +80,7 @@ func TestResolver_ClosureDFSAndMissing(t *testing.T) {
 // TestResolver_EditorStateWinsOverDisk checks that an open document's
 // text overrides its disk copy.
 func TestResolver_EditorStateWinsOverDisk(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	uris := writeTree(t, dir, map[string]string{
 		"a.rms":   "#include \"old.rms\"\n",
@@ -97,6 +100,7 @@ func TestResolver_EditorStateWinsOverDisk(t *testing.T) {
 // TestResolver_RootUnavailable checks degradation: an unopened and
 // unreadable root yields an empty closure, no panic.
 func TestResolver_RootUnavailable(t *testing.T) {
+	t.Parallel()
 	r := NewResolver(fakeSource{})
 
 	c := r.Closure(context.Background(), "file:///no/such/file.rms")
@@ -110,6 +114,7 @@ func TestResolver_RootUnavailable(t *testing.T) {
 // TestResolver_CycleTerminates checks that A→B→A cycles visit each file
 // once and the call returns.
 func TestResolver_CycleTerminates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	uris := writeTree(t, dir, map[string]string{
 		"a.rms": "#include \"b.rms\"\n",
@@ -127,6 +132,7 @@ func TestResolver_CycleTerminates(t *testing.T) {
 // TestResolver_DepthAndCountLimits checks that a deep chain stops
 // expanding at maxDepth while the boundary entry stays in the closure.
 func TestResolver_DepthAndCountLimits(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	tree := map[string]string{"f70.rms": ""}
@@ -160,6 +166,7 @@ func navTree(t *testing.T) map[string]string {
 // TestResolver_DefinitionIncludeDirective checks scenario 1: the cursor on
 // an include path jumps to the target file start (0:0, zero length).
 func TestResolver_DefinitionIncludeDirective(t *testing.T) {
+	t.Parallel()
 	uris := navTree(t)
 
 	r := NewResolver(fakeSource{})
@@ -173,6 +180,7 @@ func TestResolver_DefinitionIncludeDirective(t *testing.T) {
 // TestResolver_DefinitionExternalDecl checks scenario 2: an inline XS name
 // resolves to the declaring file's name range.
 func TestResolver_DefinitionExternalDecl(t *testing.T) {
+	t.Parallel()
 	uris := navTree(t)
 
 	// sharedFn sits on line 2 (the inline block), column 14..22
@@ -191,6 +199,7 @@ func TestResolver_DefinitionExternalDecl(t *testing.T) {
 // TestResolver_DefinitionBuiltinNotFound checks the negative: builtins do
 // not resolve.
 func TestResolver_DefinitionBuiltinNotFound(t *testing.T) {
+	t.Parallel()
 	uris := writeTree(t, t.TempDir(), map[string]string{
 		"b.xs": "void m() { xsGetMapSeed(); }\n",
 	})
@@ -204,6 +213,7 @@ func TestResolver_DefinitionBuiltinNotFound(t *testing.T) {
 // TestResolver_ReferencesReverseOverOpenDocs checks scenario 3: references
 // from the included lib.xs find occurrences in the including main.rms.
 func TestResolver_ReferencesReverseOverOpenDocs(t *testing.T) {
+	t.Parallel()
 	uris := navTree(t)
 
 	source := fakeSource{uris["main.rms"]: readFile(t, uris["main.rms"]), uris["parts/lib.xs"]: readFile(t, uris["parts/lib.xs"])}
@@ -230,6 +240,7 @@ func TestResolver_ReferencesReverseOverOpenDocs(t *testing.T) {
 // TestResolver_ReferencesDedupAndSort checks that duplicate collection
 // through multiple roots collapses and the result is sorted.
 func TestResolver_ReferencesDedupAndSort(t *testing.T) {
+	t.Parallel()
 	uris := navTree(t)
 
 	source := fakeSource{uris["main.rms"]: readFile(t, uris["main.rms"]), uris["parts/lib.xs"]: readFile(t, uris["parts/lib.xs"])}
@@ -261,6 +272,7 @@ func readFile(t *testing.T, uriArg string) string {
 // #include escaping the root document's directory becomes MissingInclude
 // even when the target exists on disk.
 func TestResolver_EscapeBeyondRootMissing(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	inner := filepath.Join(dir, "maps")
 	require.NoError(t, os.MkdirAll(inner, 0o755))
@@ -282,6 +294,7 @@ func TestResolver_EscapeBeyondRootMissing(t *testing.T) {
 // TestResolver_DirectoryTargetMissing checks a directory target: not a
 // regular file → MissingInclude, not a silently dropped Resolved entry.
 func TestResolver_DirectoryTargetMissing(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o755))
 
@@ -298,6 +311,7 @@ func TestResolver_DirectoryTargetMissing(t *testing.T) {
 // not leak the first requester's URI spelling into targets: each query
 // gets its own spelling back.
 func TestResolver_TwoSpellingsOwnTargetURI(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeTree(t, dir, map[string]string{
 		"sub/main.rms": "#includeXS\nint q = 1;\nvoid f() { q = 2; }\n",

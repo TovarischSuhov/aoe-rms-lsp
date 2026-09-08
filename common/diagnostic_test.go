@@ -8,6 +8,7 @@ import (
 )
 
 func TestDiagnostic_SeverityValues(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		severity int
@@ -30,6 +31,7 @@ func TestDiagnostic_SeverityValues(t *testing.T) {
 }
 
 func TestDiagnostic_Fields(t *testing.T) {
+	t.Parallel()
 	d := Diagnostic{
 		Range: Range{
 			Start: Pos{Line: 3, Column: 0, Offset: 42},

@@ -35,6 +35,7 @@ func codes(diags []common.Diagnostic) []string {
 // TestAnalyzeRms_Checks covers every RMS check with a positive and a
 // negative case.
 func TestAnalyzeRms_Checks(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		src  string
@@ -159,6 +160,7 @@ base_terrain GRASS
 // TestAnalyzeRms_Invariants checks sorting, severity and that the input
 // AST is not mutated.
 func TestAnalyzeRms_Invariants(t *testing.T) {
+	t.Parallel()
 	a := newAnalyzer(t)
 
 	src := `<GENERATION_OF_WONK>
@@ -189,6 +191,7 @@ create_land {
 // TestAnalyzeXs_Checks covers every XS check with a positive and a
 // negative case.
 func TestAnalyzeXs_Checks(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		src  string
@@ -310,6 +313,7 @@ void f() {
 
 // TestAnalyzeXs_Invariants checks sorting, severity and AST immutability.
 func TestAnalyzeXs_Invariants(t *testing.T) {
+	t.Parallel()
 	a := newAnalyzer(t)
 
 	src := `void main() {
@@ -353,6 +357,7 @@ func assertSorted(t *testing.T, diags []common.Diagnostic) {
 // declarations suppress undefined-symbol, provide types, and never
 // override the file's own declarations.
 func TestAnalyzeXs_ExternalsSuppressUndefinedAndLocalsWin(t *testing.T) {
+	t.Parallel()
 	a := newAnalyzer(t)
 
 	// the file calls an external function declared only in the closure
@@ -388,6 +393,7 @@ func TestAnalyzeXs_ExternalsSuppressUndefinedAndLocalsWin(t *testing.T) {
 }
 
 func TestAnalyzeXs_ForLoopVarNoUndefined(t *testing.T) {
+	t.Parallel()
 	// the review repro: the loop variable used in init/cond/step/body
 	// must not fire undefined-symbol (previously 4 false errors)
 	src := "void main() { for (int i = 0; i < 10; i++) { int j = i + 1; } }"
@@ -399,6 +405,7 @@ func TestAnalyzeXs_ForLoopVarNoUndefined(t *testing.T) {
 }
 
 func TestAnalyzeXs_ForLoopVarUsedAfterNotFlagged(t *testing.T) {
+	t.Parallel()
 	// conservative semantics: a use after the loop is not marked —
 	// same treatment as locals of nested blocks
 	src := "void main() { for (int i = 0; i < 3; i++) { } i = 5; }"

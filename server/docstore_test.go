@@ -9,6 +9,7 @@ import (
 )
 
 func TestDocStore_GetNotOpen(t *testing.T) {
+	t.Parallel()
 	s := NewDocStore()
 
 	_, _, found := s.Get("file:///missing.rms")
@@ -17,6 +18,7 @@ func TestDocStore_GetNotOpen(t *testing.T) {
 }
 
 func TestDocStore_PutGet(t *testing.T) {
+	t.Parallel()
 	s := NewDocStore()
 
 	s.Put("file:///map.rms", "text v1", 1)
@@ -29,6 +31,7 @@ func TestDocStore_PutGet(t *testing.T) {
 }
 
 func TestDocStore_StaleVersionIgnored(t *testing.T) {
+	t.Parallel()
 	s := NewDocStore()
 
 	s.Put("file:///map.rms", "new", 5)
@@ -47,6 +50,7 @@ func TestDocStore_StaleVersionIgnored(t *testing.T) {
 }
 
 func TestDocStore_Remove(t *testing.T) {
+	t.Parallel()
 	s := NewDocStore()
 
 	s.Put("file:///map.rms", "text", 1)
@@ -60,6 +64,7 @@ func TestDocStore_Remove(t *testing.T) {
 // TestDocStore_SatisfiesSource checks the compile-time structural
 // satisfaction of include.Source (Text + URIs).
 func TestDocStore_SatisfiesSource(t *testing.T) {
+	t.Parallel()
 	var _ include.Source = testDocStore()
 }
 
@@ -75,6 +80,7 @@ func testDocStore() *DocStore {
 // TestDocStore_TextAndURIs checks the Source projection: Text without a
 // version, URIs sorted for determinism.
 func TestDocStore_TextAndURIs(t *testing.T) {
+	t.Parallel()
 	s := testDocStore()
 
 	text, found := s.Text("file:///a.rms")

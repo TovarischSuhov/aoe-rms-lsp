@@ -10,6 +10,7 @@ import (
 // TestNewStore_Success loads the embedded knowledge base and checks the
 // headline counters.
 func TestNewStore_Success(t *testing.T) {
+	t.Parallel()
 	store, err := NewStore()
 	require.NoError(t, err)
 
@@ -29,6 +30,7 @@ func TestNewStore_Success(t *testing.T) {
 
 // TestStore_Function covers exact-name function lookups.
 func TestStore_Function(t *testing.T) {
+	t.Parallel()
 	store, err := NewStore()
 	require.NoError(t, err)
 
@@ -46,6 +48,7 @@ func TestStore_Function(t *testing.T) {
 
 // TestStore_Functions_Order checks file-order preservation for completion.
 func TestStore_Functions_Order(t *testing.T) {
+	t.Parallel()
 	store, err := NewStore()
 	require.NoError(t, err)
 
@@ -56,6 +59,7 @@ func TestStore_Functions_Order(t *testing.T) {
 
 // TestStore_Constant covers exact-name and section-scoped constant lookups.
 func TestStore_Constant(t *testing.T) {
+	t.Parallel()
 	store, err := NewStore()
 	require.NoError(t, err)
 
@@ -79,6 +83,7 @@ func TestStore_Constant(t *testing.T) {
 
 // TestStore_Command covers exact-name and section-scoped command lookups.
 func TestStore_Command(t *testing.T) {
+	t.Parallel()
 	store, err := NewStore()
 	require.NoError(t, err)
 
@@ -106,6 +111,7 @@ func TestStore_Command(t *testing.T) {
 
 // TestStore_Attribute covers attribute lookups per command.
 func TestStore_Attribute(t *testing.T) {
+	t.Parallel()
 	store, err := NewStore()
 	require.NoError(t, err)
 
@@ -124,6 +130,7 @@ func TestStore_Attribute(t *testing.T) {
 
 // TestIndexFunctions_InvalidPayload covers schema validation failures.
 func TestIndexFunctions_InvalidPayload(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		payload string
@@ -155,6 +162,7 @@ func TestIndexFunctions_InvalidPayload(t *testing.T) {
 
 // TestIndexConstants_InvalidPayload covers schema validation failures.
 func TestIndexConstants_InvalidPayload(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		payload string
@@ -186,6 +194,7 @@ func TestIndexConstants_InvalidPayload(t *testing.T) {
 
 // TestIndexCommands_InvalidPayload covers schema validation failures.
 func TestIndexCommands_InvalidPayload(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		payload string
@@ -219,6 +228,7 @@ func TestIndexCommands_InvalidPayload(t *testing.T) {
 // arg whose desc carries bounds and whose payload has no range key (the
 // committed-JSON shape) is served with the mined kind and range.
 func TestStore_LoadMines_APIShape(t *testing.T) {
+	t.Parallel()
 	s := newStore()
 
 	payload := `[{"name":"set_gaia_civilization","args":[` +
@@ -236,6 +246,7 @@ func TestStore_LoadMines_APIShape(t *testing.T) {
 // the committed (unmined) JSON shape — the shipping path for the
 // existing data file.
 func TestStore_LoadMinesRangeAndEmptyKind(t *testing.T) {
+	t.Parallel()
 	s := newStore()
 
 	payload := `[{"name":"set_gaia_civilization","args":[` +
@@ -254,6 +265,7 @@ func TestStore_LoadMinesRangeAndEmptyKind(t *testing.T) {
 // a structured kind from extraction is never overwritten by the mined
 // word — the percent set analysis gates on depends on it.
 func TestStore_LoadKeepsStructuredKindOverMined(t *testing.T) {
+	t.Parallel()
 	s := newStore()
 
 	payload := `[{"name":"cliff_curliness","args":[` +
@@ -270,6 +282,7 @@ func TestStore_LoadKeepsStructuredKindOverMined(t *testing.T) {
 // TestStore_FlagAttributesStayNameOnly covers flag attributes (empty
 // Desc): nothing to mine, the name-only form survives the load pipeline.
 func TestStore_FlagAttributesStayNameOnly(t *testing.T) {
+	t.Parallel()
 	s := newStore()
 
 	payload := `[{"name":"create_elevation","attributes":[` +

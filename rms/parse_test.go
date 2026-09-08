@@ -23,6 +23,7 @@ func loadFixture(t *testing.T, name string) string {
 // TestParse_Fixtures parses every fixture and checks sections and
 // diagnostics.
 func TestParse_Fixtures(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		fixture    string
@@ -119,6 +120,7 @@ func TestParse_Fixtures(t *testing.T) {
 // TestParse_PositionalSemantics checks that attributes written after a
 // command (in its braces) belong to that command in all layout styles.
 func TestParse_PositionalSemantics(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse(loadFixture(t, "positional.rms"), "positional.rms")
 	require.Empty(t, diags)
 
@@ -140,6 +142,7 @@ func TestParse_PositionalSemantics(t *testing.T) {
 
 // TestParse_RandomNesting checks start_random/percent_chance children.
 func TestParse_RandomNesting(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse(loadFixture(t, "random.rms"), "random.rms")
 	require.Empty(t, diags)
 
@@ -166,6 +169,7 @@ func TestParse_RandomNesting(t *testing.T) {
 
 // TestParse_Conditionals checks the if/elseif/else sibling structure.
 func TestParse_Conditionals(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse(loadFixture(t, "conditionals.rms"), "conditionals.rms")
 	require.Empty(t, diags)
 
@@ -189,6 +193,7 @@ func TestParse_Conditionals(t *testing.T) {
 
 // TestParse_Expressions checks DE math trees, floats and percents.
 func TestParse_Expressions(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse(loadFixture(t, "expressions.rms"), "expressions.rms")
 	require.Empty(t, diags)
 
@@ -232,6 +237,7 @@ func TestParse_Expressions(t *testing.T) {
 
 // TestParse_IncludesAndXs checks #include handling and the XS block.
 func TestParse_IncludesAndXs(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse(loadFixture(t, "includes.rms"), "includes.rms")
 	require.Empty(t, diags)
 
@@ -261,6 +267,7 @@ func TestParse_IncludesAndXs(t *testing.T) {
 
 // TestParse_NeverNil checks the total-garbage path.
 func TestParse_NeverNil(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		src  string
@@ -283,6 +290,7 @@ func TestParse_NeverNil(t *testing.T) {
 // TestRmsFile_StatementAt checks hover navigation, including the
 // attribute-returns-owner requirement.
 func TestRmsFile_StatementAt(t *testing.T) {
+	t.Parallel()
 	source := loadFixture(t, "positional.rms")
 	file, _ := Parse(source, "positional.rms")
 
@@ -305,6 +313,7 @@ func TestRmsFile_StatementAt(t *testing.T) {
 
 // TestRmsFile_SectionAt checks completion-context navigation.
 func TestRmsFile_SectionAt(t *testing.T) {
+	t.Parallel()
 	source := loadFixture(t, "includes.rms")
 	file, _ := Parse(source, "includes.rms")
 
@@ -323,6 +332,7 @@ func TestRmsFile_SectionAt(t *testing.T) {
 // TestParse_DiagnosticsSorted is covered per fixture; this checks the
 // explicit ordering invariant on the broken input.
 func TestParse_DiagnosticsSortedExplicit(t *testing.T) {
+	t.Parallel()
 	_, diags := Parse(loadFixture(t, "broken.rms"), "broken.rms")
 
 	assertSorted(t, diags)
@@ -356,6 +366,7 @@ func messages(diags []common.Diagnostic) []string {
 }
 
 func TestParse_ClosingTag_NoPhantomSection(t *testing.T) {
+	t.Parallel()
 	src := "<PLAYER_SETUP>\n" +
 		"random_placement\n" +
 		"</PLAYER_SETUP>\n" +
@@ -379,6 +390,7 @@ func TestParse_ClosingTag_NoPhantomSection(t *testing.T) {
 }
 
 func TestParse_ClosingTag_PostCloseGlobal(t *testing.T) {
+	t.Parallel()
 	src := "<CLIFF_GENERATION>\n" +
 		"</CLIFF_GENERATION>\n" +
 		"create_land TERRAIN_GRASS\n"
@@ -399,6 +411,7 @@ func TestParse_ClosingTag_PostCloseGlobal(t *testing.T) {
 }
 
 func TestParse_WordIndexRecordsAllKinds(t *testing.T) {
+	t.Parallel()
 	src := "<LAND_GENERATION>\n" +
 		"create_terrain FOREST {\n" +
 		"	land_percent 12\n" +
@@ -422,6 +435,7 @@ func TestParse_WordIndexRecordsAllKinds(t *testing.T) {
 // TestParse_IncludeRecordsPathArgumentRange checks that include directives
 // record the path argument with its own range — quoted and bare forms.
 func TestParse_IncludeRecordsPathArgumentRange(t *testing.T) {
+	t.Parallel()
 	src := "#include \"parts/econ.rms\"\n#include parts/bare.inc\n"
 
 	file, diags := Parse(src, "main.rms")
@@ -446,6 +460,7 @@ func TestParse_IncludeRecordsPathArgumentRange(t *testing.T) {
 // #includeXS with a file argument: the external path is recorded while the
 // region after the directive stays an inline XsBlock.
 func TestParse_IncludeXSArgumentAndInlineBlock(t *testing.T) {
+	t.Parallel()
 	src := "#includeXS lib/helpers.xs\nvoid sharedFn(int n) { }\n"
 
 	file, diags := Parse(src, "main.rms")
@@ -464,6 +479,7 @@ func TestParse_IncludeXSArgumentAndInlineBlock(t *testing.T) {
 // TestParse_IncludeWithoutPath checks the missing-argument syntax error:
 // a diagnostic is reported and no Include is created.
 func TestParse_IncludeWithoutPath(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse("#include\n", "main.rms")
 
 	assert.Empty(t, file.Includes)
@@ -476,6 +492,7 @@ func TestParse_IncludeWithoutPath(t *testing.T) {
 // block left open at end of file (no trailing newline) spans to the end
 // of the last line instead of panicking on the line-index boundary.
 func TestParse_UnclosedXsBlockAtEOFWithoutNewline(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse("#includeXS\nvoid main() { int x = 1; }", "t.rms")
 
 	require.Empty(t, diags)
@@ -491,6 +508,7 @@ func TestParse_UnclosedXsBlockAtEOFWithoutNewline(t *testing.T) {
 // block at end of file, without panicking (the block start line equals
 // the line count).
 func TestParse_BareIncludeXSAtEOF(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse("#includeXS", "t.rms")
 
 	require.Empty(t, diags)
@@ -505,6 +523,7 @@ func TestParse_BareIncludeXSAtEOF(t *testing.T) {
 // case: a block closed by a following directive keeps spanning to the
 // start of the terminating line.
 func TestParse_XsBlockTerminatedByDirective(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse("#includeXS\nvoid f() { }\n#include other.rms\n", "t.rms")
 
 	require.Empty(t, diags)
@@ -519,6 +538,7 @@ func TestParse_XsBlockTerminatedByDirective(t *testing.T) {
 // are trimmed from an open block: the range ends on the last non-blank
 // line, the code carries no trailing blanks.
 func TestParse_XsBlockTrailingBlankLines(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse("#includeXS\nvoid f() { }\n\n\n#include other.rms\n", "t.rms")
 
 	require.Empty(t, diags)
@@ -532,6 +552,7 @@ func TestParse_XsBlockTrailingBlankLines(t *testing.T) {
 // warning: end_random silently closing an unterminated if reports a
 // warning naming both blocks.
 func TestParse_EndRandomClosesUnterminatedIf(t *testing.T) {
+	t.Parallel()
 	src := "start_random\nif 1\npercent_chance 50\ncreate_terrain GRASS\nend_random\n"
 
 	file, diags := Parse(src, "t.rms")
@@ -553,6 +574,7 @@ func TestParse_EndRandomClosesUnterminatedIf(t *testing.T) {
 // nesting (if/endif inside start_random) produces no implicit-close
 // warnings.
 func TestParse_EndRandomClosedNestNoWarning(t *testing.T) {
+	t.Parallel()
 	src := "start_random\nif 1\npercent_chance 50\ncreate_terrain GRASS\nendif\nend_random\n"
 
 	file, diags := Parse(src, "t.rms")
@@ -566,6 +588,7 @@ func TestParse_EndRandomClosedNestNoWarning(t *testing.T) {
 // an unterminated percent_chance branch closes implicitly without a
 // warning.
 func TestParse_PercentChanceImplicitNoWarn(t *testing.T) {
+	t.Parallel()
 	src := "start_random\npercent_chance 50\ncreate_terrain GRASS\nend_random\n"
 
 	_, diags := Parse(src, "t.rms")
@@ -576,6 +599,7 @@ func TestParse_PercentChanceImplicitNoWarn(t *testing.T) {
 // TestParse_EndRandomWithoutMatch checks the unmatched-closer error is
 // preserved: a lone end_random stays an error, not a warning.
 func TestParse_EndRandomWithoutMatch(t *testing.T) {
+	t.Parallel()
 	_, diags := Parse("end_random\n", "t.rms")
 
 	require.Len(t, diags, 1)
@@ -586,6 +610,7 @@ func TestParse_EndRandomWithoutMatch(t *testing.T) {
 // TestReferences_ByName checks the by-name form: same occurrences as
 // ReferencesAt, without needing a position in this file.
 func TestReferences_ByName(t *testing.T) {
+	t.Parallel()
 	src := "create_elevator 7\ncreate_elevator 3\nbase_terrain GRASS\n"
 	file, diags := Parse(src, "main.rms")
 	require.Empty(t, diags)
@@ -609,6 +634,7 @@ func TestReferences_ByName(t *testing.T) {
 // #includeXS whose inline region is empty (a terminator on the next
 // line) owns no XsBlock — no phantom outline node.
 func TestParse_IncludeXSArgEmptyRegionNoBlock(t *testing.T) {
+	t.Parallel()
 	src := "#includeXS lib/helpers.xs\n<land_generation>\ncreate_elevator 7\n"
 
 	file, diags := Parse(src, "t.rms")
@@ -623,6 +649,7 @@ func TestParse_IncludeXSArgEmptyRegionNoBlock(t *testing.T) {
 // blanking respects string literals: the path and range of a quoted
 // include argument survive comment markers inside the quotes.
 func TestParse_StringLiteralKeepsCommentMarkers(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse("#include \"a//b.rms\"\n", "t.rms")
 
 	require.Empty(t, diags)
@@ -636,6 +663,7 @@ func TestParse_StringLiteralKeepsCommentMarkers(t *testing.T) {
 // TestParse_StringLiteralKeepsBlockMarker checks a block-comment opener
 // inside a quoted path neither opens a comment nor mangles the range.
 func TestParse_StringLiteralKeepsBlockMarker(t *testing.T) {
+	t.Parallel()
 	file, diags := Parse("#include \"a/*b.rms\"\ncreate_elevator 7\n", "t.rms")
 
 	require.Empty(t, diags)
