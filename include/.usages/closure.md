@@ -51,6 +51,10 @@ Preconditions:
   includeDeclaration=false.
 - Definition returns found=false for builtins and unknown names — an
   empty LSP result, not an error.
+- Resolution stays inside the root document's directory; escapes
+  (`../`) and directory targets become MissingInclude entries.
+- Target.URI spells the path as resolved for the current query; the
+  canonical path is only the cache key.
 
 ## External declarations for analysis
 
