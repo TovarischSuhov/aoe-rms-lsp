@@ -25,6 +25,15 @@ const (
 	DeclExtern = "extern"
 )
 
+// Symbol kinds of VisibleAt results beyond the declaration kinds.
+const (
+	// KindParam is a function parameter visible inside its function.
+	KindParam = "param"
+	// KindLocal is a local variable declared at or before the position
+	// in an enclosing block.
+	KindLocal = "local"
+)
+
 // Statement kinds.
 const (
 	// StmtBlock is a { } block.
@@ -444,17 +453,125 @@ func (f XsFile) collectLocals(
 // declaration item matches name: items are bare identifiers or
 // name = initializer binary nodes.
 func declaredLocal(item Expr, name string) (common.Range, bool) {
-	if item.Kind == ExprIdent && item.Value == name {
-		return item.Range, true
-	}
+	n, r, ok := declaredLocalName(item)
 
-	if item.Kind == ExprBinary && item.Value == "=" &&
-		len(item.Children) > 0 && item.Children[0].Kind == ExprIdent &&
-		item.Children[0].Value == name {
-		return item.Children[0].Range, true
+	if ok && n == name {
+		return r, true
 	}
 
 	return common.Range{}, false
+}
+
+// declaredLocalName extracts the name and its range from a local
+// declaration item: bare identifiers or name = initializer binaries.
+func declaredLocalName(item Expr) (string, common.Range, bool) {
+	if item.Kind == ExprIdent {
+		return item.Value, item.Range, true
+	}
+
+	if item.Kind == ExprBinary && item.Value == "=" &&
+		len(item.Children) > 0 && item.Children[0].Kind == ExprIdent {
+		return item.Children[0].Value, item.Children[0].Range, true
+	}
+
+	return "", common.Range{}, false
+}
+
+// VisibleAt returns the named symbols visible at pos (completion):
+// top-level declarations, the parameters of the enclosing function and
+// the locals of enclosing blocks declared at or before pos. found is
+// false only inside strings and comments — an empty list with
+// found=true means the file declares no visible symbols. Shadowing is
+// not resolved: same-name symbols from different scopes both come
+// back; prioritization is the consumer's decision. The scope rule is
+// the same as Definition's: a local is visible from its declaration to
+// the end of its enclosing block.
+func (f XsFile) VisibleAt(pos common.Pos) ([]common.Symbol, bool) {
+	// Step 1: positions inside strings and comments resolve to nothing.
+	for _, r := range f.noncode {
+		if r.Contains(pos) {
+			return nil, false
+		}
+	}
+
+	// Step 2: top-level named declarations in source order.
+	out := make([]common.Symbol, 0, len(f.Decls))
+
+	for _, decl := range f.Decls {
+		if decl.Kind == DeclInclude {
+			continue
+		}
+
+		out = append(out, common.Symbol{
+			Kind:      decl.Kind,
+			Name:      decl.Name,
+			Range:     decl.Range,
+			Selection: f.declNameRange(decl),
+		})
+	}
+
+	// Steps 3-4: parameters and locals of the function covering pos
+	// (top-level spans never overlap, so at most one qualifies; only
+	// function bodies carry scope — a variable's initializer stmts are
+	// not locals).
+	for _, decl := range f.Decls {
+		if decl.Kind != DeclFunction || !decl.Range.Contains(pos) {
+			continue
+		}
+
+		f.appendParams(&out, decl)
+		f.appendLocals(&out, decl.Body, decl.Range.End, pos)
+	}
+
+	return out, true
+}
+
+// appendParams appends the parameters of decl as param symbols,
+// in parameter-list order.
+func (f XsFile) appendParams(out *[]common.Symbol, decl Decl) {
+	for _, p := range decl.Params {
+		r, ok := f.paramNameRange(decl, p.Name)
+		if !ok {
+			r = decl.Range
+		}
+
+		*out = append(*out, common.Symbol{
+			Kind:      KindParam,
+			Name:      p.Name,
+			Range:     r,
+			Selection: r,
+		})
+	}
+}
+
+// appendLocals appends the local declarations of stmts visible at pos:
+// a local is visible when declared at or before pos inside a block
+// whose scope covers pos (the covers rule of bestDeclarer).
+func (f XsFile) appendLocals(
+	out *[]common.Symbol,
+	stmts []Stmt,
+	blockEnd common.Pos,
+	pos common.Pos,
+) {
+	for i := range stmts {
+		if stmts[i].Kind == StmtDecl {
+			for _, item := range stmts[i].Exprs {
+				name, r, ok := declaredLocalName(item)
+				if !ok || pos.Before(r.Start) || !pos.Before(blockEnd) {
+					continue
+				}
+
+				*out = append(*out, common.Symbol{
+					Kind:      KindLocal,
+					Name:      name,
+					Range:     r,
+					Selection: r,
+				})
+			}
+		}
+
+		f.appendLocals(out, stmts[i].Body, stmts[i].Range.End, pos)
+	}
 }
 
 // Decl is one top-level declaration.
