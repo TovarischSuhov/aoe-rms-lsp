@@ -510,10 +510,12 @@ func (f XsFile) VisibleAt(pos common.Pos) ([]common.Symbol, bool) {
 		})
 	}
 
-	// Steps 3-4: parameters and locals of the declaration covering pos
-	// (top-level spans never overlap, so at most one qualifies).
+	// Steps 3-4: parameters and locals of the function covering pos
+	// (top-level spans never overlap, so at most one qualifies; only
+	// function bodies carry scope — a variable's initializer stmts are
+	// not locals).
 	for _, decl := range f.Decls {
-		if !decl.Range.Contains(pos) {
+		if decl.Kind != DeclFunction || !decl.Range.Contains(pos) {
 			continue
 		}
 
