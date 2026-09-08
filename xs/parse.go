@@ -1439,6 +1439,12 @@ func (s *xscanner) scanString() {
 
 	for s.pos < len(s.src) {
 		if s.src[s.pos] == '\\' && s.pos+1 < len(s.src) {
+			if s.src[s.pos+1] == '\n' {
+				// an escaped newline still ends the physical line
+				s.line++
+				s.lineStart = s.pos + 2
+			}
+
 			s.pos += 2
 
 			continue
