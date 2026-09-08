@@ -406,4 +406,42 @@ func TestXsParse_MultiDeclNavigation(t *testing.T) {
 	r, found := file.Definition(common.Pos{Line: 0, Column: 11})
 	require.True(t, found)
 	assert.Equal(t, common.Pos{Line: 0, Column: 11, Offset: 11}, r.Start)
+// TestXsParse_StringEscapeNewlineTracksLines checks that a backslash
+// escape followed by a newline inside a string literal advances the
+// scanner line counter: positions after the literal stay on their
+// physical lines.
+func TestXsParse_StringEscapeNewlineTracksLines(t *testing.T) {
+	src := "string s = \"abc\\\nDEF\";\nint z = 1;"
+
+	file, diags := XsParse(src, "t.xs")
+
+	require.Empty(t, diags)
+	require.Len(t, file.Decls, 2)
+	assert.Equal(t, "s", file.Decls[0].Name)
+	assert.Equal(t, uint32(0), file.Decls[0].Range.Start.Line)
+	assert.Equal(t, "z", file.Decls[1].Name)
+	assert.Equal(t, uint32(2), file.Decls[1].Range.Start.Line)
+}
+
+// TestXsParse_StringEscapeNonNewlineUnchanged checks that escapes not
+// followed by a newline keep the previous line accounting untouched.
+func TestXsParse_StringEscapeNonNewlineUnchanged(t *testing.T) {
+	src := "string s = \"a\\nb\\\"c\";\nint z = 1;"
+
+	file, diags := XsParse(src, "t.xs")
+
+	require.Empty(t, diags)
+	require.Len(t, file.Decls, 2)
+	assert.Equal(t, uint32(1), file.Decls[1].Range.Start.Line)
+}
+
+// TestXsParse_StringEscapeAtEOFDoesNotPanic checks a trailing backslash
+// as the very last byte of a string literal at end of input.
+func TestXsParse_StringEscapeAtEOFDoesNotPanic(t *testing.T) {
+	file, diags := XsParse("string s = \"abc\\", "t.xs")
+
+	require.NotNil(t, file)
+	assert.Empty(t, diags)
+	require.Len(t, file.Decls, 1)
+	assert.Equal(t, "s", file.Decls[0].Name)
 }
