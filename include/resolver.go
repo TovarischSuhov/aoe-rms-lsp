@@ -64,7 +64,13 @@ func (r *Resolver) Closure(ctx context.Context, uriArg string) Closure {
 	c := Closure{Root: uriArg}
 	visited := make(map[string]bool)
 
-	r.expand(ctx, &c, uriArg, 0, visited)
+	rootDir := ""
+
+	if path := canonicalPath(uriArg); path != "" {
+		rootDir = filepath.Dir(path)
+	}
+
+	r.expand(ctx, &c, uriArg, rootDir, 0, visited)
 
 	return c
 }
@@ -72,7 +78,14 @@ func (r *Resolver) Closure(ctx context.Context, uriArg string) Closure {
 // expand loads uriArg, appends its entry and recurses into its include
 // directives. Guards: ctx cancellation, depth, file count and the
 // visit-set (cycles terminate, each canonical path expands once).
-func (r *Resolver) expand(ctx context.Context, c *Closure, uriArg string, depth int, visited map[string]bool) {
+func (r *Resolver) expand(
+	ctx context.Context,
+	c *Closure,
+	uriArg string,
+	rootDir string,
+	depth int,
+	visited map[string]bool,
+) {
 	if ctx.Err() != nil || depth > maxDepth || len(c.Rms)+len(c.Xs) >= maxFiles {
 		return
 	}
@@ -92,7 +105,7 @@ func (r *Resolver) expand(ctx context.Context, c *Closure, uriArg string, depth 
 	switch {
 	case f.rms != nil:
 		c.Rms = append(c.Rms, RmsEntry{URI: uriArg, File: *f.rms})
-		r.expandDirectives(ctx, c, uriArg, path, f.rms, depth, visited)
+		r.expandDirectives(ctx, c, uriArg, path, rootDir, f.rms, depth, visited)
 	default:
 		c.Xs = append(c.Xs, XsEntry{URI: uriArg, File: *f.xs})
 	}
@@ -106,6 +119,7 @@ func (r *Resolver) expandDirectives(
 	c *Closure,
 	ownerURI string,
 	ownerPath string,
+	rootDir string,
 	file *rms.RmsFile,
 	depth int,
 	visited map[string]bool,
@@ -117,7 +131,7 @@ func (r *Resolver) expandDirectives(
 	for _, inc := range directives {
 		target := filepath.Join(filepath.Dir(ownerPath), inc.Path)
 
-		if _, err := os.Stat(target); err != nil {
+		if st, err := os.Stat(target); err != nil || !st.Mode().IsRegular() || !withinRoot(rootDir, target) {
 			c.Missing = append(c.Missing, MissingInclude{
 				Owner: ownerURI,
 				Path:  inc.Path,
@@ -134,8 +148,20 @@ func (r *Resolver) expandDirectives(
 			Target: targetURI,
 		})
 
-		r.expand(ctx, c, targetURI, depth+1, visited)
+		r.expand(ctx, c, targetURI, rootDir, depth+1, visited)
 	}
+}
+
+// withinRoot reports whether target stays inside rootDir; an empty
+// rootDir (non-disk root) disables the bound.
+func withinRoot(rootDir string, target string) bool {
+	if rootDir == "" {
+		return true
+	}
+
+	rel, err := filepath.Rel(rootDir, target)
+
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../")
 }
 
 // load returns the file for uriArg: the editor-state text when open
@@ -160,7 +186,12 @@ func (r *Resolver) loadDisk(uriArg string, path string) (file, bool) {
 	r.mu.Unlock()
 
 	if ok && cached.size == st.Size() && cached.mod.Equal(st.ModTime()) {
-		return cached.file, true
+		// a light copy: the ASTs are read-only, the URI spelling is the
+		// current query's — never the first requester's
+		copied := cached.file
+		copied.uri = uriArg
+
+		return copied, true
 	}
 
 	raw, err := os.ReadFile(path)
@@ -268,7 +299,9 @@ func (r *Resolver) definitionInRms(f file, path string, pos common.Pos) (Target,
 		}
 
 		target := filepath.Join(filepath.Dir(path), inc.Path)
-		if _, err := os.Stat(target); err != nil {
+
+		st, err := os.Stat(target)
+		if err != nil || !st.Mode().IsRegular() || !withinRoot(filepath.Dir(path), target) {
 			return Target{}, false
 		}
 
@@ -325,8 +358,10 @@ func (r *Resolver) References(ctx context.Context, uriArg string, pos common.Pos
 			continue
 		}
 
-		if r.closureContains(ctx, u, uriArg) {
-			closures = append(closures, r.Closure(ctx, u))
+		cl := r.Closure(ctx, u)
+
+		if closureHas(cl, uriArg) {
+			closures = append(closures, cl)
 		}
 	}
 
@@ -405,15 +440,13 @@ func (r *Resolver) addShifted(
 	}
 }
 
-// closureContains reports whether root's closure has target among its
-// entries (canonical path comparison).
-func (r *Resolver) closureContains(ctx context.Context, root string, target string) bool {
+// closureHas reports whether target is among the closure's entries
+// (canonical path comparison).
+func closureHas(c Closure, target string) bool {
 	tgt := canonicalPath(target)
 	if tgt == "" {
 		return false
 	}
-
-	c := r.Closure(ctx, root)
 
 	for _, e := range c.Rms {
 		if canonicalPath(e.URI) == tgt {
