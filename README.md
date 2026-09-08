@@ -23,24 +23,26 @@ a pre-DE grammar, and fresh editor extensions provide highlighting only.
 ## Project layout
 
 ```
-cmd/       thin entrypoints: aoe2-lsp (server binary), kbgen (KB regeneration)
-common/    positions, ranges, diagnostics, outline symbols (shared data types)
-kb/        knowledge base: embedded JSON (XS functions, constants, RMS commands)
-           + data pipeline (GenKB extraction from the reference docs)
-rms/       RMS parser (lexer → AST with error recovery)
-xs/        XS parser (C-like grammar, rules/events, externs)
-analysis/  semantic checks (unknown symbols, arity, value types)
-hints/     signature-help computation (protocol-agnostic)
-complete/  completion candidates (protocol-agnostic)
-include/   #include/#includeXS closure, cross-file navigation
-server/    LSP server over go.lsp.dev/protocol (stdio)
+cmd/            thin entrypoints: aoe2-lsp (server binary), kbgen (KB regeneration)
+internal/
+  common/       positions, ranges, diagnostics, outline symbols (shared data types)
+  kb/           knowledge base: embedded JSON (XS functions, constants, RMS commands)
+                + data pipeline (GenKB extraction from the reference docs)
+  rms/          RMS parser (lexer → AST with error recovery)
+  xs/           XS parser (C-like grammar, rules/events, externs)
+  analysis/     semantic checks (unknown symbols, arity, value types)
+  hints/        signature-help computation (protocol-agnostic)
+  complete/     completion candidates (protocol-agnostic)
+  include/      #include/#includeXS closure, cross-file navigation
+  server/       LSP server over go.lsp.dev/protocol (stdio)
+scripts/        release.sh (version + changelog + tag)
 docs/
-  tasks/     task definitions & acceptance criteria
-  plans/     execution plans (build-lsp-rms-xs.md is the root one)
-  arch/      architecture plans (cells, CODEMANIFEST contracts)
-  design/    design documents per feature
-  reviews/   review notes
-  ref/       local copies of all data sources (see below)
+  tasks/        task definitions & acceptance criteria
+  plans/        execution plans (build-lsp-rms-xs.md is the root one)
+  arch/         architecture plans (cells, CODEMANIFEST contracts)
+  design/       design documents per feature
+  reviews/      review notes
+  ref/          local copies of all data sources (see below)
 ```
 
 The repository follows the [goga](https://pypi.org/project/goga/) CODEMANIFEST
