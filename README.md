@@ -82,6 +82,12 @@ Prebuilt binaries (Windows, Linux, macOS Intel/Apple Silicon) are attached to
 archives plus `SHA256SUMS`; releases are built and published by CI when a
 `v*` tag is pushed. Check the version with `aoe2-lsp --version`.
 
+Cutting a release (from a clean, synced master): `make release BUMP=patch`
+(or `VERSION=vX.Y.Z`) — the script prepends the changelog built from the
+conventional commits since the last tag to `CHANGELOG.md`, commits, tags
+and pushes; CI does the rest. `scripts/release.sh <spec> --dry-run` shows
+what would be released without changing anything.
+
 Or build from source; requires Go 1.26+.
 
 ```sh
