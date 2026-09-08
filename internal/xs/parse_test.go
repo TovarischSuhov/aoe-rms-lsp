@@ -257,6 +257,32 @@ func TestXsParse_Prelude(t *testing.T) {
 	assert.Equal(t, "infiniteLoopLimit", name)
 }
 
+// TestXsParse_ConstLocalDecl covers const local declarations inside
+// function bodies — the engine XS and real-world scripts use them
+// heavily (found on the vendored bugged cases corpus).
+func TestXsParse_ConstLocalDecl(t *testing.T) {
+	t.Parallel()
+
+	src := `void main() {
+	const int cGenghisKhan = 731;
+	const int cWorkValue = 0, cQuantity = 0;
+	int plain = cGenghisKhan + 1;
+}
+`
+
+	file, diags := XsParse(src, "const.xs")
+
+	require.Empty(t, diags, "const locals must parse cleanly: %v", messages(diags))
+
+	fn := file.Decls[0]
+	require.Len(t, fn.Body, 3)
+
+	first := fn.Body[0]
+	require.Len(t, first.Exprs, 1)
+	assert.Equal(t, "=", first.Exprs[0].Value)
+	assert.Equal(t, "cGenghisKhan", first.Exprs[0].Children[0].Value)
+}
+
 // TestXsParse_NeverNil checks the total-garbage path.
 func TestXsParse_NeverNil(t *testing.T) {
 	t.Parallel()
