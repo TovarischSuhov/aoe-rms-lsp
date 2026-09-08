@@ -395,7 +395,9 @@ func (p *parser) structuralInBrace(first token) {
 // implicitly and never warns).
 func (p *parser) closeScopes(closer token, stops func(string) bool) {
 	for i, open := range slices.Backward(p.scopes) {
-		if i < len(p.scopes)-1 && open.name != "percent_chance" {
+		// A scope the closer does not target is being closed implicitly:
+		// warn, except percent_chance which closes silently by design.
+		if !stops(open.name) && open.name != "percent_chance" {
 			p.reportf(closer.at, common.SeverityWarning, "syntax",
 				`"%s" closes an unterminated "%s" block`, closer.text, open.name)
 		}

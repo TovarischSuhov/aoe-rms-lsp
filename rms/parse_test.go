@@ -529,6 +529,61 @@ func TestParse_XsBlockTrailingBlankLines(t *testing.T) {
 	assert.Equal(t, common.Pos{Line: 2, Column: 0, Offset: 24}, file.XsBlocks[0].Range.End)
 }
 
+// TestParse_EndRandomClosesUnterminatedIf checks the implicit-close
+// warning: end_random silently closing an unterminated if reports a
+// warning naming both blocks.
+func TestParse_EndRandomClosesUnterminatedIf(t *testing.T) {
+	src := "start_random\nif 1\npercent_chance 50\ncreate_terrain GRASS\nend_random\n"
+
+	file, diags := Parse(src, "t.rms")
+
+	require.Len(t, diags, 1)
+	assert.Equal(t, common.SeverityWarning, diags[0].Severity)
+	assert.Equal(t, "syntax", diags[0].Code)
+	assert.Equal(t, `"end_random" closes an unterminated "if" block`, diags[0].Message)
+	assert.Equal(t, uint32(4), diags[0].Range.Start.Line)
+
+	// The random block itself is the legitimate close target and stays
+	// nested in the tree.
+	start := file.Sections[0].Statements[0]
+	assert.Equal(t, "start_random", start.Name)
+	require.Len(t, start.Children, 1)
+}
+
+// TestParse_EndRandomClosedNestNoWarning checks that a properly paired
+// nesting (if/endif inside start_random) produces no implicit-close
+// warnings.
+func TestParse_EndRandomClosedNestNoWarning(t *testing.T) {
+	src := "start_random\nif 1\npercent_chance 50\ncreate_terrain GRASS\nendif\nend_random\n"
+
+	file, diags := Parse(src, "t.rms")
+
+	assert.Empty(t, diags)
+	start := file.Sections[0].Statements[0]
+	assert.Equal(t, "start_random", start.Name)
+}
+
+// TestParse_PercentChanceImplicitNoWarn checks the documented exception:
+// an unterminated percent_chance branch closes implicitly without a
+// warning.
+func TestParse_PercentChanceImplicitNoWarn(t *testing.T) {
+	src := "start_random\npercent_chance 50\ncreate_terrain GRASS\nend_random\n"
+
+	_, diags := Parse(src, "t.rms")
+
+	assert.Empty(t, diags)
+}
+
+// TestParse_EndRandomWithoutMatch checks the unmatched-closer error is
+// preserved: a lone end_random stays an error, not a warning.
+func TestParse_EndRandomWithoutMatch(t *testing.T) {
+	_, diags := Parse("end_random\n", "t.rms")
+
+	require.Len(t, diags, 1)
+	assert.Equal(t, common.SeverityError, diags[0].Severity)
+	assert.Equal(t, `"end_random" without a matching opening block`, diags[0].Message)
+}
+
 // TestReferences_ByName checks the by-name form: same occurrences as
 // ReferencesAt, without needing a position in this file.
 func TestReferences_ByName(t *testing.T) {
