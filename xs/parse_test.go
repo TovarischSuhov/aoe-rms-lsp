@@ -191,17 +191,22 @@ func TestXsParse_ControlFlow(t *testing.T) {
 
 	forStmt := body[0]
 	assert.Equal(t, StmtFor, forStmt.Kind)
-	require.Len(t, forStmt.Exprs, 3) // init, cond, step
-	cond := forStmt.Exprs[1]
+	// Exprs hold cond/step; the typed init lives as Body[0]
+	require.Len(t, forStmt.Exprs, 2)
+	cond := forStmt.Exprs[0]
 	assert.Equal(t, ExprBinary, cond.Kind)
 	assert.Equal(t, "<", cond.Value)
 	assert.Equal(t, "i", cond.Children[0].Value)
 	assert.Equal(t, "10", cond.Children[1].Value)
-	// the init declarator names i
-	assert.Equal(t, "i", forStmt.Exprs[0].Children[0].Value)
 
-	// the for body is a block wrapping the if with else
-	block := forStmt.Body[0]
+	// the init declarator names i, as the first body statement
+	init := forStmt.Body[0]
+	assert.Equal(t, StmtDecl, init.Kind)
+	require.Len(t, init.Exprs, 1)
+	assert.Equal(t, "i", init.Exprs[0].Children[0].Value)
+
+	// the loop body block wraps the if with else
+	block := forStmt.Body[1]
 	assert.Equal(t, StmtBlock, block.Kind)
 	require.Len(t, block.Body, 1)
 	ifStmt := block.Body[0]

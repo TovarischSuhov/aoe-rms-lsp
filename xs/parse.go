@@ -521,20 +521,23 @@ func (p *xparser) parseDo() Stmt {
 	return stmt
 }
 
-// parseFor parses a for loop; Exprs holds init/cond/step in that order
-// (missing parts are skipped).
+// parseFor parses a for loop. Exprs holds cond/step; a typed init
+// declaration is stored as the first statement of Body so that the
+// existing scope walks see the loop variable inside the statement only.
 func (p *xparser) parseFor() Stmt {
 	start := p.next().at.Start // for
 	stmt := &Stmt{Kind: StmtFor, Range: common.Range{Start: start, End: start}}
+
+	var init *Stmt
 
 	if p.atOp("(") {
 		p.next()
 
 		// init: a typed declaration or a plain expression
 		if p.at(xIdent) && (isTypeWord(p.peek().text) || p.peek().text == "const") {
-			init := p.parseLocalDecl() // consumes through ';'
-			stmt.Exprs = append(stmt.Exprs, init.Exprs...)
-			stmt.Range.End = init.Range.End
+			decl := p.parseLocalDecl() // consumes through ';'
+			init = &decl
+			stmt.Range.End = decl.Range.End
 		} else {
 			stmt.Range.End = p.forPart(stmt, 0)
 			p.expect(";")
@@ -548,8 +551,15 @@ func (p *xparser) parseFor() Stmt {
 		p.expect(")")
 	}
 
-	stmt.Body = []Stmt{p.parseStmt()}
-	stmt.Range.End = stmt.Body[0].Range.End
+	body := p.parseStmt()
+
+	if init != nil {
+		stmt.Body = append([]Stmt{*init}, body)
+	} else {
+		stmt.Body = []Stmt{body}
+	}
+
+	stmt.Range.End = stmt.Body[len(stmt.Body)-1].Range.End
 
 	return *stmt
 }

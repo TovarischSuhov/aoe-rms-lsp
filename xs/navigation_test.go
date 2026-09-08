@@ -532,3 +532,145 @@ func TestVisibleAt_ShadowingBothKept(t *testing.T) {
 	require.Equal(t, 1, kinds[DeclVariable], "top-level x kept")
 	require.Equal(t, 1, kinds[KindLocal], "local x kept")
 }
+
+func TestVisibleAt_ForInitVisible(t *testing.T) {
+	src := "void main() {\n" +
+		"  for (int i = 0; i < 10; i++) {\n" +
+		"    int j = i + 1;\n" +
+		"  }\n" +
+		"}\n"
+
+	file, _ := XsParse(src, "for.xs")
+
+	// cursor on the i reference inside the loop body
+	syms, found := file.VisibleAt(common.Pos{Line: 2, Column: 12})
+
+	require.True(t, found)
+
+	kinds := make(map[string]string)
+
+	for _, s := range syms {
+		kinds[s.Name] = s.Kind
+	}
+
+	require.Equal(t, DeclFunction, kinds["main"])
+	require.Equal(t, KindLocal, kinds["i"], "for-init must be a visible local")
+	require.Equal(t, KindLocal, kinds["j"])
+}
+
+func TestVisibleAt_ForInitNotVisibleAfter(t *testing.T) {
+	src := "void main() {\n" +
+		"  for (int i = 0; i < 3; i++) {\n" +
+		"    int j = 1;\n" +
+		"  }\n" +
+		"  int k = 2;\n" +
+		"}\n"
+
+	file, _ := XsParse(src, "for.xs")
+
+	// cursor on the initializer of k, past both loop scopes
+	syms, found := file.VisibleAt(common.Pos{Line: 4, Column: 9})
+
+	require.True(t, found)
+
+	for _, s := range syms {
+		require.NotEqual(t, "i", s.Name, "for-init out of scope after the loop")
+		require.NotEqual(t, "j", s.Name, "body local out of scope after the loop")
+	}
+
+	kinds := make(map[string]string)
+
+	for _, s := range syms {
+		kinds[s.Name] = s.Kind
+	}
+
+	require.Equal(t, KindLocal, kinds["k"])
+}
+
+func TestDefinition_ForInit(t *testing.T) {
+	src := "void main() {\n" +
+		"  for (int i = 0; i < 10; i++) {\n" +
+		"    int j = i + 1;\n" +
+		"  }\n" +
+		"}\n"
+
+	file, _ := XsParse(src, "for.xs")
+
+	// the i occurrence in the condition jumps to the for-init declarator
+	r, found := file.Definition(common.Pos{Line: 1, Column: 18})
+
+	require.True(t, found)
+	assert.Equal(t, common.Pos{Line: 1, Column: 11, Offset: 25}, r.Start)
+	assert.Equal(t, common.Pos{Line: 1, Column: 12, Offset: 26}, r.End)
+}
+
+func TestXsParse_ForAssignFormNoPhantomLocal(t *testing.T) {
+	src := "int i = 0;\n" +
+		"void main() {\n" +
+		"  for (i = 0; i < 3; i++) {\n" +
+		"    i = 5;\n" +
+		"  }\n" +
+		"}\n"
+
+	file, _ := XsParse(src, "assign.xs")
+
+	syms, found := file.VisibleAt(common.Pos{Line: 3, Column: 4})
+
+	require.True(t, found)
+
+	count := 0
+
+	for _, s := range syms {
+		if s.Name == "i" {
+			count++
+			require.Equal(t, DeclVariable, s.Kind, "assign-form init is not a declaration")
+		}
+	}
+
+	require.Equal(t, 1, count, "exactly the top-level i")
+}
+
+func TestXsParse_MultiVarForInit(t *testing.T) {
+	src := "void main() {\n" +
+		"  for (int i = 0, j = 5; i < j; i++) {\n" +
+		"    j = j - 1;\n" +
+		"  }\n" +
+		"}\n"
+
+	file, _ := XsParse(src, "multi.xs")
+
+	syms, found := file.VisibleAt(common.Pos{Line: 2, Column: 4})
+
+	require.True(t, found)
+
+	kinds := make(map[string]string)
+
+	for _, s := range syms {
+		kinds[s.Name] = s.Kind
+	}
+
+	require.Equal(t, KindLocal, kinds["i"])
+	require.Equal(t, KindLocal, kinds["j"])
+}
+
+func TestXsParse_ForBodyWithoutBraces(t *testing.T) {
+	src := "void main() {\n" +
+		"  for (int i = 0; i < 3; i++)\n" +
+		"    i = i + 1;\n" +
+		"}\n"
+
+	file, diags := XsParse(src, "nobrace.xs")
+	require.Empty(t, diags)
+
+	syms, found := file.VisibleAt(common.Pos{Line: 2, Column: 4})
+
+	require.True(t, found)
+
+	kinds := make(map[string]string)
+
+	for _, s := range syms {
+		kinds[s.Name] = s.Kind
+	}
+
+	require.Equal(t, KindLocal, kinds["i"])
+}
