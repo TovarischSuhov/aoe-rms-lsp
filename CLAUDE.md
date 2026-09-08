@@ -6,14 +6,18 @@ LSP-сервер `aoe2-lsp` для AoE2 RMS + XS (Go 1.26+, module `aoe2-lsp`).
 
 ## Commands
 
+- `make check` — вся предзадачная проверка одним вызовом (fmt → build →
+  memory-cap test → lint → goga lint); то же по шагам: `make build`,
+  `make test`, `make lint`, `make fmt`
 - `go build ./...` — сборка
 - `go test ./... -count=1` — тесты (только под memory cap, см. ниже)
 - `golangci-lint run` — линтер (v2-конфиг `.golangci.yml`)
 - `golangci-lint fmt` — форматирование (gofumpt)
 - `goga lint` / `goga contract <cell>` — DSL-контракты ячеек
+- `make release BUMP=patch|minor|major` (или `VERSION=vX.Y.Z`) — выпуск
+  версии: changelog, тег, пуш; бинарники собирает CI
 - **Проверка перед завершением задачи** (доводить до зелёного):
-  memory-cap `go test ./... -count=1` → `golangci-lint fmt` →
-  `golangci-lint run` → `goga lint` → `goga contract` затронутых ячеек
+  `make check` → `goga contract` затронутых ячеек
 
 ## Тесты — только под лимитом памяти
 
@@ -37,7 +41,12 @@ Race-прогон — в CI (`go test -race ./...`).
 - Публичная поверхность ячейки — её `CODEMANIFEST` (read-only в кодовых
   задачах). Принимай интерфейсы (`Source`), возвращай структуры.
 - Тесты table-driven, same package; `t.Parallel()` для новых тестов без
-  общего состояния. Тесты для тривиальных функций и методов не нужны.
+  общего состояния; результат — одним assert'ом. Тесты для тривиальных
+  функций и методов не нужны — покрывай тестами логику, а не пересказ
+  сигнатур.
+- Golden files для CLI/сериализации — `go test -update`
+  (`<cell>/testdata/`). Заявил «сделал быстрее» — `go test -bench`
+  до/после через benchstat, не словами.
 - `any` вместо `interface{}`; без `github.com/pkg/errors` и `io/ioutil`.
 - Комментарий — «почему», не пересказ кода; doc-комментарий обязателен
   на экспортах (`.goga/usages/conventions.md`).
@@ -48,7 +57,10 @@ Race-прогон — в CI (`go test -race ./...`).
 - `cmd/` — тонкие entrypoints (`aoe2-lsp`, `kbgen`)
 - ячейки-пакеты: `common`, `kb`, `rms`, `xs`, `analysis`, `hints`,
   `complete`, `include`, `server` — контракт каждой в её `CODEMANIFEST`,
-  потребительские практики в `<cell>/.usages/`
+  потребительские практики в `<cell>/.usages/` (отступление от шаблона
+  new-go-project: вместо `internal/`/`pkg/` — goga-ячейки в корне,
+  инкапсуляция контрактами)
+- `scripts/` — релизный скрипт (`release.sh`: версия + CHANGELOG.md + тег)
 - `docs/` — планы, дизайн, задачи, ревью, справочники
 - `<cell>/testdata/` — фикстуры ячеек (сейчас `rms/testdata`, `xs/testdata`;
   корневого `testdata/` нет)

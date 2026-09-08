@@ -89,6 +89,11 @@ small modules — it produces the same archives and avoids artifact passing
 between matrix jobs (this repo's release.yml uses it; add `-trimpath` for
 reproducible builds).
 
+The tag itself is put by `scripts/release.sh` (`make release`): it computes
+the next version, prepends the conventional-commit changelog to
+`CHANGELOG.md`, commits and pushes `master` + tag together, so the workflow
+always runs at a commit that carries its own changelog entry.
+
 Upload archives + a combined `SHA256SUMS` to the release created with
 `gh release create "$GITHUB_REF_NAME" --generate-notes`.
 
