@@ -605,3 +605,45 @@ func TestReferences_ByName(t *testing.T) {
 	// Unknown name: empty result.
 	assert.Empty(t, file.References("no_such_command"))
 }
+
+// TestParse_IncludeXSArgEmptyRegionNoBlock checks that an argumented
+// #includeXS whose inline region is empty (a terminator on the next
+// line) owns no XsBlock — no phantom outline node.
+func TestParse_IncludeXSArgEmptyRegionNoBlock(t *testing.T) {
+	src := "#includeXS lib/helpers.xs\n<land_generation>\ncreate_elevator 7\n"
+
+	file, diags := Parse(src, "t.rms")
+
+	require.Empty(t, diags)
+	require.Len(t, file.XsIncludes, 1)
+	assert.Equal(t, "lib/helpers.xs", file.XsIncludes[0].Path)
+	assert.Empty(t, file.XsBlocks)
+}
+
+// TestParse_StringLiteralKeepsCommentMarkers checks that comment
+// blanking respects string literals: the path and range of a quoted
+// include argument survive comment markers inside the quotes.
+func TestParse_StringLiteralKeepsCommentMarkers(t *testing.T) {
+	file, diags := Parse("#include \"a//b.rms\"\n", "t.rms")
+
+	require.Empty(t, diags)
+	require.Len(t, file.Includes, 1)
+
+	assert.Equal(t, "a//b.rms", file.Includes[0].Path)
+	assert.Equal(t, common.Pos{Line: 0, Column: 9, Offset: 9}, file.Includes[0].Range.Start)
+	assert.Equal(t, common.Pos{Line: 0, Column: 19, Offset: 19}, file.Includes[0].Range.End)
+}
+
+// TestParse_StringLiteralKeepsBlockMarker checks a block-comment opener
+// inside a quoted path neither opens a comment nor mangles the range.
+func TestParse_StringLiteralKeepsBlockMarker(t *testing.T) {
+	file, diags := Parse("#include \"a/*b.rms\"\ncreate_elevator 7\n", "t.rms")
+
+	require.Empty(t, diags)
+	require.Len(t, file.Includes, 1)
+
+	assert.Equal(t, "a/*b.rms", file.Includes[0].Path)
+
+	// the command after the string still parses — no runaway comment
+	assert.Equal(t, "create_elevator", file.Sections[0].Statements[0].Name)
+}
