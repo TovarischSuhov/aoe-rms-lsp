@@ -14,8 +14,19 @@ Target audience: maintainers updating the knowledge base.
 
 ```go
 cmds, err := kb.ExtractRmsCommands("docs/ref/zetnus-rms-guide.txt")
-// marshal into kb/data/rms-commands.json per the kbdata schema
+// marshal into kb/data/rms-commands.json per the JSON schema:
+// name, section, args[], attributes[], desc, game_versions, since_update
+```
 
 Preconditions:
 - Duplicate names within one file are a build error — resolve, do not skip.
 - NewStore() must pass after regeneration (run kb tests).
+
+## Mining on regeneration (signature help)
+
+ExtractRmsCommands now mines structured kind/range from Desc prose via
+kb.MineKindRange: bounded entries get Range ("number (0-99)" → 0..99);
+empty-Kind entries get the mined kind when prose has one. Flag attributes
+(empty Desc, e.g. set_circular_base) stay name-only — nothing to mine.
+After regeneration run kb tests: NewStore re-mines fill-when-empty, so
+regenerated JSON and load-time mining must agree (idempotent rule).

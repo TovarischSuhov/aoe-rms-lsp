@@ -147,7 +147,7 @@ Rules:
   is off any argument or the index is beyond the declared parameters. **Never clamp** to the last
   parameter — a wrong highlight is worse than none.
 - **`ParameterInformation.Label` is a plain string** (`"float x"`, `"%: percent 0..99"`);
-  optional parameters render in square brackets (`"[z: float]"`). Omit `Documentation` — extended
+  optional parameters render in square brackets (`"[float z]"`). Omit `Documentation` — extended
   descriptions stay in hover (concise-hints rule).
 - `params.Context` (`TriggerKind`, `TriggerCharacter`, `IsRetrigger`, `ActiveSignatureHelp`) describes
   why the request fired. The provider is **stateless**: the answer must depend only on

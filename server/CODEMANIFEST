@@ -24,6 +24,12 @@ Imports:
       - checks
     From: analysis
   - Types:
+      - Computer
+      - Hint
+    Usages:
+      - computing
+    From: hints
+  - Types:
       - Symbol
     Usages:
       - symbols
@@ -46,12 +52,12 @@ Annotations: |
   Use `conventions` for code writing rules and testing.
   Use `lsp-protocol` for go.lsp.dev patterns (NewServer bootstrap, Full sync,
   PublishDiagnostics, Hover/Completion result shapes, Boolean/Optional arms).
-  Use `lookups`, `rms-parsing`, `xs-parsing`, `checks`, `closure` from
-  Imports for the provider APIs wired into handlers.
+  Use `lookups`, `rms-parsing`, `xs-parsing`, `checks`, `closure`, `computing`
+  from Imports for the provider APIs wired into handlers.
 
   Language selection by URI extension: .rms → `Parse` → `RmsFile`
-  (+ inline `XsBlock` → `XsParse` with range shift), .xs → `XsParse` →
-  `XsFile`. One change = one diagnostics batch.
+  (+ inline `XsBlock` → `XsParse` with range shift), .xs → `XsParse` → `XsFile`.
+  One change = one diagnostics batch.
   Protocol types (InitializeParams, Hover, CompletionList, ...) belong to
   go.lsp.dev/protocol — follow `lsp-protocol` for their construction.
 
@@ -65,14 +71,19 @@ Annotations: |
   Внешние декларации (`Decl` из ExternalDecls по `closure`) передаются в
   AnalyzeXs — тип `Decl` импортирован из xs.
 
+  Use `computing` from Imports для вычисления хинтов signature help:
+  молчание found=false → nil, nil (конвенция Hover); триггеры «(» и «,»
+  не пересекаются с completion'ыми « » и «<».
+
 ---
 
-"Server(store: Store, analyzer: Analyzer)":
+"Server(store: Store, analyzer: Analyzer, computer: Computer)":
   location: server.go
   annotations: |
-    LSP-сервер: протокол поверх kb/rms/xs/analysis.
+    LSP-сервер: протокол поверх kb/rms/xs/analysis/hints.
 
-    `store`: база знаний; `analyzer`: семантические проверки (DI)
+    `store`: база знаний; `analyzer`: семантические проверки;
+    `computer`: вычислитель хинтов (DI)
 
     Requirements:
     - паттерны протокола строго по `lsp-protocol` (UnimplementedServer, Full sync)
@@ -82,6 +93,7 @@ Annotations: |
       Заявить возможности: TextDocumentSync Full+OpenClose, HoverProvider
       Boolean(true), CompletionProvider с триггерами; DefinitionProvider,
       ReferencesProvider, DocumentSymbolProvider — Boolean(true);
+      SignatureHelpProvider с триггерами «(» и «,»;
       согласовать positionEncoding (utf-8 при поддержке клиентом).
     "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |
       Algorithm:
@@ -108,6 +120,33 @@ Annotations: |
       1. .rms: SectionAt → Store.Commands(section) + константы;
          .xs: префикс слова → Store.Functions + Store.Constants
       2. CompletionList: label, kind, detail=сигнатура, documentation=desc
+    "SignatureHelp(ctx: Context, params: SignatureHelpParams) -> help: SignatureHelp, err: error": |
+      Параметрические хинты для позиции в документе (stateless, read-only).
+
+      `params`: позиция и контекст запроса; `help`: результат или nil (молчание)
+
+      Algorithm:
+      1. Язык по расширению URI (общий шаблон с Hover)
+      2. .xs: XsParse(text) + Closure(uri).ExternalDecls(uri) →
+         computer.XsAt(file, pos, decls)
+      3. .rms: Parse(text); external = Closure(uri).ExternalDecls("")
+         (как DidOpen для inline-блоков); позиция внутри XsBlock
+         (Range.Contains) →
+         трансляция в block-local координаты (шаблон include.Definition) +
+         XsParse(block.Code) → computer.XsAt(xsFile, blockPos, external);
+         иначе computer.RmsAt(file, pos)
+      4. `Hint` → protocol.SignatureInformation по `lsp-protocol` (Signature Help):
+         Label=hint.Label; Parameters — метки строкой; Documentation опускается;
+         ровно одна сигнатура, ActiveSignature=0; ActiveParameter=uint32(active)
+         при active>=0, иначе nil
+      5. Молчание: found=false → nil, nil
+
+      Requirements:
+      - stateless: ответ зависит только от (document, position);
+        TriggerKind/TriggerCharacter/IsRetrigger на результат не влияют
+      - read-only (R10), аддитивно к существующим хендлерам (C4/SC8)
+      - C6: недоступное замыкание → ExternalDecls даёт что может,
+        unknown-имена молча падают до kb → silence
     "Definition(ctx: Context, params: DefinitionParams) -> result: DefinitionResult, err: error": |
       Кросс-файловый переход к определению.
 
@@ -179,7 +218,8 @@ Annotations: |
     `ctx`: контекст процесса; `err`: причина завершения
 
     Algorithm:
-    1. Собрать зависимости: NewStore, NewAnalyzer, Server, DocStore
+    1. Собрать зависимости: NewStore, NewAnalyzer, NewComputer(store),
+       Server(store, analyzer, computer), DocStore
     2. protocol.NewServer(ctx, srv, stream); ждать conn.Done()
 
 ---
@@ -187,5 +227,5 @@ Annotations: |
 Author: Goga
 CreatedAt: 04/09/26
 Description: |
-  Корневая ячейка: LSP-сервер (stdio) над kb/rms/xs/analysis/include
+  Корневая ячейка: LSP-сервер (stdio) над kb/rms/xs/analysis/include/hints
   для редакторов.

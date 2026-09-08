@@ -22,6 +22,10 @@ Annotations: |
   Parser never fails hard: every problem becomes a Diagnostic; recovery
   resynchronizes to the next statement/declaration. Every AST node carries a Range.
 
+  Call-контекст для signature help создаётся только узлами Expr Kind=call:
+  векторные литералы «(1,2,3)» по `xs_grammar`, условия if/while/for, списки
+  параметров деклараций и скобки группировки вызовом не являются.
+
 ---
 
 "XsParse(source: string, name: string) -> file: XsFile, diags: []Diagnostic":
@@ -130,6 +134,54 @@ Annotations: |
       - Selection ⊆ Range для каждого узла
       - плоский список: тела деклараций не раскрываются
       - include-декларации пропускаются: словарь kind их не содержит
+
+    "CallAt(pos: Pos) -> call: CallSite, found: bool": |
+      Внутренний (innermost) вызов, объемлющий позицию (signature help).
+
+      `pos`: позиция в файле; `call`: контекст вызова; `found`: объемлющий вызов есть
+
+      Algorithm:
+      1. Позиция внутри строки или комментария → found=false
+      2. Найти внутренний call-узел, чей span — от имени callee до конца списка
+         аргументов — содержит `pos`; span списка аргументов тянется до фронта
+         восстановления (для незакрытого вызова — до конца доступного ввода),
+         не ограничен Range выражения
+      3. Объемлющего вызова нет → found=false
+      4. `pos` на имени callee или между именем и «(» → CallSite{callee,
+         argIndex=0, onArg=false}
+      5. Внутри скобок: подсчитать запятые верхнего уровня (не внутри вложенных
+         вызовов/скобок/строк) до `pos` → argIndex=k, onArg=true
+
+      Requirements:
+      - in-progress (незакрытые) вызовы дают результат — жёсткое требование SC1:
+        первый символ после «(» — ключевой момент фичи
+      - вложенные вызовы: внутренний побеждает (f(g(x| → g, аргумент 0)
+      - только Expr Kind=call создаёт контекст вызова — см. глобальные Annotations
+      - детерминированность: одинаковый вход → одинаковый результат
+
+      Constraints:
+      - argIndex не клампится: выход за границы списка параметров — решение
+        потребителя, не навигации
+
+"CallSite(callee: string, argIndex: int, onArg: bool)":
+  location: ast.go
+  annotations: |
+    Контекст вызова под курсором — данные для signature help.
+
+    `callee`: имя вызываемой функции внутреннего вызова
+    `argIndex`: 0-based ординал аргумента под курсором (валиден при onArg=true:
+    сразу после «(» — 0; после k запятых верхнего уровня — k)
+    `onArg`: курсор внутри списка аргументов (false — на имени callee)
+
+    Requirements:
+    - чистые данные: construct-and-use, без мутации
+  properties:
+    "Callee -> string": |
+      Имя вызываемой функции.
+    "ArgIndex -> int": |
+      0-based ординал аргумента под курсором (при onArg=true).
+    "OnArg -> bool": |
+      Курсор внутри списка аргументов (false — на имени callee).
 
 "Decl()":
   location: ast.go

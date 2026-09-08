@@ -88,6 +88,7 @@ Annotations: |
       "global" (если она материализована), иначе found=false.
 
       `pos`: позиция в файле
+
     "StatementAt(pos: Pos) -> stmt: Statement, found: bool": |
       Ближайший statement, содержащий/предшествующий позиции (для hover).
 
@@ -149,6 +150,62 @@ Annotations: |
       Requirements:
       - ReferencesAt(pos) эквивалентен References(слово под pos)
       - отсутствие имени — пустой список
+
+    "ArgAt(pos: Pos) -> site: ArgSite, found: bool": |
+      Дискриминация аргумента под курсором: команда-владелец + активный
+      элемент (signature help).
+
+      `pos`: позиция в файле; `site`: аргументный контекст; `found`: владелец есть
+
+      Algorithm:
+      1. Ближайший statement, объемлющий/предшествующий `pos` — семантика
+         StatementAt, включая хвостовые позиции и незакрытые блоки; нет
+         (директивы #const/#include, заголовки секций, вне всего) → found=false
+      2. `pos` внутри строки или комментария → found=false
+      3. `pos` на токене имени команды → kind=none
+      4. `pos` внутри значения N-го позиционного аргумента (Args[N]) →
+         kind=arg, index=N
+      5. `pos` на имени атрибута или его значении (Attribute.Name/Value) →
+         kind=attr, name=имя атрибута (name-match — имя атрибута — его
+         единственная truthful-идентичность)
+      6. Неоднозначный маппинг (странные однострочные сплиты атрибутов,
+         braceless-слово как позиционный аргумент при неясности) или
+         позиция вне всех значений и имён (пробел между аргументами,
+         «{»/«}», хвост команды) → kind=none
+
+      Requirements:
+      - вложенные блоки (random/conditional): владеет самый внутренний statement
+      - атрибуты в «{ }» после команды — обычный случай позиционной семантики
+      - детерминированность: одинаковый вход → одинаковый результат
+
+      Constraints:
+      - kind=none при неоднозначности — никогда неправильная активная метка (SC6);
+        это решение навигации, а не потребителя
+
+"ArgSite(stmt: Statement, kind: string, index: int, name: string)":
+  location: ast.go
+  annotations: |
+    Аргументный контекст под курсором — данные для signature help.
+
+    `stmt`: команда-владелец (позиционная семантика: атрибуты принадлежат
+    предшествующей команде; вложенные блоки — своему statement)
+    `kind`: arg (курсор на позиционном аргументе) / attr (на атрибуте — имени
+    или значении) / none (на имени команды или неоднозначно)
+    `index`: 0-based номер позиционного аргумента (kind=arg)
+    `name`: имя атрибута (kind=attr)
+
+    Requirements:
+    - чистые данные: construct-and-use, без мутации
+    - kind-дискриминатор — стиль Statement.Kind/Expr.Kind
+  properties:
+    "Stmt -> Statement": |
+      Команда-владелец.
+    "Kind -> string": |
+      arg / attr / none.
+    "Index -> int": |
+      0-based номер позиционного аргумента (kind=arg).
+    "Name -> string": |
+      Имя атрибута (kind=attr).
 
 "XsBlock()":
   location: ast.go

@@ -60,3 +60,29 @@ Preconditions:
 - Navigation answers from the token/occurrence index recorded at parse
   time — reparse before querying after text changes.
 
+## Argument lookup (signature help)
+
+ArgAt answers "which command owns the cursor, and which argument or
+attribute am I on" — for hint providers. Owner resolution follows
+StatementAt semantics (works on trailing positions and unclosed blocks);
+the added value is argument discrimination.
+
+```go
+if site, ok := file.ArgAt(pos); ok {
+    // site.Stmt — owning command statement (attrs attach to the preceding
+    //             command; nested blocks own their innermost statement)
+    // site.Kind — "arg" | "attr" | "none"
+    // site.Index — 0-based positional ordinal (Kind="arg")
+    // site.Name — attribute name (Kind="attr"), active by name-match
+}
+```
+
+Preconditions:
+- Positions inside strings/comments and on directives/section headers
+  return found=false — render no hint.
+- Ambiguous mappings return Kind="none" — render the signature with no
+  active mark rather than a guessed one.
+- The consumer (hints) maps a positional ordinal to the kb Args list and
+  an attribute name to its index in kb Attributes — RMS has no local
+  declarations to consult.
+

@@ -10,12 +10,27 @@ Usages:
     since_update sourced from docs/ref/aoe2de-xs-rms-changelog.md; empty string when unknown.
     Names must be unique within each file — validated on load.
 
+    Desc prose mining (signature help):
+    - Value bounds appear as "(<num>-<num>)" right after the kind word:
+      "number (0-99)", "number (1-16)", "number (36-480)"; decimals and negative
+      bounds allowed; often followed by unrelated "(default: …)" / "(see: …)"
+      parenthesized fragments — only numeric bounds match.
+    - The kind word in prose is "number" even for percent-typed args
+      (cliff_curliness %: kind=percent, desc="number (0-100)") — mined kind fills
+      only empty Kind entries, never overwrites structured ones.
+    - Flag attributes (34 entries: set_circular_base, make_indestructible, …) carry
+      empty Desc — nothing to mine; they stay name-only by design.
+
 Annotations: |
   Use `conventions` for code writing rules and testing.
   Use `kbdata` for the embedded JSON file layout and schema.
 
   Cell is the AoE2 RMS+XS knowledge base: loads embedded JSON once at
   construction and serves read-only lookups. No IO after construction.
+
+  Mined data (kind/range) follows the provenance rule: structured values from
+  extraction win; mining fills only empty fields; unparseable prose silently
+  keeps raw values — the load pipeline never fails.
 
 ---
 
@@ -28,6 +43,9 @@ Annotations: |
     - конструктор NewStore() читает файлы по `kbdata` и валидирует схему:
       неизвестные ключи, дубликаты имён, пустые name — ошибка загрузки
     - после построения Store потокобезопасен для чтения (immutable данные)
+    - при загрузке CommandArg с пустым Range или пустым Kind —
+      `MineKindRange`(Desc); идемпотентно с экстракцией (заполнение только
+      пустых), непарсимое молча остаётся сырым
   methods:
     "Function(name: string) -> fn: Function, found: bool": |
       Lookup XS-функции по точному имени.
@@ -121,15 +139,63 @@ Annotations: |
   location: model.go
   annotations: |
     Спецификация аргумента/атрибута RMS-команды (данные).
+
+    Requirements:
+    - Kind после загрузки: пустой заполняется замайненным (`MineKindRange`),
+      непустой (из экстракции) не перезаписывается
   properties:
     "Name -> string": |
       Имя аргумента/атрибута.
     "Kind -> string": |
       Ожидаемая форма значения: number / percent / const / terrain / object / ...
+      Пустой после загрузки — только если prose не парсится (флаг-атрибуты).
+    "Range -> ValueRange": |
+      Замайненные границы значения; пустая — не замайнено.
     "Required -> bool": |
       Обязательность.
     "Desc -> string": |
       Описание.
+
+"ValueRange(min: string, max: string)":
+  location: model.go
+  annotations: |
+    Замайненные границы значения аргумента из Desc-prose (данные).
+
+    `min`: нижняя граница как в prose ("" — не замайнено)
+    `max`: верхняя граница ("" — не замайнено)
+
+    Requirements:
+    - чистые данные: construct-and-use, без мутации
+    - границы — строки: текст prose без преобразования точности
+  properties:
+    "Min -> string": |
+      Нижняя граница ("" — не замайнено).
+    "Max -> string": |
+      Верхняя граница ("" — не замайнено).
+
+"MineKindRange(desc: string) -> kind: string, r: ValueRange":
+  location: mine.go
+  annotations: |
+    Разбор Desc-prose в структурированные kind и границы значения.
+
+    `desc`: prose-описание аргумента/атрибута из базы
+    `kind`: замайненный kind ("" — не найден); `r`: границы (пустая — не найдены)
+
+    Algorithm:
+    1. Найти в `desc` первый фрагмент "(<num>-<num>)" — целые или десятичные,
+       опциональный минус; нет — вернуть "", пустую `ValueRange`
+    2. Слово непосредственно перед фрагментом — замайненный kind
+       (в корпусе: number); слова нет — kind=""
+    3. Вернуть kind и `ValueRange` с границами как записаны в prose
+       (только обрезка окружающих пробелов)
+
+    Requirements:
+    - паттерны prose — по `kbdata` (Desc prose mining)
+    - детерминированность: одинаковый вход → одинаковый результат
+
+    Constraints:
+    - непарсимая prose → пустой результат, не ошибка
+    - нечисловые скобочные фрагменты ("(default: …)", "(see: …)") не матчатся
 
 "ExtractRmsCommands(path: string) -> commands: []Command, err: error":
   location: extract.go
@@ -143,7 +209,9 @@ Annotations: |
     Algorithm:
     1. Прочитать файл по `path`
     2. Найти секции Syntax Skeleton и пройтись по блокам команд
-    3. Для каждой команды собрать Name, Section, Args, Attributes, Desc, GameVersions
+    3. Для каждой команды собрать Name, Section, Args, Attributes, Desc,
+       GameVersions; для каждого CommandArg — `MineKindRange`(Desc) →
+       заполнить Range, Kind пуст → замайненный kind
     4. Обогатить SinceUpdate по changelog (docs/ref/aoe2de-xs-rms-changelog.md)
     5. Проверить дубликаты имён; вернуть []Command
 
