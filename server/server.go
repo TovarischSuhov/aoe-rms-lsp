@@ -9,6 +9,7 @@ import (
 
 	"aoe2-lsp/analysis"
 	"aoe2-lsp/common"
+	"aoe2-lsp/complete"
 	"aoe2-lsp/hints"
 	"aoe2-lsp/include"
 	"aoe2-lsp/kb"
@@ -27,32 +28,36 @@ const serverName = "aoe2-lsp"
 type Server struct {
 	protocol.UnimplementedServer
 
-	store    *kb.Store
-	analyzer *analysis.Analyzer
-	computer *hints.Computer
-	docs     *DocStore
-	resolver *include.Resolver
-	exit     chan struct{}
-	exitOnce sync.Once
+	store     *kb.Store
+	analyzer  *analysis.Analyzer
+	computer  *hints.Computer
+	completer *complete.Completer
+	docs      *DocStore
+	resolver  *include.Resolver
+	exit      chan struct{}
+	exitOnce  sync.Once
 }
 
-// NewServer builds the server from its knowledge base, analyzer and hint
-// computer (DI); the document cache and the include resolver over it are
-// created internally (DocStore structurally satisfies include.Source).
+// NewServer builds the server from its knowledge base, analyzer, hint
+// computer and completion completer (DI); the document cache and the
+// include resolver over it are created internally (DocStore
+// structurally satisfies include.Source).
 func NewServer(
 	store *kb.Store,
 	analyzer *analysis.Analyzer,
 	computer *hints.Computer,
+	completer *complete.Completer,
 ) *Server {
 	docs := NewDocStore()
 
 	return &Server{
-		store:    store,
-		analyzer: analyzer,
-		computer: computer,
-		docs:     docs,
-		resolver: include.NewResolver(docs),
-		exit:     make(chan struct{}),
+		store:     store,
+		analyzer:  analyzer,
+		computer:  computer,
+		completer: completer,
+		docs:      docs,
+		resolver:  include.NewResolver(docs),
+		exit:      make(chan struct{}),
 	}
 }
 
@@ -333,8 +338,12 @@ func toSignatureHelp(hint hints.Hint) *protocol.SignatureHelp {
 }
 
 // Completion answers with the kb entries in scope: for .rms the commands of
-// the section at pos plus all constants, for .xs the functions and
-// constants matching the word prefix at pos.
+// Completion answers the candidates in scope: .rms positions complete
+// by the RMS context matrix, .xs and inline XS blocks by the visible
+// symbol pool over the kb functions and constants. The provider is
+// stateless — the answer depends only on (document, position); prefix
+// filtering belongs to the client. An empty candidate list is the
+// designed silence: an empty CompletionList, never an error.
 func (s *Server) Completion(
 	ctx context.Context,
 	params *protocol.CompletionParams,
@@ -344,103 +353,104 @@ func (s *Server) Completion(
 		return &protocol.CompletionList{Items: []protocol.CompletionItem{}}, nil
 	}
 
+	docURI := string(params.TextDocument.URI)
 	pos := fromProtocolPos(params.Position)
 
-	var items []protocol.CompletionItem
+	var cands []complete.Candidate
 
 	switch {
 	case strings.HasSuffix(name, ".rms"):
-		items = s.completionsRms(text, name, pos)
+		cands = s.completionRms(ctx, text, name, pos, docURI)
 	case strings.HasSuffix(name, ".xs"):
-		items = s.completionsXs(text, pos)
+		cands = s.completionXs(ctx, text, name, pos, docURI)
 	}
 
-	return &protocol.CompletionList{Items: items}, nil
+	return &protocol.CompletionList{IsIncomplete: false, Items: toCompletionItems(cands)}, nil
 }
 
-// completionsRms lists the commands of the section containing pos plus all
-// constants.
-func (s *Server) completionsRms(
+// completionRms parses the .rms document: a position inside an inline
+// XS block routes to the XS path in block-local coordinates (the
+// include-Definition template; inline blocks are not closure members,
+// so the whole closure serves as externals); any other position takes
+// the RMS context matrix.
+func (s *Server) completionRms(
+	ctx context.Context,
 	text string,
 	name string,
 	pos common.Pos,
-) []protocol.CompletionItem {
+	docURI string,
+) []complete.Candidate {
 	file, _ := rms.Parse(text, name)
 
-	sec, ok := file.SectionAt(pos)
-	if !ok {
-		return nil
-	}
-
-	cmds := s.store.Commands(sec.Name)
-	consts := s.store.Constants("")
-
-	items := make([]protocol.CompletionItem, 0, len(cmds)+len(consts))
-
-	for _, cmd := range cmds {
-		items = append(items, protocol.CompletionItem{
-			Label:         cmd.Name,
-			Kind:          protocol.CompletionItemKindKeyword,
-			Detail:        protocol.NewOptional(commandSignature(cmd)),
-			Documentation: protocol.String(cmd.Desc),
-		})
-	}
-
-	for _, c := range consts {
-		items = append(items, protocol.CompletionItem{
-			Label:         c.Name,
-			Kind:          protocol.CompletionItemKindConstant,
-			Detail:        protocol.NewOptional(c.Value),
-			Documentation: protocol.String(c.Desc),
-		})
-	}
-
-	return items
-}
-
-// completionsXs lists functions and constants matching (case-insensitively)
-// the identifier prefix ending at pos; an empty prefix matches everything.
-func (s *Server) completionsXs(text string, pos common.Pos) []protocol.CompletionItem {
-	prefix := strings.ToLower(wordPrefix(text, pos))
-
-	fns := s.store.Functions()
-	consts := s.store.Constants("")
-
-	items := make([]protocol.CompletionItem, 0, len(fns)+len(consts))
-
-	for _, fn := range fns {
-		if !matchesPrefix(fn.Name, prefix) {
+	for _, block := range file.XsBlocks {
+		if !block.Range.Contains(pos) {
 			continue
 		}
 
-		items = append(items, protocol.CompletionItem{
-			Label:         fn.Name,
-			Kind:          protocol.CompletionItemKindFunction,
-			Detail:        protocol.NewOptional(functionSignature(fn)),
-			Documentation: protocol.String(fn.Desc),
-		})
+		xsFile, _ := xs.XsParse(block.Code, "inline:"+name)
+		closure := s.resolver.Closure(ctx, docURI)
+
+		return s.completer.XsAt(
+			xsFile,
+			unshiftPos(pos, block.Range.Start),
+			closure.ExternalDecls(""),
+		)
 	}
 
-	for _, c := range consts {
-		if !matchesPrefix(c.Name, prefix) {
-			continue
+	return s.completer.RmsAt(file, pos)
+}
+
+// completionXs parses the .xs document and computes the candidates with
+// the closure's external declarations (the analyzed file is excluded
+// from its own externals — the analyzeXs pattern).
+func (s *Server) completionXs(
+	ctx context.Context,
+	text string,
+	name string,
+	pos common.Pos,
+	docURI string,
+) []complete.Candidate {
+	file, _ := xs.XsParse(text, name)
+	closure := s.resolver.Closure(ctx, docURI)
+
+	return s.completer.XsAt(file, pos, closure.ExternalDecls(docURI))
+}
+
+// completionKinds maps the complete cell's candidate kinds to protocol
+// completion kinds; the table is parallel to the DocumentSymbol mapping
+// (command → Function, like the outline).
+var completionKinds = map[string]protocol.CompletionItemKind{
+	complete.KindCommand:   protocol.CompletionItemKindFunction,
+	complete.KindAttribute: protocol.CompletionItemKindField,
+	complete.KindConstant:  protocol.CompletionItemKindConstant,
+	complete.KindFunction:  protocol.CompletionItemKindFunction,
+	complete.KindVariable:  protocol.CompletionItemKindVariable,
+	complete.KindParam:     protocol.CompletionItemKindVariable,
+	complete.KindLocal:     protocol.CompletionItemKindVariable,
+}
+
+// toCompletionItems renders candidates per lsp-protocol (Completion
+// Items): Label, the kind-table Kind, one-line Detail, SortText; the
+// insert text equals the label and stays unset, documentation stays
+// out of completion (concise-items rule).
+func toCompletionItems(cands []complete.Candidate) []protocol.CompletionItem {
+	items := make([]protocol.CompletionItem, 0, len(cands))
+
+	for _, c := range cands {
+		item := protocol.CompletionItem{
+			Label:    c.Label,
+			Kind:     completionKinds[c.Kind],
+			SortText: protocol.NewOptional(c.Sort),
 		}
 
-		items = append(items, protocol.CompletionItem{
-			Label:         c.Name,
-			Kind:          protocol.CompletionItemKindConstant,
-			Detail:        protocol.NewOptional(c.Value),
-			Documentation: protocol.String(c.Desc),
-		})
+		if c.Detail != "" {
+			item.Detail = protocol.NewOptional(c.Detail)
+		}
+
+		items = append(items, item)
 	}
 
 	return items
-}
-
-// matchesPrefix reports whether name starts with the lowercase prefix,
-// comparing case-insensitively.
-func matchesPrefix(name string, prefix string) bool {
-	return strings.HasPrefix(strings.ToLower(name), prefix)
 }
 
 // Definition answers textDocument/definition across the document's
@@ -810,34 +820,6 @@ func fromProtocolPos(p protocol.Position) common.Pos {
 // toProtocolRange converts a shared range to the protocol shape.
 func toProtocolRange(r common.Range) protocol.Range {
 	return protocol.Range{Start: toProtocolPos(r.Start), End: toProtocolPos(r.End)}
-}
-
-// wordPrefix returns the identifier prefix ending at pos in text.
-func wordPrefix(text string, pos common.Pos) string {
-	lines := strings.Split(text, "\n")
-	if int(pos.Line) >= len(lines) {
-		return ""
-	}
-
-	line := lines[pos.Line]
-
-	end := min(int(pos.Column), len(line))
-
-	start := end
-
-	for start > 0 && isIdentByte(line[start-1]) {
-		start--
-	}
-
-	return line[start:end]
-}
-
-// isIdentByte reports whether b can appear in an XS identifier.
-func isIdentByte(b byte) bool {
-	return b == '_' ||
-		(b >= 'a' && b <= 'z') ||
-		(b >= 'A' && b <= 'Z') ||
-		(b >= '0' && b <= '9')
 }
 
 // commandSignature renders the call signature of an RMS command, e.g.

@@ -12,6 +12,7 @@ import (
 	"go.lsp.dev/uri"
 
 	"aoe2-lsp/analysis"
+	"aoe2-lsp/complete"
 	"aoe2-lsp/hints"
 	"aoe2-lsp/kb"
 )
@@ -23,7 +24,12 @@ func newNavigationServer(t *testing.T) *Server {
 	store, err := kb.NewStore()
 	require.NoError(t, err)
 
-	return NewServer(store, analysis.NewAnalyzer(store), hints.NewComputer(store))
+	return NewServer(
+		store,
+		analysis.NewAnalyzer(store),
+		hints.NewComputer(store),
+		complete.NewCompleter(store),
+	)
 }
 
 func TestServerDefinition_APIShape(t *testing.T) {

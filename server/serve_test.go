@@ -19,6 +19,7 @@ import (
 	"go.lsp.dev/uri"
 
 	"aoe2-lsp/analysis"
+	"aoe2-lsp/complete"
 	"aoe2-lsp/hints"
 	"aoe2-lsp/kb"
 )
@@ -570,7 +571,12 @@ func TestServe_SignatureHelpAPIShape(t *testing.T) {
 	store, err := kb.NewStore()
 	require.NoError(t, err)
 
-	srv := NewServer(store, analysis.NewAnalyzer(store), hints.NewComputer(store))
+	srv := NewServer(
+		store,
+		analysis.NewAnalyzer(store),
+		hints.NewComputer(store),
+		complete.NewCompleter(store),
+	)
 
 	require.NotNil(t, srv)
 
@@ -857,4 +863,103 @@ func paramLabel(t *testing.T, sig protocol.SignatureInformation, i int) string {
 	require.True(t, ok, "parameter labels are plain strings")
 
 	return string(label)
+}
+
+// TestServe_CompletionAPIShape verifies the four-argument NewServer
+// wiring and the Completer injection.
+func TestServe_CompletionAPIShape(t *testing.T) {
+	store, err := kb.NewStore()
+	require.NoError(t, err)
+
+	srv := NewServer(
+		store,
+		analysis.NewAnalyzer(store),
+		hints.NewComputer(store),
+		complete.NewCompleter(store),
+	)
+
+	require.NotNil(t, srv)
+	require.NotNil(t, srv.completer)
+}
+
+func TestCompletionKinds_FullDictionary(t *testing.T) {
+	expected := map[string]protocol.CompletionItemKind{
+		complete.KindCommand:   protocol.CompletionItemKindFunction,
+		complete.KindAttribute: protocol.CompletionItemKindField,
+		complete.KindConstant:  protocol.CompletionItemKindConstant,
+		complete.KindFunction:  protocol.CompletionItemKindFunction,
+		complete.KindVariable:  protocol.CompletionItemKindVariable,
+		complete.KindParam:     protocol.CompletionItemKindVariable,
+		complete.KindLocal:     protocol.CompletionItemKindVariable,
+	}
+
+	require.Len(t, completionKinds, len(expected), "every candidate kind maps")
+
+	for kind, want := range expected {
+		require.Equal(t, want, completionKinds[kind], "candidate kind %s", kind)
+	}
+}
+
+func TestToCompletionItems_Render(t *testing.T) {
+	items := toCompletionItems([]complete.Candidate{
+		{Label: "create_land", Kind: complete.KindCommand,
+			Detail: "land_generation", Sort: "1create_land"},
+		{Label: "set_circular_base", Kind: complete.KindAttribute,
+			Detail: "", Sort: "0set_circular_base"},
+	})
+
+	require.Len(t, items, 2)
+
+	require.Equal(t, "create_land", items[0].Label)
+	require.Equal(t, protocol.CompletionItemKindFunction, items[0].Kind)
+
+	detail, has := items[0].Detail.Get()
+	require.True(t, has)
+	require.Equal(t, "land_generation", detail)
+
+	sort, has := items[0].SortText.Get()
+	require.True(t, has)
+	require.Equal(t, "1create_land", sort)
+
+	require.True(t, items[0].InsertText.IsZero(), "insert text equals the label — unset")
+	require.Nil(t, items[0].Documentation, "concise-items: documentation stays out")
+
+	require.True(t, items[1].Detail.IsZero(), "empty detail stays unset")
+}
+
+func TestToCompletionItems_EmptyNilSafe(t *testing.T) {
+	items := toCompletionItems(nil)
+
+	require.NotNil(t, items)
+	require.Empty(t, items)
+}
+
+func TestCompletion_UnknownLanguage_EmptyList(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	docURI := uri.URI("file:///work/notes.txt")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI: docURI, LanguageID: "plaintext", Version: 1, Text: "hello",
+		},
+	}))
+
+	res, err := h.disp.Completion(ctx, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 0, Character: 1},
+		},
+	})
+
+	require.NoError(t, err)
+
+	list, ok := res.(*protocol.CompletionList)
+	require.True(t, ok)
+	require.NotNil(t, list.Items, "empty list, not a nil result")
+	assert.Empty(t, list.Items)
 }
