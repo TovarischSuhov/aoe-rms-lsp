@@ -225,3 +225,199 @@ func TestRmsSymbols_FixturesInvariantSweep(t *testing.T) {
 func rangeWithin(inner common.Range, outer common.Range) bool {
 	return !inner.Start.Before(outer.Start) && !outer.End.Before(inner.End)
 }
+
+// TestRmsArgAt_APIShape pins the argument-context contract surface: the
+// ArgAt method on RmsFile returning the exported ArgSite with the Kind*
+// vocabulary.
+func TestRmsArgAt_APIShape(t *testing.T) {
+	src := "create_elevator PLAYER_1 5"
+	file, _ := Parse(src, "shape.rms")
+
+	site, found := file.ArgAt(common.Pos{Line: 0, Column: uint32(strings.Index(src, "PLAYER_1"))})
+
+	require.True(t, found)
+	require.IsType(t, ArgSite{}, site)
+	require.IsType(t, Statement{}, site.Stmt)
+	require.Equal(t, KindArg, site.Kind)
+	require.Equal(t, 0, site.Index)
+	require.Equal(t, "", site.Name)
+	require.Equal(t, "create_elevator", site.Stmt.Name)
+	require.Equal(t, "arg", KindArg)
+	require.Equal(t, "attr", KindAttr)
+	require.Equal(t, "none", KindNone)
+}
+
+// linePos builds the position of needle's first occurrence on the given
+// line of a fixture (offset shifts within the needle).
+func linePos(src string, line int, needle string, offset int) common.Pos {
+	lines := strings.Split(src, "\n")
+
+	return common.Pos{Line: uint32(line), Column: uint32(strings.Index(lines[line], needle) + offset)}
+}
+
+// TestArgAt_OnPositionalArg covers baseline positional-argument
+// discrimination.
+func TestArgAt_OnPositionalArg(t *testing.T) {
+	src := "create_elevator PLAYER_1 5"
+	file, _ := Parse(src, "t.rms")
+
+	site, found := file.ArgAt(linePos(src, 0, "PLAYER_1", 0))
+
+	require.True(t, found)
+	require.Equal(t, KindArg, site.Kind)
+	require.Equal(t, 0, site.Index)
+	require.Equal(t, "create_elevator", site.Stmt.Name)
+}
+
+// TestArgAt_OnAttributeValueAndName covers attribute discrimination on
+// the value and on the name (name-match identity; flag attributes work
+// through the name branch).
+func TestArgAt_OnAttributeValueAndName(t *testing.T) {
+	src := "create_elevator A {\n  number_of_objects 5\n}\n"
+	file, _ := Parse(src, "t.rms")
+
+	site, found := file.ArgAt(linePos(src, 1, "5", 0))
+	require.True(t, found)
+	require.Equal(t, KindAttr, site.Kind)
+	require.Equal(t, "number_of_objects", site.Name)
+	require.Equal(t, "create_elevator", site.Stmt.Name)
+
+	site, found = file.ArgAt(linePos(src, 1, "number_of_objects", 0))
+	require.True(t, found)
+	require.Equal(t, KindAttr, site.Kind)
+	require.Equal(t, "number_of_objects", site.Name)
+}
+
+// TestArgAt_TrailingSameLine covers the band-owner fix: a cursor past the
+// last argument of a command — the primary RMS hint moment — is owned by
+// its own statement, not an earlier one.
+func TestArgAt_TrailingSameLine(t *testing.T) {
+	src := "create_elevation 7 "
+	file, _ := Parse(src, "t.rms")
+
+	site, found := file.ArgAt(common.Pos{Line: 0, Column: uint32(len(src))})
+
+	require.True(t, found)
+	require.Equal(t, KindNone, site.Kind)
+	require.Equal(t, "create_elevation", site.Stmt.Name)
+}
+
+// TestArgAt_BraceAndGapPositions covers step 6: braces and inter-token
+// gaps never guess a label (SC6).
+func TestArgAt_BraceAndGapPositions(t *testing.T) {
+	src := "create_elevation 3 {\n  spacing 5\n}\n"
+	file, _ := Parse(src, "t.rms")
+
+	for name, pos := range map[string]common.Pos{
+		"open brace":  linePos(src, 0, "{", 0),
+		"close brace": linePos(src, 2, "}", 0),
+		"gap":         linePos(src, 0, " 3", 0),
+	} {
+		site, found := file.ArgAt(pos)
+
+		require.True(t, found, name)
+		require.Equal(t, KindNone, site.Kind, name)
+		require.Equal(t, "create_elevation", site.Stmt.Name, name)
+	}
+}
+
+// TestArgAt_NonStatementLinesAfterCommand pins the categorical exclusion
+// in the only configuration that exposes it — a preceding command
+// exists: header, include-path and #-comment cursors answer silence,
+// not the previous command with kind=none.
+func TestArgAt_NonStatementLinesAfterCommand(t *testing.T) {
+	src := "create_elevation 3\n" +
+		"<LAND_GENERATION>\n" +
+		"#include \"other.rms\"\n" +
+		"# a plain comment\n"
+	file, _ := Parse(src, "t.rms")
+
+	site, found := file.ArgAt(linePos(src, 0, "3", 0))
+	require.True(t, found)
+	require.Equal(t, KindArg, site.Kind)
+	require.Equal(t, 0, site.Index)
+
+	_, found = file.ArgAt(linePos(src, 1, "LAND", 0))
+	require.False(t, found, "section header")
+
+	_, found = file.ArgAt(linePos(src, 2, "other.rms", 1))
+	require.False(t, found, "quoted include path")
+
+	_, found = file.ArgAt(linePos(src, 3, "plain", 0))
+	require.False(t, found, "#-comment line")
+}
+
+// TestArgAt_OnDirectiveAndSectionHeader covers the exclusion list in a
+// leading configuration: #const statements are filtered by the
+// #-prefix owner rule.
+func TestArgAt_OnDirectiveAndSectionHeader(t *testing.T) {
+	src := "#include other.rms\n" +
+		"<LAND_GENERATION>\n" +
+		"#const TERRAIN 7\n" +
+		"create_elevation 3\n"
+	file, _ := Parse(src, "t.rms")
+
+	_, found := file.ArgAt(linePos(src, 0, "other.rms", 0))
+	require.False(t, found, "include path")
+
+	_, found = file.ArgAt(linePos(src, 1, "LAND", 0))
+	require.False(t, found, "section header")
+
+	_, found = file.ArgAt(linePos(src, 2, "7", 0))
+	require.False(t, found, "#const statement")
+}
+
+// TestArgAt_InComment covers comment exclusion through the recorded
+// blankComments extents.
+func TestArgAt_InComment(t *testing.T) {
+	src := "create_elevation 3 /* hill */"
+	file, _ := Parse(src, "t.rms")
+
+	_, found := file.ArgAt(linePos(src, 0, "hill", 0))
+
+	require.False(t, found)
+}
+
+// TestArgAt_InString covers string exclusion on statement lines: editing
+// a quoted attribute value renders no hint.
+func TestArgAt_InString(t *testing.T) {
+	src := "create_object GOLF_BALL {\n  object_name \"grassland\"\n}\n"
+	file, _ := Parse(src, "t.rms")
+
+	_, found := file.ArgAt(linePos(src, 1, "land", 0))
+
+	require.False(t, found)
+}
+
+// TestArgAt_NestedBlockInnermost covers «владеет самый внутренний
+// statement» for nested random blocks.
+func TestArgAt_NestedBlockInnermost(t *testing.T) {
+	src := "start_random\n" +
+		"  percent_chance 50\n" +
+		"    create_elevation 3\n" +
+		"  end_random\n" +
+		"end_random\n"
+	file, _ := Parse(src, "t.rms")
+
+	site, found := file.ArgAt(linePos(src, 2, "3", 0))
+
+	require.True(t, found)
+	require.Equal(t, "create_elevation", site.Stmt.Name)
+	require.Equal(t, KindArg, site.Kind)
+	require.Equal(t, 0, site.Index)
+}
+
+// TestArgAt_Deterministic covers the determinism requirement.
+func TestArgAt_Deterministic(t *testing.T) {
+	src := "create_elevation 3 {\n  spacing 5\n}\n"
+	file, _ := Parse(src, "t.rms")
+
+	pos := linePos(src, 1, "5", 0)
+
+	first, found1 := file.ArgAt(pos)
+	second, found2 := file.ArgAt(pos)
+
+	require.True(t, found1)
+	require.True(t, found2)
+	require.Equal(t, first, second)
+}
