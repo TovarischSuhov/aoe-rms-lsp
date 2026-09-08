@@ -473,6 +473,62 @@ func TestParse_IncludeWithoutPath(t *testing.T) {
 	assert.Equal(t, "syntax", diags[0].Code)
 }
 
+// TestParse_UnclosedXsBlockAtEOFWithoutNewline checks that an inline XS
+// block left open at end of file (no trailing newline) spans to the end
+// of the last line instead of panicking on the line-index boundary.
+func TestParse_UnclosedXsBlockAtEOFWithoutNewline(t *testing.T) {
+	file, diags := Parse("#includeXS\nvoid main() { int x = 1; }", "t.rms")
+
+	require.Empty(t, diags)
+	require.Len(t, file.XsBlocks, 1)
+
+	assert.Equal(t, "void main() { int x = 1; }", file.XsBlocks[0].Code)
+	assert.Equal(t, common.Pos{Line: 1, Column: 0, Offset: 11}, file.XsBlocks[0].Range.Start)
+	assert.Equal(t, common.Pos{Line: 1, Column: 26, Offset: 37}, file.XsBlocks[0].Range.End)
+}
+
+// TestParse_BareIncludeXSAtEOF checks the bare #includeXS directive as
+// the very last line without a trailing newline: an empty zero-width
+// block at end of file, without panicking (the block start line equals
+// the line count).
+func TestParse_BareIncludeXSAtEOF(t *testing.T) {
+	file, diags := Parse("#includeXS", "t.rms")
+
+	require.Empty(t, diags)
+	require.Len(t, file.XsBlocks, 1)
+
+	assert.Equal(t, "", file.XsBlocks[0].Code)
+	assert.Equal(t, common.Pos{Line: 0, Column: 10, Offset: 10}, file.XsBlocks[0].Range.Start)
+	assert.Equal(t, common.Pos{Line: 0, Column: 10, Offset: 10}, file.XsBlocks[0].Range.End)
+}
+
+// TestParse_XsBlockTerminatedByDirective checks the regular mid-file
+// case: a block closed by a following directive keeps spanning to the
+// start of the terminating line.
+func TestParse_XsBlockTerminatedByDirective(t *testing.T) {
+	file, diags := Parse("#includeXS\nvoid f() { }\n#include other.rms\n", "t.rms")
+
+	require.Empty(t, diags)
+	require.Len(t, file.XsBlocks, 1)
+
+	assert.Equal(t, "void f() { }", file.XsBlocks[0].Code)
+	assert.Equal(t, common.Pos{Line: 1, Column: 0, Offset: 11}, file.XsBlocks[0].Range.Start)
+	assert.Equal(t, common.Pos{Line: 2, Column: 0, Offset: 24}, file.XsBlocks[0].Range.End)
+}
+
+// TestParse_XsBlockTrailingBlankLines checks that trailing blank lines
+// are trimmed from an open block: the range ends on the last non-blank
+// line, the code carries no trailing blanks.
+func TestParse_XsBlockTrailingBlankLines(t *testing.T) {
+	file, diags := Parse("#includeXS\nvoid f() { }\n\n\n#include other.rms\n", "t.rms")
+
+	require.Empty(t, diags)
+	require.Len(t, file.XsBlocks, 1)
+
+	assert.Equal(t, "void f() { }", file.XsBlocks[0].Code)
+	assert.Equal(t, common.Pos{Line: 2, Column: 0, Offset: 24}, file.XsBlocks[0].Range.End)
+}
+
 // TestReferences_ByName checks the by-name form: same occurrences as
 // ReferencesAt, without needing a position in this file.
 func TestReferences_ByName(t *testing.T) {
