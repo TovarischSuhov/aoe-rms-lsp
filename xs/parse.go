@@ -131,19 +131,46 @@ func (p *xparser) parseTypedDecl() {
 		return
 	}
 
-	decl := Decl{Kind: DeclVariable, Name: name.text, Type: typ, Range: common.Range{Start: start, End: name.at.End}}
+	// a comma-separated declaration list yields one Decl per declarator;
+	// the first carries the type words in its range, the rest start at
+	// their own names
+	declStart := start
 
-	if p.atOp("=") {
-		p.next()
+	for {
+		decl := Decl{Kind: DeclVariable, Name: name.text, Type: typ,
+			Range: common.Range{Start: declStart, End: name.at.End}}
 
-		if value, ok := p.parseExpr(); ok {
-			decl.Body = []Stmt{initStmt(name, value)}
-			decl.Range.End = value.Range.End
+		if p.atOp("=") {
+			p.next()
+
+			if value, ok := p.parseExpr(); ok {
+				decl.Body = []Stmt{initStmt(name, value)}
+				decl.Range.End = value.Range.End
+			}
 		}
-	}
 
-	decl.Range.End = p.expectSemi(decl.Range.End)
-	p.file.Decls = append(p.file.Decls, decl)
+		end := decl.Range.End
+		p.file.Decls = append(p.file.Decls, decl)
+
+		if !p.atOp(",") {
+			p.file.Decls[len(p.file.Decls)-1].Range.End = p.expectSemi(end)
+
+			return
+		}
+
+		p.next()
+		declStart = p.peek().at.Start
+
+		name = p.next()
+		if name.kind != xIdent {
+			p.reportf(name.at, common.SeverityError, "syntax", "expected a name in declaration")
+			p.file.Decls[len(p.file.Decls)-1].Range.End = p.expectSemi(end)
+
+			return
+		}
+
+		p.record(name)
+	}
 }
 
 // parseExtern parses `extern [const] <type> <name> [= expr];` and the

@@ -348,6 +348,71 @@ func messages(diags []common.Diagnostic) []string {
 	return out
 }
 
+// TestXsParse_TopLevelMultiDecl checks a comma-separated top-level
+// declaration list: one Decl per declarator, each with its own range,
+// no syntax diagnostics.
+func TestXsParse_TopLevelMultiDecl(t *testing.T) {
+	file, diags := XsParse("int a = 1, b = 2;", "t.xs")
+
+	require.Empty(t, diags)
+	require.Len(t, file.Decls, 2)
+
+	a, b := file.Decls[0], file.Decls[1]
+
+	assert.Equal(t, "a", a.Name)
+	assert.Equal(t, DeclVariable, a.Kind)
+	assert.Equal(t, "int", a.Type)
+	assert.Equal(t, common.Pos{Line: 0, Column: 0, Offset: 0}, a.Range.Start)
+	assert.Equal(t, common.Pos{Line: 0, Column: 9, Offset: 9}, a.Range.End)
+
+	assert.Equal(t, "b", b.Name)
+	assert.Equal(t, DeclVariable, b.Kind)
+	assert.Equal(t, "int", b.Type)
+	assert.Equal(t, common.Pos{Line: 0, Column: 11, Offset: 11}, b.Range.Start)
+	assert.Equal(t, common.Pos{Line: 0, Column: 17, Offset: 17}, b.Range.End)
+
+	// initializers survive as name = value statements
+	require.Len(t, a.Body, 1)
+	assert.Equal(t, "=", a.Body[0].Exprs[0].Value)
+	assert.Equal(t, "a", a.Body[0].Exprs[0].Children[0].Value)
+	require.Len(t, b.Body, 1)
+	assert.Equal(t, "=", b.Body[0].Exprs[0].Value)
+	assert.Equal(t, "b", b.Body[0].Exprs[0].Children[0].Value)
+}
+
+// TestXsParse_TopLevelSingleDeclUnchanged checks a single declaration
+// keeps its historical shape: the range starts at the type words and
+// closes at the semicolon.
+func TestXsParse_TopLevelSingleDeclUnchanged(t *testing.T) {
+	file, diags := XsParse("int a = 1;", "t.xs")
+
+	require.Empty(t, diags)
+	require.Len(t, file.Decls, 1)
+
+	a := file.Decls[0]
+
+	assert.Equal(t, "a", a.Name)
+	assert.Equal(t, common.Pos{Line: 0, Column: 0, Offset: 0}, a.Range.Start)
+	assert.Equal(t, common.Pos{Line: 0, Column: 10, Offset: 10}, a.Range.End)
+}
+
+// TestXsParse_MultiDeclNavigation checks both declarators of a list are
+// navigable: outline carries both names, definition jumps to the own
+// declarator.
+func TestXsParse_MultiDeclNavigation(t *testing.T) {
+	file, diags := XsParse("int a = 1, b = 2;", "t.xs")
+	require.Empty(t, diags)
+
+	syms := file.Symbols()
+	require.Len(t, syms, 2)
+	assert.Equal(t, "a", syms[0].Name)
+	assert.Equal(t, "b", syms[1].Name)
+
+	r, found := file.Definition(common.Pos{Line: 0, Column: 11})
+	require.True(t, found)
+	assert.Equal(t, common.Pos{Line: 0, Column: 11, Offset: 11}, r.Start)
+}
+
 // TestXsParse_StringEscapeNewlineTracksLines checks that a backslash
 // escape followed by a newline inside a string literal advances the
 // scanner line counter: positions after the literal stay on their
