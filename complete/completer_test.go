@@ -9,6 +9,7 @@ import (
 	"aoe2-lsp/common"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
+	"aoe2-lsp/xs"
 )
 
 // at returns the position offset bytes after the first occurrence of
@@ -183,4 +184,148 @@ func TestRmsAt_AttributeWithoutValue_DefaultsToName(t *testing.T) {
 	for _, cand := range cands {
 		require.Equal(t, KindAttribute, cand.Kind, "no value yet — name position defaults")
 	}
+}
+
+func TestCompleter_XsAt_Contract(t *testing.T) {
+	c := newTestCompleter(t)
+
+	file, _ := xs.XsParse("void f() {}", "t.xs")
+
+	require.IsType(t, []Candidate{}, c.XsAt(file, common.Pos{Line: 0, Column: 6}, nil))
+}
+
+func TestXsAt_SourceShadowsKb(t *testing.T) {
+	src := "int xsGetGoal() { return 1; }"
+	file, _ := xs.XsParse(src, "t.xs")
+
+	cands := newTestCompleter(t).XsAt(file, at(src, "return", 0), nil)
+
+	var got []Candidate
+
+	for _, cand := range cands {
+		if cand.Label == "xsGetGoal" {
+			got = append(got, cand)
+		}
+	}
+
+	require.Len(t, got, 1, "source wins over the same-name kb entry")
+
+	require.Equal(t, KindFunction, got[0].Kind)
+	require.Equal(t, "int xsGetGoal()", got[0].Detail, "detail from the source declaration")
+	require.Equal(t, "0xsGetGoal", got[0].Sort)
+}
+
+func TestXsAt_ExternalDeclsMerged(t *testing.T) {
+	src := "void main() { }"
+	file, _ := xs.XsParse(src, "t.xs")
+
+	external := []xs.Decl{
+		{Kind: xs.DeclFunction, Name: "helper", Type: "void",
+			Params: []xs.Param{{Name: "b", Type: "bool"}}},
+		{Kind: xs.DeclInclude, Name: "z.xs"},
+	}
+
+	cands := newTestCompleter(t).XsAt(file, at(src, "main", 2), external)
+
+	byLabel := make(map[string]Candidate)
+
+	for _, cand := range cands {
+		byLabel[cand.Label] = cand
+	}
+
+	require.Equal(t, KindFunction, byLabel["helper"].Kind)
+	require.Equal(t, "void helper(bool)", byLabel["helper"].Detail)
+	require.Equal(t, "0helper", byLabel["helper"].Sort)
+
+	_, included := byLabel["z.xs"]
+	require.False(t, included, "include declarations are not addressable")
+
+	require.Equal(t, "int xsGetGoal(int)", byLabel["xsGetGoal"].Detail)
+	require.Equal(t, "1xsGetGoal", byLabel["xsGetGoal"].Sort)
+
+	require.Equal(t, "2cColorBlue", byLabel["cColorBlue"].Sort)
+}
+
+func TestXsAt_VisibleAtFalse_Empty(t *testing.T) {
+	src := "void f() { string s = \"ab\"; }"
+	file, _ := xs.XsParse(src, "t.xs")
+
+	cands := newTestCompleter(t).XsAt(file, at(src, "ab", 0), nil)
+
+	require.Empty(t, cands, "strings answer silence")
+}
+
+func TestXsAt_SameNameDifferentKinds_BothKept(t *testing.T) {
+	src := "int foo = 1;"
+	file, _ := xs.XsParse(src, "t.xs")
+
+	external := []xs.Decl{{Kind: xs.DeclFunction, Name: "foo", Type: "void"}}
+
+	cands := newTestCompleter(t).XsAt(file, at(src, "foo", 1), external)
+
+	var kinds []string
+
+	for _, cand := range cands {
+		if cand.Label == "foo" {
+			kinds = append(kinds, cand.Kind)
+			require.Equal(t, "0foo", cand.Sort)
+		}
+	}
+
+	require.ElementsMatch(t, []string{KindVariable, KindFunction}, kinds)
+}
+
+func TestXsAt_ExternalNoReturnType_DetailWithoutRet(t *testing.T) {
+	src := "void main() { }"
+	file, _ := xs.XsParse(src, "t.xs")
+
+	external := []xs.Decl{{Kind: xs.DeclFunction, Name: "foo",
+		Params: []xs.Param{{Name: "a", Type: "int"}}}}
+
+	cands := newTestCompleter(t).XsAt(file, at(src, "main", 2), external)
+
+	byLabel := make(map[string]Candidate)
+
+	for _, cand := range cands {
+		byLabel[cand.Label] = cand
+	}
+
+	require.Equal(t, "foo(int)", byLabel["foo"].Detail, "no invented return type")
+}
+
+func TestXsAt_RuleExcludedExternIsFunction(t *testing.T) {
+	src := "rule r { condition 1 }\nextern int ex();"
+	file, _ := xs.XsParse(src, "t.xs")
+
+	cands := newTestCompleter(t).XsAt(file, at(src, "extern", 2), nil)
+
+	byLabel := make(map[string]Candidate)
+
+	for _, cand := range cands {
+		byLabel[cand.Label] = cand
+	}
+
+	_, ruled := byLabel["r"]
+	require.False(t, ruled, "rule names are not addressable")
+
+	require.Equal(t, KindFunction, byLabel["ex"].Kind, "extern maps to function")
+	require.Equal(t, "int ex()", byLabel["ex"].Detail)
+}
+
+func TestXsAt_ParamAndLocalEmptyDetail(t *testing.T) {
+	src := "void f(int p) {\n  int loc = 1;\n  loc = p;\n}\n"
+	file, _ := xs.XsParse(src, "t.xs")
+
+	cands := newTestCompleter(t).XsAt(file, at(src, "loc = p", 1), nil)
+
+	byLabel := make(map[string]Candidate)
+
+	for _, cand := range cands {
+		byLabel[cand.Label] = cand
+	}
+
+	require.Equal(t, KindParam, byLabel["p"].Kind)
+	require.Empty(t, byLabel["p"].Detail, "no type data on symbols — nothing invented")
+	require.Equal(t, KindLocal, byLabel["loc"].Kind)
+	require.Empty(t, byLabel["loc"].Detail)
 }

@@ -1,9 +1,12 @@
 package complete
 
 import (
+	"strings"
+
 	"aoe2-lsp/common"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
+	"aoe2-lsp/xs"
 )
 
 // Candidate kinds — the complete cell's protocol-agnostic dictionary.
@@ -30,6 +33,14 @@ const (
 	sortAttr    = "0"
 	sortCommand = "1"
 	sortConst   = "2"
+)
+
+// XS sort groups: source symbols first, then kb functions and kb
+// constants; the label orders inside a group.
+const (
+	sortSource     = "0"
+	sortKbFunction = "1"
+	sortKbConstant = "2"
 )
 
 // Completer computes completion candidates over parsed ASTs and the
@@ -187,4 +198,146 @@ func attrValueAt(site rms.ArgSite, pos common.Pos) bool {
 	}
 
 	return false
+}
+
+// XsAt returns the completion candidates for pos in an XS file (a
+// document or an inline block in block-local coordinates — the caller
+// translates). Source symbols — the file's visible symbols plus the
+// include-closure declarations — win over same-name kb entries (truth
+// model); same-name source symbols of different kinds are both kept.
+// Rule and event names are skipped: they are not addressable in
+// expressions. Positions inside strings and comments answer silence.
+func (c *Completer) XsAt(file xs.XsFile, pos common.Pos, external []xs.Decl) []Candidate {
+	syms, ok := file.VisibleAt(pos)
+	if !ok {
+		return nil
+	}
+
+	source := make(map[string]bool, len(syms)+len(external))
+	out := make([]Candidate, 0, len(syms)+len(external))
+
+	addSource := func(name string, kind string, detail string) {
+		source[name] = true
+		out = append(out, Candidate{
+			Label:  name,
+			Kind:   kind,
+			Detail: detail,
+			Sort:   sortSource + name,
+		})
+	}
+
+	for _, s := range syms {
+		var kind string
+
+		switch s.Kind {
+		case KindFunction, KindVariable, KindParam, KindLocal:
+			kind = s.Kind
+		case xs.DeclExtern:
+			kind = KindFunction
+		default: // rule, event: not addressable by name
+			continue
+		}
+
+		detail := ""
+		if kind == KindFunction {
+			detail = fileSignature(file.Decls, s.Name)
+		}
+
+		addSource(s.Name, kind, detail)
+	}
+
+	for _, d := range external {
+		var kind string
+
+		switch d.Kind {
+		case xs.DeclFunction, xs.DeclExtern:
+			kind = KindFunction
+		case xs.DeclVariable:
+			kind = KindVariable
+		default: // rule, event, include: not addressable by name
+			continue
+		}
+
+		addSource(d.Name, kind, declSignature(d))
+	}
+
+	for _, fn := range c.store.Functions() {
+		if source[fn.Name] {
+			continue
+		}
+
+		types := make([]string, 0, len(fn.Params))
+
+		for _, p := range fn.Params {
+			types = append(types, p.Type)
+		}
+
+		out = append(out, Candidate{
+			Label:  fn.Name,
+			Kind:   KindFunction,
+			Detail: kbSignature(fn.ReturnType, fn.Name, types),
+			Sort:   sortKbFunction + fn.Name,
+		})
+	}
+
+	for _, k := range c.store.Constants("") {
+		if source[k.Name] {
+			continue
+		}
+
+		out = append(out, Candidate{
+			Label:  k.Name,
+			Kind:   KindConstant,
+			Detail: k.Value,
+			Sort:   sortKbConstant + k.Name,
+		})
+	}
+
+	return out
+}
+
+// fileSignature returns the mini signature of the named function or
+// extern declaration in decls, "" when no such declaration exists.
+func fileSignature(decls []xs.Decl, name string) string {
+	for _, d := range decls {
+		if d.Name == name && (d.Kind == xs.DeclFunction || d.Kind == xs.DeclExtern) {
+			return declSignature(d)
+		}
+	}
+
+	return ""
+}
+
+// declSignature renders the mini signature of a source declaration:
+// "[ret ]name(types…)" — types only as declared, never invented.
+func declSignature(d xs.Decl) string {
+	return signature(d.Type, d.Name, paramTypes(d.Params))
+}
+
+// kbSignature renders the mini signature of a kb function.
+func kbSignature(ret string, name string, types []string) string {
+	return signature(ret, name, types)
+}
+
+// signature composes "[ret ]name(types…)"; an empty return type
+// omits the prefix.
+func signature(ret string, name string, types []string) string {
+	call := name + "(" + strings.Join(types, ", ") + ")"
+
+	if ret == "" {
+		return call
+	}
+
+	return ret + " " + call
+}
+
+// paramTypes extracts the declared parameter types.
+func paramTypes(params []xs.Param) []string {
+	types := make([]string, 0, len(params))
+
+	for _, p := range params {
+		types = append(types, p.Type)
+	}
+
+	return types
 }
