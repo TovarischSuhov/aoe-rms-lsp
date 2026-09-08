@@ -91,10 +91,11 @@ type commandJSON struct {
 
 // argJSON is one command argument or attribute in rms-commands.json.
 type argJSON struct {
-	Name     string `json:"name"`
-	Kind     string `json:"kind"`
-	Required bool   `json:"required"`
-	Desc     string `json:"desc"`
+	Name     string        `json:"name"`
+	Kind     string        `json:"kind"`
+	Range    kb.ValueRange `json:"range"`
+	Required bool          `json:"required"`
+	Desc     string        `json:"desc"`
 }
 
 // update is one parsed changelog update: its id and raw body lines.
@@ -385,6 +386,7 @@ func argsToJSON(args []kb.CommandArg) []argJSON {
 		out = append(out, argJSON{
 			Name:     a.Name,
 			Kind:     a.Kind,
+			Range:    a.Range,
 			Required: a.Required,
 			Desc:     a.Desc,
 		})
