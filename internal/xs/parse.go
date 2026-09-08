@@ -455,7 +455,9 @@ func (p *xparser) parseStmt() Stmt {
 		}
 	}
 
-	if isTypeWord(tok.text) && p.peekAhead(1).kind == xIdent {
+	// local declarations: `int x = 1;` and `const int c = 7;` (parseTypeWords
+	// consumes the const word along with the type)
+	if (isTypeWord(tok.text) || tok.text == "const") && p.peekAhead(1).kind == xIdent {
 		return p.parseLocalDecl()
 	}
 
