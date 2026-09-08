@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -644,4 +645,216 @@ func TestServe_SignatureHelpSilence(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Nil(t, help)
+}
+
+// openForSignatureHelp opens a document in the harness and waits for its
+// diagnostics batch (the established SignatureHelp test prologue).
+func openForSignatureHelp(
+	t *testing.T,
+	h *lspHarness,
+	docURI uri.URI,
+	text string,
+) {
+	t.Helper()
+
+	require.NoError(t, h.disp.DidOpen(context.Background(), &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{URI: docURI, LanguageID: "aoe2rms", Version: 1, Text: text},
+	}))
+	h.waitDiagnostics(docURI)
+}
+
+// TestServe_SignatureHelpXs covers the full XS stack through the real
+// stdio harness, including the DI wiring Serve built.
+func TestServe_SignatureHelpXs(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	line := "\txsVectorSet(1.0, 2.0, 3.0);"
+	docURI := uri.URI("file:///work/script.xs")
+	openForSignatureHelp(t, h, docURI, "void test() {\n"+line+"\n}\n")
+
+	help, err := h.disp.SignatureHelp(ctx, &protocol.SignatureHelpParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 1, Character: uint32(strings.Index(line, "2.0"))},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, help)
+	require.Len(t, help.Signatures, 1)
+	require.NotNil(t, help.ActiveSignature)
+	require.EqualValues(t, 0, *help.ActiveSignature)
+
+	sig := help.Signatures[0]
+	assert.Equal(t, "vector xsVectorSet(float x, float y, float z)", sig.Label)
+	require.Len(t, sig.Parameters, 3)
+
+	active, ok := sig.ActiveParameter.Get()
+	require.True(t, ok, "the second argument is active")
+	assert.EqualValues(t, 1, active)
+}
+
+// TestServe_SignatureHelpRms covers the RMS path end-to-end: the full
+// kb-ordered list with the mined range, active on the first argument.
+func TestServe_SignatureHelpRms(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	line := "create_elevation 3"
+	docURI := uri.URI("file:///work/map.rms")
+	openForSignatureHelp(t, h, docURI, "<LAND_GENERATION>\n"+line+"\n")
+
+	help, err := h.disp.SignatureHelp(ctx, &protocol.SignatureHelpParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 1, Character: uint32(strings.Index(line, "3"))},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, help)
+	require.Len(t, help.Signatures, 1)
+
+	sig := help.Signatures[0]
+	assert.True(t, strings.HasPrefix(sig.Label, "create_elevation("))
+	require.NotEmpty(t, sig.Parameters)
+	assert.Equal(t, "[MaxHeight: number 1..16]", paramLabel(t, sig, 0))
+
+	active, ok := sig.ActiveParameter.Get()
+	require.True(t, ok)
+	assert.EqualValues(t, 0, active)
+}
+
+// TestServe_SignatureHelpInlineXsBlock covers the inline-block coordinate
+// template — the only place block-local translation is exercised
+// end-to-end: the call is left unclosed, the cursor on the second
+// argument; a wrong translation yields silence or a wrong index.
+func TestServe_SignatureHelpInlineXsBlock(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	line := "void b() { xsVectorSet(1.0, 2 }"
+	docURI := uri.URI("file:///work/map.rms")
+	openForSignatureHelp(t, h, docURI, "#includeXS\n"+line+"\n")
+
+	help, err := h.disp.SignatureHelp(ctx, &protocol.SignatureHelpParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 1, Character: uint32(strings.Index(line, "2 "))},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, help)
+	require.Len(t, help.Signatures, 1)
+
+	sig := help.Signatures[0]
+	assert.Equal(t, "vector xsVectorSet(float x, float y, float z)", sig.Label)
+
+	active, ok := sig.ActiveParameter.Get()
+	require.True(t, ok, "the active index comes from the translated position")
+	assert.EqualValues(t, 1, active)
+}
+
+// TestServe_SignatureHelpStateless covers the statelessness requirement:
+// the answer depends only on (document, position), never on the trigger
+// context.
+func TestServe_SignatureHelpStateless(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	line := "\txsVectorSet(1.0, 2.0, 3.0);"
+	docURI := uri.URI("file:///work/script.xs")
+	openForSignatureHelp(t, h, docURI, "void test() {\n"+line+"\n}\n")
+
+	position := protocol.Position{Line: 1, Character: uint32(strings.Index(line, "2.0"))}
+
+	manual, err := h.disp.SignatureHelp(ctx, &protocol.SignatureHelpParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     position,
+		},
+		Context: protocol.SignatureHelpContext{
+			TriggerKind: protocol.SignatureHelpTriggerKindInvoked,
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, manual)
+
+	trigger := "("
+
+	auto, err := h.disp.SignatureHelp(ctx, &protocol.SignatureHelpParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     position,
+		},
+		Context: protocol.SignatureHelpContext{
+			TriggerKind:      protocol.SignatureHelpTriggerKindTriggerCharacter,
+			TriggerCharacter: &trigger,
+			IsRetrigger:      true,
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, auto)
+
+	require.Equal(t, manual, auto, "identical (document, position) — identical answers")
+}
+
+// TestServe_SignatureHelpRmsNoActiveParameter covers the RMS kind=none
+// path end-to-end: the cursor on the command name renders the full list
+// with no active parameter (nil, not 0, not last).
+func TestServe_SignatureHelpRmsNoActiveParameter(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	line := "create_elevation 3"
+	docURI := uri.URI("file:///work/map.rms")
+	openForSignatureHelp(t, h, docURI, "<LAND_GENERATION>\n"+line+"\n")
+
+	help, err := h.disp.SignatureHelp(ctx, &protocol.SignatureHelpParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 1, Character: 0},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, help)
+	require.Len(t, help.Signatures, 1)
+
+	sig := help.Signatures[0]
+	assert.True(t, strings.HasPrefix(sig.Label, "create_elevation("))
+
+	_, ok := sig.ActiveParameter.Get()
+	assert.False(t, ok, "no active parameter on the command name")
+
+	_, ok = help.ActiveParameter.Get()
+	assert.False(t, ok, "the result-level field is unset too")
+}
+
+// paramLabel extracts the plain-string label of parameter i.
+func paramLabel(t *testing.T, sig protocol.SignatureInformation, i int) string {
+	t.Helper()
+	require.Less(t, i, len(sig.Parameters))
+
+	label, ok := sig.Parameters[i].Label.(protocol.String)
+	require.True(t, ok, "parameter labels are plain strings")
+
+	return string(label)
 }

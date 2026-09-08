@@ -306,8 +306,9 @@ func (s *Server) signatureHelpRms(
 // toSignatureHelp maps one rendered hint to the protocol shape per
 // lsp-protocol: exactly one signature, ActiveSignature 0, plain-string
 // parameter labels, documentation omitted (concise-hints rule);
-// ActiveParameter is nil when no argument is active — never clamped to
-// the last parameter.
+// ActiveParameter is unset when no argument is active — never clamped to
+// the last parameter. It is set on both the result and the signature
+// (the per-signature field takes precedence since 3.16).
 func toSignatureHelp(hint hints.Hint) *protocol.SignatureHelp {
 	sig := protocol.SignatureInformation{Label: hint.Label}
 
@@ -321,6 +322,7 @@ func toSignatureHelp(hint hints.Hint) *protocol.SignatureHelp {
 
 	if hint.Active >= 0 {
 		active = protocol.NewNullable(uint32(hint.Active))
+		sig.ActiveParameter = active
 	}
 
 	return &protocol.SignatureHelp{
