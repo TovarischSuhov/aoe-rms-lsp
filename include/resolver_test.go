@@ -257,3 +257,68 @@ func readFile(t *testing.T, uriArg string) string {
 
 	return string(raw)
 }
+
+// TestResolver_EscapeBeyondRootMissing checks the workspace bound: a
+// #include escaping the root document's directory becomes MissingInclude
+// even when the target exists on disk.
+func TestResolver_EscapeBeyondRootMissing(t *testing.T) {
+	dir := t.TempDir()
+	inner := filepath.Join(dir, "maps")
+	require.NoError(t, os.MkdirAll(inner, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "outside.rms"),
+		[]byte("create_elevator 7\n"), 0o644))
+
+	uris := writeTree(t, dir, map[string]string{
+		"maps/main.rms": "#include ../outside.rms\n",
+	})
+
+	r := NewResolver(fakeSource{})
+	c := r.Closure(context.Background(), uris["maps/main.rms"])
+
+	assert.Empty(t, c.Resolved)
+	require.Len(t, c.Missing, 1)
+	assert.Equal(t, "../outside.rms", c.Missing[0].Path)
+}
+
+// TestResolver_DirectoryTargetMissing checks a directory target: not a
+// regular file → MissingInclude, not a silently dropped Resolved entry.
+func TestResolver_DirectoryTargetMissing(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o755))
+
+	uris := writeTree(t, dir, map[string]string{"main.rms": "#include sub\n"})
+
+	r := NewResolver(fakeSource{})
+	c := r.Closure(context.Background(), uris["main.rms"])
+
+	assert.Empty(t, c.Resolved)
+	require.Len(t, c.Missing, 1)
+}
+
+// TestResolver_TwoSpellingsOwnTargetURI checks the cached disk copy does
+// not leak the first requester's URI spelling into targets: each query
+// gets its own spelling back.
+func TestResolver_TwoSpellingsOwnTargetURI(t *testing.T) {
+	dir := t.TempDir()
+	writeTree(t, dir, map[string]string{
+		"sub/main.rms": "#includeXS\nint q = 1;\nvoid f() { q = 2; }\n",
+	})
+
+	plain := uri.File(filepath.Join(dir, "sub", "main.rms")).String()
+	dotted := "file://" + filepath.ToSlash(dir) + "/sub/../sub/main.rms"
+	require.NotEqual(t, plain, dotted)
+	require.Equal(t, canonicalPath(plain), canonicalPath(dotted), "same cache key")
+
+	r := NewResolver(fakeSource{})
+
+	// the q occurrence inside the inline XS block (line 2, column 11)
+	pos := common.Pos{Line: 2, Column: 11}
+
+	t1, ok := r.Definition(context.Background(), plain, pos)
+	require.True(t, ok)
+	assert.Equal(t, plain, t1.URI)
+
+	t2, ok := r.Definition(context.Background(), dotted, pos)
+	require.True(t, ok)
+	assert.Equal(t, dotted, t2.URI)
+}
