@@ -1155,3 +1155,75 @@ func TestCompletion_EmptyCandidates_EmptyListNotError(t *testing.T) {
 	require.NotNil(t, list.Items, "empty items, not a nil list")
 	require.Empty(t, list.Items)
 }
+
+// TestServer_Utf16DocumentSymbolColumns checks column translation for
+// clients that did not negotiate utf-8: parser byte columns become
+// UTF-16 code units in the outline (Cyrillic comment on the line).
+func TestServer_Utf16DocumentSymbolColumns(t *testing.T) {
+	srv, docURI := utf16ServerFixture(t, "/* Поколение */ random_placement\n")
+
+	res, err := srv.DocumentSymbol(context.Background(), &protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+	})
+	require.NoError(t, err)
+
+	tree, ok := res.(protocol.DocumentSymbolSlice)
+	require.True(t, ok)
+	require.NotEmpty(t, tree)
+
+	// the command node: a root child, or under the synthetic global section
+	cmd := tree[0]
+
+	if cmd.Name != "create_elevator" && len(cmd.Children) > 0 {
+		cmd = cmd.Children[0]
+	}
+
+	require.Equal(t, "random_placement", cmd.Name)
+	assert.Equal(t, uint32(16), cmd.Range.Start.Character, "UTF-16 units, not bytes (25)")
+}
+
+// TestServer_Utf16HoverPosition checks the inbound direction: the
+// client's UTF-16 column translates into the parser's byte column.
+func TestServer_Utf16HoverPosition(t *testing.T) {
+	srv, docURI := utf16ServerFixture(t, "/* Поколение */ random_placement\n")
+
+	hover, err := srv.Hover(context.Background(), &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 0, Character: 16},
+		},
+	})
+	require.NoError(t, err)
+
+	require.NotNil(t, hover, "UTF-16 column 16 → byte 25 lands on random_placement")
+
+	md, ok := hover.Contents.(*protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Contains(t, md.Value, "random_placement")
+}
+
+// utf16ServerFixture builds a server with the utf-16 default (no
+// Initialize call) and opens the document.
+func utf16ServerFixture(t *testing.T, text string) (*Server, uri.URI) {
+	t.Helper()
+
+	store, err := kb.NewStore()
+	require.NoError(t, err)
+
+	srv := NewServer(
+		store,
+		analysis.NewAnalyzer(store),
+		hints.NewComputer(store),
+		complete.NewCompleter(store),
+	)
+
+	docURI := uri.URI("file:///work/ru.rms")
+
+	require.NoError(t, srv.DidOpen(context.Background(), &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI: docURI, LanguageID: "aoe2rms", Version: 1, Text: text,
+		},
+	}))
+
+	return srv, docURI
+}

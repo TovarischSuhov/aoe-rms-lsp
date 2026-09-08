@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"aoe2-lsp/analysis"
 	"aoe2-lsp/common"
@@ -36,6 +37,8 @@ type Server struct {
 	resolver  *include.Resolver
 	exit      chan struct{}
 	exitOnce  sync.Once
+
+	utf16 atomic.Bool // protocol default: translate byte columns unless utf-8 is negotiated
 }
 
 // NewServer builds the server from its knowledge base, analyzer, hint
@@ -50,7 +53,7 @@ func NewServer(
 ) *Server {
 	docs := NewDocStore()
 
-	return &Server{
+	srv := &Server{
 		store:     store,
 		analyzer:  analyzer,
 		computer:  computer,
@@ -59,6 +62,10 @@ func NewServer(
 		resolver:  include.NewResolver(docs),
 		exit:      make(chan struct{}),
 	}
+
+	srv.utf16.Store(true) // the protocol default until utf-8 is negotiated
+
+	return srv
 }
 
 // Initialize declares the server capabilities and negotiates the position
@@ -84,6 +91,10 @@ func (s *Server) Initialize(
 
 	if enc, ok := negotiateEncoding(params); ok {
 		caps.PositionEncoding = enc
+
+		if enc == protocol.PositionEncodingKindUTF8 {
+			s.utf16.Store(false)
+		}
 	}
 
 	return &protocol.InitializeResult{
@@ -166,7 +177,7 @@ func (s *Server) Hover(
 		return nil, nil
 	}
 
-	pos := fromProtocolPos(params.Position)
+	pos := s.fromProtocolPos(text, params.Position)
 
 	var markdown string
 
@@ -240,7 +251,7 @@ func (s *Server) SignatureHelp(
 	}
 
 	docURI := string(params.TextDocument.URI)
-	pos := fromProtocolPos(params.Position)
+	pos := s.fromProtocolPos(text, params.Position)
 
 	var hint hints.Hint
 
@@ -354,7 +365,7 @@ func (s *Server) Completion(
 	}
 
 	docURI := string(params.TextDocument.URI)
-	pos := fromProtocolPos(params.Position)
+	pos := s.fromProtocolPos(text, params.Position)
 
 	var cands []complete.Candidate
 
@@ -461,10 +472,12 @@ func (s *Server) Definition(
 	ctx context.Context,
 	params *protocol.DefinitionParams,
 ) (protocol.DefinitionResult, error) {
+	text, _, _ := s.openDocument(params.TextDocument.URI)
+
 	target, found := s.resolver.Definition(
 		ctx,
 		string(params.TextDocument.URI),
-		fromProtocolPos(params.Position),
+		s.fromProtocolPos(text, params.Position),
 	)
 	if !found {
 		return protocol.LocationSlice{}, nil
@@ -472,7 +485,7 @@ func (s *Server) Definition(
 
 	return &protocol.Location{
 		URI:   uri.URI(target.URI),
-		Range: toProtocolRange(target.Range),
+		Range: s.targetRange(target.URI, target.Range),
 	}, nil
 }
 
@@ -485,7 +498,8 @@ func (s *Server) References(
 	params *protocol.ReferenceParams,
 ) ([]protocol.Location, error) {
 	docURI := string(params.TextDocument.URI)
-	pos := fromProtocolPos(params.Position)
+	text, _, _ := s.openDocument(params.TextDocument.URI)
+	pos := s.fromProtocolPos(text, params.Position)
 
 	targets := s.resolver.References(ctx, docURI, pos)
 
@@ -498,7 +512,7 @@ func (s *Server) References(
 	for _, t := range targets {
 		out = append(out, protocol.Location{
 			URI:   uri.URI(t.URI),
-			Range: toProtocolRange(t.Range),
+			Range: s.targetRange(t.URI, t.Range),
 		})
 	}
 
@@ -554,7 +568,7 @@ func (s *Server) DocumentSymbol(
 	out := make(protocol.DocumentSymbolSlice, 0, len(syms))
 
 	for _, sym := range syms {
-		out = append(out, toDocumentSymbol(sym))
+		out = append(out, s.toDocumentSymbol(text, sym))
 	}
 
 	return out, nil
@@ -575,7 +589,7 @@ var symbolKindTable = map[string]protocol.SymbolKind{
 
 // toDocumentSymbol converts one outline node recursively, preserving
 // the Selection ⊆ Range invariant of the source tree.
-func toDocumentSymbol(sym common.Symbol) protocol.DocumentSymbol {
+func (s *Server) toDocumentSymbol(text string, sym common.Symbol) protocol.DocumentSymbol {
 	kind, ok := symbolKindTable[sym.Kind]
 	if !ok {
 		kind = protocol.SymbolKindField
@@ -584,15 +598,15 @@ func toDocumentSymbol(sym common.Symbol) protocol.DocumentSymbol {
 	out := protocol.DocumentSymbol{
 		Name:           sym.Name,
 		Kind:           kind,
-		Range:          toProtocolRange(sym.Range),
-		SelectionRange: toProtocolRange(sym.Selection),
+		Range:          s.toProtocolRange(text, sym.Range),
+		SelectionRange: s.toProtocolRange(text, sym.Selection),
 	}
 
 	if len(sym.Children) > 0 {
 		out.Children = make([]protocol.DocumentSymbol, 0, len(sym.Children))
 
 		for _, child := range sym.Children {
-			out.Children = append(out.Children, toDocumentSymbol(child))
+			out.Children = append(out.Children, s.toDocumentSymbol(text, child))
 		}
 	}
 
@@ -666,7 +680,7 @@ func (s *Server) analyze(uriArg string, text string, closure include.Closure) []
 
 	sortDiags(diags)
 
-	return toProtocolDiags(diags)
+	return s.toProtocolDiags(text, diags)
 }
 
 // analyzeRms parses the RMS source, runs semantic checks, reports the
@@ -788,13 +802,14 @@ func comparePos(a, b common.Pos) int {
 	return int(a.Column) - int(b.Column)
 }
 
-// toProtocolDiags converts shared diagnostics to the protocol shape.
-func toProtocolDiags(diags []common.Diagnostic) []protocol.Diagnostic {
+// toProtocolDiags converts shared diagnostics to the protocol shape,
+// translating columns for the negotiated encoding.
+func (s *Server) toProtocolDiags(text string, diags []common.Diagnostic) []protocol.Diagnostic {
 	out := make([]protocol.Diagnostic, 0, len(diags))
 
 	for _, d := range diags {
 		out = append(out, protocol.Diagnostic{
-			Range:    toProtocolRange(d.Range),
+			Range:    s.toProtocolRange(text, d.Range),
 			Severity: protocol.DiagnosticSeverity(d.Severity),
 			Code:     protocol.String(d.Code),
 			Source:   protocol.NewOptional(serverName),
@@ -805,21 +820,107 @@ func toProtocolDiags(diags []common.Diagnostic) []protocol.Diagnostic {
 	return out
 }
 
-// toProtocolPos converts a shared position to the protocol shape (Offset is
+// toProtocolPos converts a shared position to the protocol shape,
+// translating the byte column into UTF-16 code units unless the client
+// negotiated utf-8 (parser columns are byte offsets; Offset itself is
 // protocol-external and dropped).
-func toProtocolPos(p common.Pos) protocol.Position {
-	return protocol.Position{Line: p.Line, Character: p.Column}
+func (s *Server) toProtocolPos(text string, p common.Pos) protocol.Position {
+	if !s.utf16.Load() {
+		return protocol.Position{Line: p.Line, Character: p.Column}
+	}
+
+	return protocol.Position{Line: p.Line, Character: byteToUTF16(lineOf(text, p.Line), p.Column)}
 }
 
-// fromProtocolPos converts a protocol position to the shared shape; the
-// byte offset is recomputed on demand by the parsers.
-func fromProtocolPos(p protocol.Position) common.Pos {
-	return common.Pos{Line: p.Line, Column: p.Character}
+// fromProtocolPos converts a protocol position to the shared shape,
+// translating UTF-16 code units back into the byte column the parsers
+// expect; the offset is recomputed on demand by the parsers.
+func (s *Server) fromProtocolPos(text string, p protocol.Position) common.Pos {
+	// no text at hand (a closed document queried from disk): keep the
+	// raw column — there is nothing to translate against
+	if !s.utf16.Load() || text == "" {
+		return common.Pos{Line: p.Line, Column: p.Character}
+	}
+
+	return common.Pos{Line: p.Line, Column: utf16ToByte(lineOf(text, p.Line), p.Character)}
 }
 
-// toProtocolRange converts a shared range to the protocol shape.
-func toProtocolRange(r common.Range) protocol.Range {
-	return protocol.Range{Start: toProtocolPos(r.Start), End: toProtocolPos(r.End)}
+// toProtocolRange converts a shared range with the document text.
+func (s *Server) toProtocolRange(text string, r common.Range) protocol.Range {
+	return protocol.Range{Start: s.toProtocolPos(text, r.Start), End: s.toProtocolPos(text, r.End)}
+}
+
+// targetRange converts a cross-file target range: open documents convert
+// with their text; unopened files keep byte columns (their text is not
+// at hand — same-line non-ASCII before the target stays shifted).
+func (s *Server) targetRange(uriArg string, r common.Range) protocol.Range {
+	if text, _, ok := s.docs.Get(uriArg); ok {
+		return s.toProtocolRange(text, r)
+	}
+
+	return protocol.Range{
+		Start: protocol.Position{Line: r.Start.Line, Character: r.Start.Column},
+		End:   protocol.Position{Line: r.End.Line, Character: r.End.Column},
+	}
+}
+
+// lineOf returns the n-th line of text ("" beyond the end).
+func lineOf(text string, n uint32) string {
+	for ; n > 0; n-- {
+		i := strings.IndexByte(text, '\n')
+		if i < 0 {
+			return ""
+		}
+
+		text = text[i+1:]
+	}
+
+	if i := strings.IndexByte(text, '\n'); i >= 0 {
+		text = text[:i]
+	}
+
+	return text
+}
+
+// byteToUTF16 converts a byte column into UTF-16 code units within line,
+// clamping past-the-end columns.
+func byteToUTF16(line string, col uint32) uint32 {
+	if int(col) > len(line) {
+		col = uint32(len(line))
+	}
+
+	units := uint32(0)
+
+	for _, r := range line[:col] {
+		if r > 0xFFFF {
+			units += 2 // surrogate pair
+		} else {
+			units++
+		}
+	}
+
+	return units
+}
+
+// utf16ToByte converts a UTF-16 unit count into a byte column; a
+// position inside a surrogate pair or past the end clamps to the line.
+func utf16ToByte(line string, units uint32) uint32 {
+	seen := uint32(0)
+
+	for i, r := range line {
+		w := uint32(1)
+		if r > 0xFFFF {
+			w = 2
+		}
+
+		if seen+w > units {
+			return uint32(i)
+		}
+
+		seen += w
+	}
+
+	return uint32(len(line))
 }
 
 // commandSignature renders the call signature of an RMS command, e.g.
