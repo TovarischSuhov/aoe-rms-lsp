@@ -1,0 +1,268 @@
+Imports:
+  - Types:
+      - Store
+    Usages:
+      - lookups
+    From: internal/kb
+  - Types:
+      - Parse
+      - RmsFile
+      - XsBlock
+    Usages:
+      - rms-parsing
+    From: internal/rms
+  - Types:
+      - XsParse
+      - XsFile
+      - Decl
+    Usages:
+      - xs-parsing
+    From: internal/xs
+  - Types:
+      - Analyzer
+    Usages:
+      - checks
+    From: internal/analysis
+  - Types:
+      - Computer
+      - Hint
+    Usages:
+      - computing
+    From: internal/hints
+  - Types:
+      - Completer
+      - Candidate
+    Usages:
+      - completing
+    From: internal/complete
+  - Types:
+      - Symbol
+    Usages:
+      - symbols
+    From: internal/common
+  - Types:
+      - Source
+      - Resolver
+      - Closure
+      - Target
+      - MissingInclude
+    Usages:
+      - closure
+    From: internal/include
+
+Usages:
+  conventions: .goga/usages/conventions.md
+  lsp-protocol: .goga/usages/cooks/lsp-protocol.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `lsp-protocol` for go.lsp.dev patterns (NewServer bootstrap, Full sync,
+  PublishDiagnostics, Hover/Completion result shapes, Boolean/Optional arms).
+  Use `lookups`, `rms-parsing`, `xs-parsing`, `checks`, `closure`, `computing`
+  from Imports for the provider APIs wired into handlers.
+
+  Language selection by URI extension: .rms → `Parse` → `RmsFile`
+  (+ inline `XsBlock` → `XsParse` with range shift), .xs → `XsParse` → `XsFile`.
+  One change = one diagnostics batch.
+  Protocol types (InitializeParams, Hover, CompletionList, ...) belong to
+  go.lsp.dev/protocol — follow `lsp-protocol` for their construction.
+
+  Навигационные хендлеры (Definition/References/DocumentSymbol) следуют
+  секции Navigation `lsp-protocol`: пустой результат — пустой slice, не nil.
+  Definition/References резолвятся через `Resolver` по include-замыканию
+  (Cross-file Navigation Results): цели могут жить в неоткрытых файлах.
+
+  `Resolver` создаётся в конструкторе `Server` над собственным `DocStore`
+  (NewResolver(docs): DocStore структурно удовлетворяет `Source`).
+  Внешние декларации (`Decl` из ExternalDecls по `closure`) передаются в
+  AnalyzeXs — тип `Decl` импортирован из xs.
+
+  Use `computing` from Imports для вычисления хинтов signature help:
+  молчание found=false → nil, nil (конвенция Hover); триггеры «(» и «,»
+  не пересекаются с completion'ыми « » и «<».
+
+  Use `completing` from Imports (complete) для вычисления кандидатов
+  completion: пустой `Candidate`-список → CompletionList с пустыми
+  items, не nil и не ошибка. Kind-маппинг `Candidate`.Kind → CompletionItemKind
+  (таблица паритетна DocumentSymbol): command→Function,
+  attribute→Field, constant→Constant, function→Function,
+  variable→Variable, param→Variable, local→Variable. Существующий
+  MVP-алгоритм Completion (прямые Store-запросы в server) упраздняется —
+  вычисление уходит в complete.
+
+---
+
+"Server(store: Store, analyzer: Analyzer, computer: Computer, completer: Completer)":
+  location: server.go
+  annotations: |
+    LSP-сервер: протокол поверх kb/rms/xs/analysis/hints/complete.
+
+    `store`: база знаний; `analyzer`: семантические проверки;
+    `computer`: вычислитель хинтов; `completer`: вычислитель
+    кандидатов completion (DI)
+
+    Requirements:
+    - паттерны протокола строго по `lsp-protocol` (UnimplementedServer, Full sync)
+    - Resolver над собственным DocStore (по `closure`)
+  methods:
+    "Initialize(ctx: Context, params: InitializeParams) -> result: InitializeResult, err: error": |
+      Заявить возможности: TextDocumentSync Full+OpenClose, HoverProvider
+      Boolean(true), CompletionProvider с триггерами; DefinitionProvider,
+      ReferencesProvider, DocumentSymbolProvider — Boolean(true);
+      SignatureHelpProvider с триггерами «(» и «,»;
+      согласовать positionEncoding (utf-8 при поддержке клиентом).
+    "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |
+      Algorithm:
+      1. Сохранить текст и версию документа в `DocStore`
+      2. Пересчитать диагностики (общая функция с DidChange):
+         вычислить `Closure` для uri; записи `MissingInclude` с Owner==uri →
+         Diagnostic (code="missing-include", range директивы); RMS:
+         синтаксис + `Analyzer`; inline `XsBlock`: пропустить код через
+         `XsParse` и передать в `Analyzer` с внешними декларациями
+         замыкания (пустыми для inline-блока); .xs: `Analyzer` с внешними
+         декларациями замыкания uri
+      3. PublishDiagnostics по `lsp-protocol` (одна пачка)
+    "DidChange(ctx: Context, params: DidChangeTextDocumentParams) -> err: error": |
+      Algorithm:
+      1. Взять весь текст из ContentChanges (WholeDocument)
+      2. Сохранить в `DocStore`; пересчитать (как в DidOpen);
+         PublishDiagnostics
+    "DidClose(ctx: Context, params: DidCloseTextDocumentParams) -> err: error": |
+      DocStore.Remove(uri); опубликовать пустой список диагностик.
+    "Hover(ctx: Context, params: HoverParams) -> hover: Hover, err: error": |
+      Algorithm:
+      1. Для .rms: StatementAt → Store.Command → Markdown (сигнатура+desc+
+         GameVersions/SinceUpdate); для .xs: SymbolAt → Store.Function
+      2. nil, nil когда под курсором ничего нет
+    "Completion(ctx: Context, params: CompletionParams) -> result: CompletionResult, err: error": |
+      Кандидаты для позиции в документе (stateless, read-only).
+
+      `params`: позиция и контекст запроса; `result`: список кандидатов
+      (возможно пустой — не ошибка)
+
+      Algorithm:
+      1. Язык по расширению URI (общий шаблон Hover/SignatureHelp)
+      2. .xs: разобрать через `XsParse`; внешние декларации из `Closure`
+         uri → получить кандидатов у `Completer` для позиции
+      3. .rms: разобрать через `Parse`; позиция внутри `XsBlock` →
+         перевести в координаты блока, пропустить код через `XsParse`
+         и получить кандидатов у `Completer` (внешние декларации
+         замыкания — пустые); иначе кандидаты у `Completer` для позиции
+      4. `Candidate`-список → []CompletionItem по `lsp-protocol`
+         (Completion Items): Label; Kind по таблице; Detail; SortText=Sort;
+         InsertText опущен; InsertTextFormat plain text
+      5. Пусто → CompletionList с пустыми items (не nil, не ошибка)
+
+      Requirements:
+      - stateless: TriggerKind/TriggerCharacter/IsRetrigger не влияют
+      - read-only (R10); существующие хендлеры не меняются (SC8)
+    "SignatureHelp(ctx: Context, params: SignatureHelpParams) -> help: SignatureHelp, err: error": |
+      Параметрические хинты для позиции в документе (stateless, read-only).
+
+      `params`: позиция и контекст запроса; `help`: результат или nil (молчание)
+
+      Algorithm:
+      1. Язык по расширению URI (общий шаблон с Hover)
+      2. .xs: разобрать через `XsParse`; внешние декларации из `Closure`
+         uri → получить хинт у `Computer` для позиции
+      3. .rms: разобрать через `Parse`; внешние декларации замыкания —
+         пустые (как DidOpen для inline-блоков); позиция внутри `XsBlock` →
+         перевести в координаты блока (шаблон include.Definition), пропустить
+         код через `XsParse` и получить хинт у `Computer`; иначе хинт у
+         `Computer` для позиции
+      4. `Hint` → protocol.SignatureInformation по `lsp-protocol` (Signature Help):
+         Label=hint.Label; Parameters — метки строкой; Documentation опускается;
+         ровно одна сигнатура, ActiveSignature=0; ActiveParameter=uint32(active)
+         при active>=0, иначе nil
+      5. Молчание: found=false → nil, nil
+
+      Requirements:
+      - stateless: ответ зависит только от (document, position);
+        TriggerKind/TriggerCharacter/IsRetrigger на результат не влияют
+      - read-only (R10), аддитивно к существующим хендлерам (C4/SC8)
+      - C6: недоступное замыкание → ExternalDecls даёт что может,
+        unknown-имена молча падают до kb → silence
+    "Definition(ctx: Context, params: DefinitionParams) -> result: DefinitionResult, err: error": |
+      Кросс-файловый переход к определению.
+
+      Algorithm:
+      1. Resolver.Definition(ctx, uri, pos) по `closure`
+      2. Найденный `Target` → protocol.Location (URI может отличаться
+         от запрошенного — Cross-file Navigation Results в `lsp-protocol`)
+      3. Промах → пустая LocationSlice (не nil); ошибкой не считать
+
+      Requirements:
+      - конвертация позиций — с учётом согласованного positionEncoding
+
+    "References(ctx: Context, params: ReferenceParams) -> locations: []Location, err: error": |
+      Ссылки на символ по include-замыканию.
+
+      Algorithm:
+      1. Resolver.References(ctx, uri, pos) по `closure`; каждый `Target` →
+         Location
+      2. IncludeDeclaration=false → исключить range локальной декларации
+         (range Definition в запрошенном файле)
+      3. Пустой результат — пустой список, не nil
+
+    "DocumentSymbol(ctx: Context, params: DocumentSymbolParams) -> result: DocumentSymbolResult, err: error": |
+      Outline документа.
+
+      Algorithm:
+      1. Symbols() по языку (`xs-parsing` / `rms-parsing`)
+      2. Рекурсивно `Symbol` → protocol.DocumentSymbol по `symbols`:
+         Kind по таблице (xs: function/extern→Function, variable→Variable,
+         rule/event→Event; rms: section→Module, command→Function,
+         xs→Namespace; неизвестный kind → Field);
+         Range/Selection напрямую, Children рекурсивно
+      3. Вернуть DocumentSymbolSlice (иерархическая форма)
+
+      Requirements:
+      - Selection ⊆ Range сохраняется при маппинге (инвариант `symbols`)
+    "Shutdown(ctx: Context) -> err: error": |
+      Вернуть nil (default Unimplemented возвращает not-implemented).
+    "Exit(ctx: Context) -> err: error": |
+      Завершить соединение/процесс.
+
+"DocStore()":
+  location: docstore.go
+  annotations: |
+    Кэш открытых документов uri → text + version.
+
+    Requirements:
+    - Put со stale version (меньше текущей) игнорируется
+    - структурно удовлетворяет Source из Imports (метод Text)
+  methods:
+    "Put(uri: string, text: string, version: int)": |
+      Сохранить текст документа с версией.
+    "Get(uri: string) -> text: string, version: int, found: bool": |
+      Текст и версия документа; found=false если документ не открыт.
+    "Text(uri: string) -> text: string, found: bool": |
+      Editor-state текст без версии (проекция Get для `Source`).
+
+      `uri`: идентификатор документа; `found`: документ открыт
+    "URIs() -> uris: []string": |
+      URI всех открытых документов (часть удовлетворения `Source`).
+    "Remove(uri: string)": |
+      Удалить документ из кэша.
+
+"Serve(ctx: Context) -> err: error":
+  location: serve.go
+  annotations: |
+    stdio-бутстрап по `lsp-protocol`.
+
+    `ctx`: контекст процесса; `err`: причина завершения
+
+    Algorithm:
+    1. Собрать зависимости: NewStore, NewAnalyzer, NewComputer(store)
+       из hints, NewCompleter(store) из complete,
+       Server(store, analyzer, computer, completer), DocStore
+    2. Поднять сервер протокола по `lsp-protocol` и дождаться
+       завершения соединения
+
+---
+
+Author: Goga
+CreatedAt: 04/09/26
+Description: |
+  Корневая ячейка: LSP-сервер (stdio) над kb/rms/xs/analysis/include/hints
+  для редакторов.
