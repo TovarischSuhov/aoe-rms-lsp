@@ -522,7 +522,7 @@ func (p *parser) endXsBlock(idx int) {
 
 	p.file.XsBlocks = append(p.file.XsBlocks, XsBlock{
 		Code:  code,
-		Range: common.Range{Start: p.pos(p.xsStart, 0), End: p.pos(end, 0)},
+		Range: common.Range{Start: p.lineStartPos(p.xsStart), End: p.lineStartPos(end)},
 	})
 
 	p.inXs = false
@@ -642,6 +642,22 @@ func (p *parser) arguments(toks []token, stmt *node) []Expr {
 // pos builds the absolute position of (line, column).
 func (p *parser) pos(line int, column int) common.Pos {
 	return common.Pos{Line: uint32(line), Column: uint32(column), Offset: p.starts[line] + column}
+}
+
+// lineStartPos builds the start position of line, tolerating line ==
+// len(p.lines) (end of file): the position of the last line's end.
+func (p *parser) lineStartPos(line int) common.Pos {
+	if line < len(p.lines) {
+		return p.pos(line, 0)
+	}
+
+	last := len(p.lines) - 1
+
+	return common.Pos{
+		Line:   uint32(last),
+		Column: uint32(len(p.lines[last])),
+		Offset: p.starts[last] + len(p.lines[last]),
+	}
 }
 
 // reportf appends a syntax diagnostic.
