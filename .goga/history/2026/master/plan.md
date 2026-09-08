@@ -326,10 +326,11 @@ Status: extends-existing = none; creation task reference = N/A.
   `strings.Index` (xs/rms navigation tests).
 - `docs/ref/zetnus-rms-guide.txt` exists and is already read by
   `TestExtractRmsCommands_RealGuide`.
-- **Environment**: `go.mod` requires go ≥ 1.26.6; the sandbox toolchain is
-  1.26.4 with toolchain download blocked — `go build`/`go test` cannot run
-  locally. All Go validation commands below run in a capable environment
-  (CI). The SC8 sweep (`go test ./...`) is the acceptance gate.
+- **Environment**: `go.mod` requires go ≥ 1.26.6; the local toolchain is
+  go1.26.6 linux/amd64 (verified) — `go build`/`go test` run locally. The
+  design was authored in a sandbox with go1.26.4 (build impossible there);
+  that restriction no longer applies. The SC8 sweep (`go test ./...`) is
+  the acceptance gate.
 - Test-runner safety: `go test ./...` must run under the memory cap
   prescribed by `CLAUDE.md` (a runaway test previously OOM'd the machine).
 
@@ -1089,10 +1090,10 @@ in `server/serve_test.go`. Tasks 1–8 must all be complete.
 
 ## Validation Commands
 
-> **Environment gate**: `go.mod` requires go ≥ 1.26.6; the sandbox
-> toolchain is 1.26.4 with toolchain download blocked. Run all Go
-> commands below in a capable environment (CI). `go test ./...` must run
-> under the memory cap (a runaway test previously OOM'd the machine).
+> **Environment gate**: `go.mod` requires go ≥ 1.26.6; the local toolchain
+> is go1.26.6 linux/amd64 (verified) — all commands below run locally.
+> `go test ./...` must run under the memory cap (a runaway test previously
+> OOM'd the machine).
 
 - `go build ./...`: compile every package — facade accessibility of all exported contract identifiers
 - `timeout 300 systemd-run --user --scope -p MemoryMax=1500M -p MemorySwapMax=0 bash -c 'go test ./... -count=1'`: run all tests (SC8 sweep included)
@@ -1116,5 +1117,5 @@ in `server/serve_test.go`. Tasks 1–8 must all be complete.
 - [ ] Integration tests exist for the cross-entity full-stack scenarios (Task 9)
 - [ ] No package boundary was expanded (`cmd/kbgen` wire mirror only, as mandated by the design's Additional Instructions; no new cells beyond the contracted `hints`)
 - [ ] `CODEMANIFEST` files were not modified (contract is read-only); `.usages/` files not modified (verified current by the design); `kb/data/rms-commands.json` not regenerated
-- [ ] All validation commands pass (in a capable environment: `go build ./...`, memory-capped `go test ./... -count=1`, `goimports`, `golangci-lint run`, `goga lint`, `goga contract <cell>` × 5)
+- [ ] All validation commands pass (local go1.26.6: `go build ./...`, memory-capped `go test ./... -count=1`, `goimports`, `golangci-lint run`, `goga lint`, `goga contract <cell>` × 5)
 - [ ] Every Usages entry is mentioned in at least one task (`conventions` T1–T9, `kbdata` T1–T3, `xs_grammar` T4, `rms_grammar` T5, `positions-and-diagnostics` T4–T7, `lookups` T7, `xs-parsing` T7–T9, `rms-parsing` T7–T9, `computing` T8–T9, `lsp-protocol` T8–T9, `closure` T8)
