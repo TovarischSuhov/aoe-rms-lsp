@@ -6,7 +6,7 @@ implementers of the analysis and server cells.
 ## Construct once, share everywhere
 
 NewStore() validates and indexes the embedded JSON. Build one Store per
-process and inject it (constructor DI per `conventions`).
+process and inject it as an explicit constructor parameter.
 
 ```go
 store, err := kb.NewStore()
@@ -38,10 +38,9 @@ Preconditions:
 - Names are case-sensitive; completion should lowercase-filter client-side.
 - SinceUpdate is "" when the version is unknown — treat as "always existed".
 
-## Mined kind/range on CommandArg (signature help rendering)
+## Mined kind/range on CommandArg
 
 CommandArg carries structured Range (min/max strings, "" when unmined) and
-Kind filled at load when the extractor left it empty. Consumers rendering
-argument lists (hints) format an entry as "Name: Kind Min..Max" when Range
-is present, "Name: Kind" otherwise, and name-only for flag attributes —
-never invent kinds or defaults.
+Kind filled at load when the extractor left it empty. Kind/Range are raw
+strings from the guide prose — consumers render them per their own contract
+(rendering rules live in the hints cell).

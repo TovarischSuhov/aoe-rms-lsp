@@ -33,8 +33,7 @@ if hint, ok := computer.RmsAt(rmsFile, pos); ok {
 Preconditions:
 - Parse the document first; hint answers are valid for that parse only.
 - Silence (found=false) is the designed answer for unknown names, broken
-  syntax, strings/comments, ambiguous mappings — map it to nil, nil in the
-  protocol handler, never to a guessed hint.
+  syntax, strings/comments, ambiguous mappings — never a guessed hint.
 - The cell never imports go.lsp.dev — mapping Hint to
   protocol.SignatureInformation (single signature, ActiveSignature=0,
   ActiveParameter=nil when Active<0) belongs to the server cell.

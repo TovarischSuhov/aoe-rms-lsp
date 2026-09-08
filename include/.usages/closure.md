@@ -10,7 +10,7 @@ Provide editor-state text via Source; DocStore satisfies it structurally
 through its Text method:
 
 ```go
-docs := server.NewStore()               // has Text(uri) (string, bool)
+docs := server.NewDocStore()             // has Text(uri) (string, bool)
 resolver := include.NewResolver(docs)   // include.Source is satisfied
 ```
 
