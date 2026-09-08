@@ -430,13 +430,29 @@ func TestServe_CompletionAllXsFunctions(t *testing.T) {
 
 	functions := 0
 
+	var sample protocol.CompletionItem
+
 	for _, item := range list.Items {
 		if item.Kind == protocol.CompletionItemKindFunction {
 			functions++
+
+			if item.Label == "xsGetGoal" {
+				sample = item
+			}
 		}
+
+		assert.Nil(t, item.Documentation, "concise-items: documentation stays out")
 	}
 
-	assert.Equal(t, 204, functions, "completion must return all 204 XS functions")
+	assert.Equal(t, 204, functions, "completion returns all 204 XS functions; the client filters")
+
+	detail, has := sample.Detail.Get()
+	require.True(t, has)
+	require.Equal(t, "int xsGetGoal(int)", detail)
+
+	sort, hasSort := sample.SortText.Get()
+	require.True(t, hasSort)
+	assert.Equal(t, "1xsGetGoal", sort, "kb functions sort into group 1")
 }
 
 func TestServe_CompletionRmsScopedToSection(t *testing.T) {
@@ -468,13 +484,32 @@ func TestServe_CompletionRmsScopedToSection(t *testing.T) {
 	list, ok := res.(*protocol.CompletionList)
 	require.True(t, ok)
 
-	labels := make([]string, 0, len(list.Items))
+	byLabel := make(map[string]protocol.CompletionItem, len(list.Items))
 	for _, item := range list.Items {
-		labels = append(labels, item.Label)
+		byLabel[item.Label] = item
+		assert.Nil(t, item.Documentation, "concise-items: documentation stays out")
 	}
 
-	assert.Contains(t, labels, "create_land")
-	assert.NotContains(t, labels, "min_number_of_cliffs", "commands of other sections must not leak")
+	land := byLabel["create_land"]
+	assert.Equal(t, protocol.CompletionItemKindFunction, land.Kind,
+		"commands map to Function — the outline-table parity, not the old Keyword")
+	detail, has := land.Detail.Get()
+	require.True(t, has)
+	assert.Equal(t, "land_generation", detail)
+
+	sort, has := land.SortText.Get()
+	require.True(t, has)
+	assert.Equal(t, "1create_land", sort)
+
+	assert.Equal(t, protocol.CompletionItemKindField, byLabel["terrain_type"].Kind,
+		"owner attributes complete alongside the section commands")
+
+	attrSort, has := byLabel["terrain_type"].SortText.Get()
+	require.True(t, has)
+	assert.Equal(t, "0terrain_type", attrSort, "attributes sort before commands")
+
+	_, leaked := byLabel["min_number_of_cliffs"]
+	assert.False(t, leaked, "commands of other sections must not leak")
 }
 
 func TestServe_ShutdownExit(t *testing.T) {
@@ -962,4 +997,161 @@ func TestCompletion_UnknownLanguage_EmptyList(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, list.Items, "empty list, not a nil result")
 	assert.Empty(t, list.Items)
+}
+
+func TestCompletion_RmsIntegration(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	docURI := uri.URI("file:///work/int.rms")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI: docURI, LanguageID: "aoe2rms", Version: 1,
+			Text: "<LAND_GENERATION>\ncreate_land\n",
+		},
+	}))
+	h.waitDiagnostics(docURI)
+
+	res, err := h.disp.Completion(ctx, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 1, Character: 6},
+		},
+	})
+
+	require.NoError(t, err)
+
+	list, ok := res.(*protocol.CompletionList)
+	require.True(t, ok)
+	assert.False(t, list.IsIncomplete)
+
+	var land protocol.CompletionItem
+
+	for _, item := range list.Items {
+		if item.Label == "create_land" {
+			land = item
+		}
+	}
+
+	require.Equal(t, protocol.CompletionItemKindFunction, land.Kind)
+	require.True(t, land.InsertText.IsZero(), "insert text equals the label — unset")
+}
+
+func TestCompletion_InlineXsBlock(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	docURI := uri.URI("file:///work/inline.rms")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI: docURI, LanguageID: "aoe2rms", Version: 1,
+			Text: "<LAND_GENERATION>\n#includeXS\nvoid inline_fn() { }\n",
+		},
+	}))
+	h.waitDiagnostics(docURI)
+
+	res, err := h.disp.Completion(ctx, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 2, Character: 17},
+		},
+	})
+
+	require.NoError(t, err)
+
+	list, ok := res.(*protocol.CompletionList)
+	require.True(t, ok)
+
+	byLabel := make(map[string]protocol.CompletionItem, len(list.Items))
+
+	for _, item := range list.Items {
+		byLabel[item.Label] = item
+	}
+
+	local := byLabel["inline_fn"]
+	require.Equal(t, protocol.CompletionItemKindFunction, local.Kind,
+		"the inline-block function completes through unshiftPos")
+
+	sort, has := local.SortText.Get()
+	require.True(t, has)
+	require.Equal(t, "0inline_fn", sort, "source symbols sort into group 0")
+
+	require.Contains(t, byLabel, "xsGetGoal", "kb functions complete inside inline blocks")
+}
+
+func TestCompletion_Stateless_SameAnswerTwice(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	docURI := uri.URI("file:///work/stateless.xs")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI: docURI, LanguageID: "aoe2xs", Version: 1, Text: "void f() { }",
+		},
+	}))
+	h.waitDiagnostics(docURI)
+
+	ask := func(trigger protocol.CompletionTriggerKind) []protocol.CompletionItem {
+		res, err := h.disp.Completion(ctx, &protocol.CompletionParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+				Position:     protocol.Position{Line: 0, Character: 11},
+			},
+			Context: protocol.CompletionContext{TriggerKind: trigger},
+		})
+		require.NoError(t, err)
+
+		list, ok := res.(*protocol.CompletionList)
+		require.True(t, ok)
+
+		return list.Items
+	}
+
+	assert.Equal(t,
+		ask(protocol.CompletionTriggerKindInvoked),
+		ask(protocol.CompletionTriggerKindTriggerForIncompleteCompletions),
+		"the answer depends only on (document, position)")
+}
+
+func TestCompletion_EmptyCandidates_EmptyListNotError(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	docURI := uri.URI("file:///work/silent.rms")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI: docURI, LanguageID: "aoe2rms", Version: 1, Text: "#include \"a.rms\"\n",
+		},
+	}))
+	h.waitDiagnostics(docURI)
+
+	res, err := h.disp.Completion(ctx, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 0, Character: 2},
+		},
+	})
+
+	require.NoError(t, err, "silence is not an error")
+
+	list, ok := res.(*protocol.CompletionList)
+	require.True(t, ok)
+	require.NotNil(t, list.Items, "empty items, not a nil list")
+	require.Empty(t, list.Items)
 }
