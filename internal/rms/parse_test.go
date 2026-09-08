@@ -157,9 +157,12 @@ func TestParse_RandomNesting(t *testing.T) {
 	first := start.Children[0]
 	assert.Equal(t, "percent_chance", first.Name)
 	assert.Equal(t, "35", first.Args[0].Value)
-	require.Len(t, first.Children, 2)
+	require.Len(t, first.Children, 1)
 	assert.Equal(t, "create_object", first.Children[0].Name)
-	assert.Equal(t, "number_of_objects", first.Children[1].Name)
+
+	// brace-less attributes attach to their create_* command
+	require.Len(t, first.Children[0].Attributes, 1)
+	assert.Equal(t, "number_of_objects", first.Children[0].Attributes[0].Name)
 
 	// attributes inside the random block of a command still attach to it
 	relic := stmts[1]
@@ -259,13 +262,166 @@ func TestParse_IncludesAndXs(t *testing.T) {
 	assert.Equal(t, "#const", global.Statements[0].Name)
 
 	objects := file.Sections[2]
-	require.Len(t, objects.Statements, 2)
+	require.Len(t, objects.Statements, 1)
 	assert.Equal(t, "create_object", objects.Statements[0].Name)
-	assert.Equal(t, "number_of_objects", objects.Statements[1].Name,
-		"attributes outside braces become plain statements")
+
+	// brace-less attributes attach to their create_* command
+	require.Len(t, objects.Statements[0].Attributes, 1)
+	assert.Equal(t, "number_of_objects", objects.Statements[0].Attributes[0].Name,
+		"attributes outside braces attach to the create_* command")
 }
 
 // TestParse_NeverNil checks the total-garbage path.
+// TestParse_IncludeDrs covers the #include_drs directive and dotted
+// file arguments — published maps use it in 45% of the corpus sample.
+func TestParse_IncludeDrs(t *testing.T) {
+	t.Parallel()
+
+	src := "#include_drs random_map.def 54000\n#const ROCKS 40\n"
+
+	file, diags := Parse(src, "drs.rms")
+
+	require.Empty(t, diags)
+
+	global := file.Sections[0]
+	require.Len(t, global.Statements, 2)
+	assert.Equal(t, "#include_drs", global.Statements[0].Name)
+	assert.Equal(t, "#const", global.Statements[1].Name)
+}
+
+// TestParse_ConditionalSpansSections checks that if/elseif chains may
+// cross section headers — the WSVG-style published maps switch whole map
+// variants inside one conditional.
+func TestParse_ConditionalSpansSections(t *testing.T) {
+	t.Parallel()
+
+	src := `<LAND_GENERATION>
+if WSVG_ACROPOLIS
+base_terrain GRASS
+<OBJECTS_GENERATION>
+create_object WOLF
+elseif WSVG_HAMBURGER
+base_terrain DIRT
+endif
+`
+
+	file, diags := Parse(src, "span.rms")
+
+	require.Empty(t, diags, "sections must not close conditional scopes")
+
+	land := file.Sections[0]
+	assert.Equal(t, "land_generation", land.Name)
+	require.Len(t, land.Statements, 1)
+
+	cond := land.Statements[0]
+	assert.Equal(t, "if", cond.Name)
+
+	// children from both sections belong to the conditional
+	require.Len(t, cond.Children, 2)
+	assert.Equal(t, "base_terrain", cond.Children[0].Name)
+	assert.Equal(t, "create_object", cond.Children[1].Name)
+}
+
+// TestParse_UnterminatedConditionalAtEOF keeps the EOF diagnostic for a
+// genuinely unterminated if.
+func TestParse_UnterminatedConditionalAtEOF(t *testing.T) {
+	t.Parallel()
+
+	_, diags := Parse("if TINY_MAP\ncreate_object WOLF\n", "eof.rms")
+
+	require.Len(t, diags, 1)
+	assert.Equal(t, "unterminated block(s): if", diags[0].Message)
+}
+
+// TestParse_ImplicitAttributeBlockClosedByBrace covers the brace-less
+// create_* attribute context terminated by a stray-looking "}".
+func TestParse_ImplicitAttributeBlockClosedByBrace(t *testing.T) {
+	t.Parallel()
+
+	src := `<OBJECTS_GENERATION>
+create_object TUNA
+number_of_objects 19
+set_scaling_to_map_size
+}
+`
+
+	file, diags := Parse(src, "implicit.rms")
+
+	require.Empty(t, diags)
+
+	stmts := file.Sections[0].Statements
+	require.Len(t, stmts, 1)
+	assert.Equal(t, "create_object", stmts[0].Name)
+	require.Len(t, stmts[0].Attributes, 2)
+	assert.Equal(t, "number_of_objects", stmts[0].Attributes[0].Name)
+}
+
+// TestParse_NonAsciiWords checks that 8-bit text lexes as words instead
+// of a stream of "unexpected byte" diagnostics.
+func TestParse_NonAsciiWords(t *testing.T) {
+	t.Parallel()
+
+	src := "<LAND_GENERATION>\nbase_terrain café GRASS\n"
+
+	_, diags := Parse(src, "nonascii.rms")
+
+	for _, d := range diags {
+		assert.NotContains(t, d.Message, "unexpected",
+			"non-ASCII bytes are word characters, not token garbage: %s", d.Message)
+	}
+}
+
+// TestParse_ImplicitAttributesAcrossBranches covers the Rooster pattern:
+// a brace-less create_* context keeps collecting attributes from inside
+// if/elseif/else branches — the branch picks the value at runtime.
+func TestParse_ImplicitAttributesAcrossBranches(t *testing.T) {
+	t.Parallel()
+
+	src := `<OBJECTS_GENERATION>
+create_object TUNA
+if LR_TSUNAMI
+  number_of_objects 22
+else
+  number_of_objects 19
+endif
+  set_scaling_to_map_size
+}
+`
+
+	file, diags := Parse(src, "branches.rms")
+
+	require.Empty(t, diags)
+
+	stmts := file.Sections[0].Statements
+
+	// the conditionals stay sibling statements; the attributes from
+	// every branch attach to the command
+	require.Len(t, stmts, 3)
+	assert.Equal(t, "create_object", stmts[0].Name)
+	assert.Equal(t, "if", stmts[1].Name)
+	assert.Equal(t, "else", stmts[2].Name)
+
+	require.Len(t, stmts[0].Attributes, 3)
+	assert.Equal(t, "number_of_objects", stmts[0].Attributes[0].Name)
+	assert.Equal(t, "set_scaling_to_map_size", stmts[0].Attributes[2].Name)
+}
+
+// TestParse_QuotesInsideCommentAreBlanked covers quoted text inside a
+// block comment: the quotes must not leak as string arguments.
+func TestParse_QuotesInsideCommentAreBlanked(t *testing.T) {
+	t.Parallel()
+
+	src := "<LAND_GENERATION>\ncreate_land  /* the \"relic isle\" :) */\n"
+
+	file, diags := Parse(src, "quoted.rms")
+
+	require.Empty(t, diags)
+
+	stmts := file.Sections[0].Statements
+	require.Len(t, stmts, 1)
+	assert.Empty(t, stmts[0].Args, "comment bytes never become arguments")
+}
+
 func TestParse_NeverNil(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -1,0 +1,106 @@
+Usages:
+  conventions: .goga/usages/conventions.md
+  lsp-protocol: .goga/usages/cooks/lsp-protocol.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `lsp-protocol` for client-side go.lsp.dev patterns (union/Optional
+  types, positions, Full sync — со стороны клиента).
+
+  Чёрный ящик относительно ячеек: связь с aoe2-lsp только через
+  LSP-протокол поверх subprocess; Imports из internal/ запрещены.
+  Каждый файл корпуса — свежий subprocess: падение одной карты не влияет
+  на остальные.
+
+---
+
+"Runner(bin: string)":
+  location: runner.go
+  annotations: |
+    Оркестратор corpus-прогона: каталог скриптов через полный LSP-цикл
+    бинарника aoe2-lsp, агрегированный отчёт.
+
+    `bin`: путь к бинарнику aoe2-lsp (спавнится на каждый файл)
+
+    Requirements:
+    - детерминированный порядок файлов (сортировка путей)
+    - фиксированный бюджет времени на файл (таймаут сессии)
+  methods:
+    "Run(ctx: Context, dir: string) -> report: Report, err: error": |
+      Прогон всех .rms/.xs файлов каталога.
+
+      `ctx`: контекст прогона (отмена прерывает весь прогон)
+      `dir`: корень каталога корпуса
+      `report`: результаты по каждому файлу; `err`: только
+      инфраструктурные сбои харнесса (bin не запускается, dir нечитаем)
+
+      Algorithm:
+      1. Рекурсивно обойти `dir`, собрать .rms/.xs, отсортировать пути
+      2. На каждый файл — LSP-сессия: спавн процесса сервера (stderr —
+         в ограниченный буфер), initialize (utf-8 positionEncoding,
+         rootUri=`dir`), didOpen, дождаться publishDiagnostics,
+         hover/completion/signatureHelp/documentSymbol в
+         детерминированно сэмплированных позициях текста, shutdown+exit
+      3. Жёсткая классификация файла: stderr содержит panic → panic;
+         ненулевой exit до конца сессии → exit; истёк бюджет → timeout;
+         обрыв JSON-RPC → transport; иначе ok
+      4. Свести результаты в `Report` (HardFailures — число не-ok)
+
+      Requirements:
+      - позиции сэмплируются детерминированно из текста (без парсинга)
+      - диагностика не интерпретируется — только счётчики
+
+      Constraints:
+      - файлы корпуса не модифицируются
+      - содержимое документов не попадает в логи харнесса
+
+"Report()":
+  location: report.go
+  annotations: |
+    Агрегат прогона по каталогу.
+
+    Requirements:
+    - Files в порядке прогона; HardFailures — число FileResult
+      со Status != ok
+  properties:
+    "Files -> []FileResult": |
+      Результаты по файлам в порядке прогона.
+    "HardFailures -> int": |
+      Число файлов с жёстким отказом (критерий exit code обвязки).
+    "DurationMS -> int64": |
+      Длительность всего прогона.
+  methods:
+    "Summary() -> text: string": |
+      Человекочитаемая сводка: строка на каждый не-ok файл + итоговые
+      счётчики (stdout обвязки cmd).
+
+"FileResult()":
+  location: report.go
+  annotations: |
+    Результат прогона одного файла корпуса.
+  properties:
+    "Path -> string": |
+      Путь файла относительно корня прогона.
+    "Status -> string": |
+      Жёсткая классификация: "ok" | "panic" | "exit" | "timeout" |
+      "transport".
+    "Detail -> string": |
+      Краткая причина отказа (фрагмент panic-трейса, код выхода,
+      ошибка транспорта); пусто для ok.
+    "Diagnostics -> int": |
+      Число опубликованных диагностик (счётчик без семантики).
+    "Requests -> int": |
+      Число LSP-запросов харнесса в сессии файла.
+    "RequestErrors -> int": |
+      Число ошибок JSON-RPC среди запросов.
+    "DurationMS -> int64": |
+      Длительность сессии файла.
+
+---
+
+Author: Goga
+CreatedAt: 09/09/26
+Description: |
+  Корпус-харнесс: прогон реальных RMS/XS скриптов через aoe2-lsp
+  subprocess'ом (полный LSP-цикл), детект паник/падений/таймаутов,
+  агрегированный отчёт. Связь с сервером — только LSP-протокол.
