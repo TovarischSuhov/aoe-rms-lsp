@@ -4,12 +4,11 @@
 package analysis
 
 import (
+	"aoe2-lsp/kb"
+	"aoe2-lsp/xs"
 	"slices"
 	"strconv"
 	"strings"
-
-	"aoe2-lsp/kb"
-	"aoe2-lsp/xs"
 )
 
 // Coerce reports whether a value of type actual is usable where expected is

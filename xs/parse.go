@@ -1,11 +1,10 @@
 package xs
 
 import (
+	"aoe2-lsp/common"
 	"fmt"
 	"slices"
 	"strings"
-
-	"aoe2-lsp/common"
 )
 
 // XsParse parses XS source (a .xs file or an inline block from rms.XsBlock)
@@ -137,8 +136,10 @@ func (p *xparser) parseTypedDecl() {
 	declStart := start
 
 	for {
-		decl := Decl{Kind: DeclVariable, Name: name.text, Type: typ,
-			Range: common.Range{Start: declStart, End: name.at.End}}
+		decl := Decl{
+			Kind: DeclVariable, Name: name.text, Type: typ,
+			Range: common.Range{Start: declStart, End: name.at.End},
+		}
 
 		if p.atOp("=") {
 			p.next()
@@ -759,8 +760,10 @@ func (p *xparser) parseLocalDecl() Stmt {
 
 			if value, ok := p.parseExpr(); ok {
 				end = value.Range.End
-				item = Expr{Kind: ExprBinary, Value: "=", Children: []Expr{item, value},
-					Range: common.Range{Start: name.at.Start, End: value.Range.End}}
+				item = Expr{
+					Kind: ExprBinary, Value: "=", Children: []Expr{item, value},
+					Range: common.Range{Start: name.at.Start, End: value.Range.End},
+				}
 			}
 		}
 
@@ -811,8 +814,10 @@ func (p *xparser) parseBinary(minPrec int) (Expr, bool) {
 				return lhs, true
 			}
 
-			lhs = Expr{Kind: ExprBinary, Value: op.text, Children: []Expr{lhs, rhs},
-				Range: common.Range{Start: lhs.Range.Start, End: rhs.Range.End}}
+			lhs = Expr{
+				Kind: ExprBinary, Value: op.text, Children: []Expr{lhs, rhs},
+				Range: common.Range{Start: lhs.Range.Start, End: rhs.Range.End},
+			}
 
 			continue
 		}
@@ -822,8 +827,10 @@ func (p *xparser) parseBinary(minPrec int) (Expr, bool) {
 			return lhs, true
 		}
 
-		lhs = Expr{Kind: ExprBinary, Value: op.text, Children: []Expr{lhs, rhs},
-			Range: common.Range{Start: lhs.Range.Start, End: rhs.Range.End}}
+		lhs = Expr{
+			Kind: ExprBinary, Value: op.text, Children: []Expr{lhs, rhs},
+			Range: common.Range{Start: lhs.Range.Start, End: rhs.Range.End},
+		}
 	}
 }
 
@@ -835,8 +842,10 @@ func (p *xparser) parseUnary() (Expr, bool) {
 		p.next()
 
 		if operand, ok := p.parseUnary(); ok {
-			return Expr{Kind: ExprUnary, Value: tok.text, Children: []Expr{operand},
-				Range: common.Range{Start: tok.at.Start, End: operand.Range.End}}, true
+			return Expr{
+				Kind: ExprUnary, Value: tok.text, Children: []Expr{operand},
+				Range: common.Range{Start: tok.at.Start, End: operand.Range.End},
+			}, true
 		}
 
 		return Expr{Kind: ExprUnary, Value: tok.text, Range: tok.at}, true
@@ -870,8 +879,10 @@ func (p *xparser) parsePostfix() (Expr, bool) {
 				end = args[len(args)-1].Range.End
 			}
 
-			operand = Expr{Kind: ExprCall, Callee: identName(operand), Children: args,
-				Range: common.Range{Start: operand.Range.Start, End: end}}
+			operand = Expr{
+				Kind: ExprCall, Callee: identName(operand), Children: args,
+				Range: common.Range{Start: operand.Range.Start, End: end},
+			}
 		case ".":
 			p.next()
 
@@ -881,8 +892,10 @@ func (p *xparser) parsePostfix() (Expr, bool) {
 				end = operand.Range.End
 			}
 
-			operand = Expr{Kind: ExprBinary, Value: ".", Children: []Expr{operand, {Kind: ExprIdent, Value: member.text, Range: member.at}},
-				Range: common.Range{Start: operand.Range.Start, End: end}}
+			operand = Expr{
+				Kind: ExprBinary, Value: ".", Children: []Expr{operand, {Kind: ExprIdent, Value: member.text, Range: member.at}},
+				Range: common.Range{Start: operand.Range.Start, End: end},
+			}
 		case "[":
 			p.next()
 
@@ -893,12 +906,16 @@ func (p *xparser) parsePostfix() (Expr, bool) {
 			}
 
 			p.expect("]")
-			operand = Expr{Kind: ExprBinary, Value: "[]", Children: []Expr{operand, index},
-				Range: common.Range{Start: operand.Range.Start, End: end}}
+			operand = Expr{
+				Kind: ExprBinary, Value: "[]", Children: []Expr{operand, index},
+				Range: common.Range{Start: operand.Range.Start, End: end},
+			}
 		case "++", "--":
 			p.next()
-			operand = Expr{Kind: ExprUnary, Value: op.text + "post", Children: []Expr{operand},
-				Range: common.Range{Start: operand.Range.Start, End: op.at.End}}
+			operand = Expr{
+				Kind: ExprUnary, Value: op.text + "post", Children: []Expr{operand},
+				Range: common.Range{Start: operand.Range.Start, End: op.at.End},
+			}
 		default:
 			return operand, true
 		}
@@ -963,8 +980,10 @@ func (p *xparser) parseParenExpr(open xtoken) (Expr, bool) {
 	closeTok := p.expect(")")
 
 	if len(operands) == 3 {
-		return Expr{Kind: ExprVector, Children: operands,
-			Range: common.Range{Start: open.at.Start, End: closeTok}}, true
+		return Expr{
+			Kind: ExprVector, Children: operands,
+			Range: common.Range{Start: open.at.Start, End: closeTok},
+		}, true
 	}
 
 	p.reportf(common.Range{Start: open.at.Start, End: closeTok}, common.SeverityWarning, "syntax",

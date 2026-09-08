@@ -1,12 +1,11 @@
 package hints
 
 import (
-	"strings"
-
 	"aoe2-lsp/common"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
 	"aoe2-lsp/xs"
+	"strings"
 )
 
 // Computer computes signature-help hints over parsed ASTs and the

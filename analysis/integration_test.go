@@ -1,6 +1,9 @@
 package analysis
 
 import (
+	"aoe2-lsp/common"
+	"aoe2-lsp/rms"
+	"aoe2-lsp/xs"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,10 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"aoe2-lsp/common"
-	"aoe2-lsp/rms"
-	"aoe2-lsp/xs"
 )
 
 // TestAnalyzeXs_PreludeNoFalsePositives guards the acceptance criterion:

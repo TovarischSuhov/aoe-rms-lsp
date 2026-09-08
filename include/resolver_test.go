@@ -1,6 +1,7 @@
 package include
 
 import (
+	"aoe2-lsp/common"
 	"context"
 	"fmt"
 	"os"
@@ -11,8 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.lsp.dev/uri"
-
-	"aoe2-lsp/common"
 )
 
 // writeTree writes name→content files under dir and returns their URIs.

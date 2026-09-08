@@ -1,16 +1,15 @@
 package analysis
 
 import (
+	"aoe2-lsp/common"
+	"aoe2-lsp/kb"
+	"aoe2-lsp/rms"
+	"aoe2-lsp/xs"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"aoe2-lsp/common"
-	"aoe2-lsp/kb"
-	"aoe2-lsp/rms"
-	"aoe2-lsp/xs"
 )
 
 // newAnalyzer builds the analyzer over the embedded knowledge base.
@@ -371,8 +370,10 @@ func TestAnalyzeXs_ExternalsSuppressUndefinedAndLocalsWin(t *testing.T) {
 	assert.Equal(t, []string{"undefined-symbol"}, codes(withoutExt))
 
 	// externals provide types for bad-type checks: float param, int arg
-	typed := []xs.Decl{{Kind: xs.DeclFunction, Name: "takeFloat", Type: "void",
-		Params: []xs.Param{{Name: "v", Type: "float"}}}}
+	typed := []xs.Decl{{
+		Kind: xs.DeclFunction, Name: "takeFloat", Type: "void",
+		Params: []xs.Param{{Name: "v", Type: "float"}},
+	}}
 	tf, _ := xs.XsParse("void u() { takeFloat(1); }", "t.xs")
 	assert.Equal(t, []string{}, codes(a.AnalyzeXs(tf, typed)))
 

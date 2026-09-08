@@ -1,14 +1,13 @@
 package rms
 
 import (
+	"aoe2-lsp/common"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"aoe2-lsp/common"
 )
 
 // loadFixture reads a testdata fixture.

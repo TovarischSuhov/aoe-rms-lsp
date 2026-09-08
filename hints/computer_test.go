@@ -1,16 +1,15 @@
 package hints
 
 import (
+	"aoe2-lsp/common"
+	"aoe2-lsp/kb"
+	"aoe2-lsp/rms"
+	"aoe2-lsp/xs"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"aoe2-lsp/common"
-	"aoe2-lsp/kb"
-	"aoe2-lsp/rms"
-	"aoe2-lsp/xs"
 )
 
 // TestHint_APIShape pins the contract surface of the render result: the

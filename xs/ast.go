@@ -3,10 +3,9 @@
 package xs
 
 import (
+	"aoe2-lsp/common"
 	"math"
 	"slices"
-
-	"aoe2-lsp/common"
 )
 
 // Declaration kinds.

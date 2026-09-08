@@ -1,0 +1,14 @@
+# golangci-lint v2 config — schema: https://golangci-lint.run/usage/configuration/
+version: "2"
+
+linters:
+  # errcheck, govet, staticcheck, unused
+  default: standard
+  enable:
+    - copyloopvar
+    - misspell
+    - unconvert
+
+formatters:
+  enable:
+    - gofumpt

@@ -3,10 +3,9 @@
 package rms
 
 import (
+	"aoe2-lsp/common"
 	"slices"
 	"strings"
-
-	"aoe2-lsp/common"
 )
 
 // Statement kinds.

@@ -1,16 +1,15 @@
 package server
 
 import (
+	"aoe2-lsp/analysis"
+	"aoe2-lsp/complete"
+	"aoe2-lsp/hints"
+	"aoe2-lsp/kb"
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
-
-	"aoe2-lsp/analysis"
-	"aoe2-lsp/complete"
-	"aoe2-lsp/hints"
-	"aoe2-lsp/kb"
 
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"

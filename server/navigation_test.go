@@ -1,6 +1,10 @@
 package server
 
 import (
+	"aoe2-lsp/analysis"
+	"aoe2-lsp/complete"
+	"aoe2-lsp/hints"
+	"aoe2-lsp/kb"
 	"context"
 	"fmt"
 	"os"
@@ -10,11 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
-
-	"aoe2-lsp/analysis"
-	"aoe2-lsp/complete"
-	"aoe2-lsp/hints"
-	"aoe2-lsp/kb"
 )
 
 // newNavigationServer builds a server over the real knowledge base.

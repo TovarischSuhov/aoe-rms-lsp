@@ -1,13 +1,6 @@
 package server
 
 import (
-	"context"
-	"fmt"
-	"slices"
-	"strings"
-	"sync"
-	"sync/atomic"
-
 	"aoe2-lsp/analysis"
 	"aoe2-lsp/common"
 	"aoe2-lsp/complete"
@@ -16,6 +9,12 @@ import (
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
 	"aoe2-lsp/xs"
+	"context"
+	"fmt"
+	"slices"
+	"strings"
+	"sync"
+	"sync/atomic"
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
