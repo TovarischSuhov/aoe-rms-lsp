@@ -7,6 +7,7 @@ import (
 )
 
 func TestCandidate_Contract(t *testing.T) {
+	t.Parallel()
 	c := Candidate{
 		Label:  "create_land",
 		Kind:   "command",
@@ -26,6 +27,7 @@ func TestCandidate_Contract(t *testing.T) {
 }
 
 func TestCandidate_ConstructAndUse(t *testing.T) {
+	t.Parallel()
 	c := Candidate{Label: "x", Kind: "local", Detail: "", Sort: "0x"}
 
 	require.Equal(t, "x", c.Label)

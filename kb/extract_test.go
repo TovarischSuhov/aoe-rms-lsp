@@ -15,7 +15,8 @@ const zetnusGuide = "../docs/ref/zetnus-rms-guide.txt"
 // TestExtractRmsCommands_RealGuide extracts from the committed Zetnus
 // export and checks structure, metadata and changelog enrichment.
 func TestExtractRmsCommands_RealGuide(t *testing.T) {
-	commands, err := ExtractRmsCommands(zetnusGuide)
+	t.Parallel()
+	commands, err := ExtractRmsCommands(zetnusGuide, nil)
 	require.NoError(t, err)
 	require.Greater(t, len(commands), 50)
 
@@ -60,17 +61,18 @@ func TestExtractRmsCommands_RealGuide(t *testing.T) {
 
 // TestExtractRmsCommands_MissingFile checks the read error path.
 func TestExtractRmsCommands_MissingFile(t *testing.T) {
-	_, err := ExtractRmsCommands("no/such/file.txt")
+	t.Parallel()
+	_, err := ExtractRmsCommands("no/such/file.txt", nil)
 
-	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "zetnus"))
+	require.ErrorContains(t, err, "zetnus")
 }
 
 // TestExtractRmsCommands_APIShape pins the mining contract of the
 // extraction pipeline: create_elevation's MaxHeight arg carries the
 // mined range from the real guide.
 func TestExtractRmsCommands_APIShape(t *testing.T) {
-	commands, err := ExtractRmsCommands(zetnusGuide)
+	t.Parallel()
+	commands, err := ExtractRmsCommands(zetnusGuide, nil)
 	require.NoError(t, err)
 
 	byName := make(map[string]Command, len(commands))
@@ -89,7 +91,8 @@ func TestExtractRmsCommands_APIShape(t *testing.T) {
 // TestExtractRmsCommands_MinesRange covers the mining pass over the real
 // guide: skeleton kind wins, mined range fills the empty field.
 func TestExtractRmsCommands_MinesRange(t *testing.T) {
-	commands, err := ExtractRmsCommands(zetnusGuide)
+	t.Parallel()
+	commands, err := ExtractRmsCommands(zetnusGuide, nil)
 	require.NoError(t, err)
 
 	byName := make(map[string]Command, len(commands))
@@ -116,7 +119,8 @@ func TestExtractRmsCommands_MinesRange(t *testing.T) {
 // (range included) re-decodes through indexCommands with no drift —
 // regeneration and load-time mining agree.
 func TestStore_MiningIdempotentWithExtraction(t *testing.T) {
-	commands, err := ExtractRmsCommands(zetnusGuide)
+	t.Parallel()
+	commands, err := ExtractRmsCommands(zetnusGuide, nil)
 	require.NoError(t, err)
 
 	wire := make([]commandWire, 0, len(commands))

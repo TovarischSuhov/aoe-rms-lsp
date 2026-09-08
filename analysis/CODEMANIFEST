@@ -69,9 +69,9 @@ Annotations: |
 
       Algorithm:
       1. Пройти все statement (вкл. Children блоков)
-      2. Неизвестная команда/секция — lookup через `lookups` (Store.Command);
+      2. Неизвестная команда/секция — lookup через `Store` по `lookups`;
          Diagnostic severity=error, code="unknown-command"/"unknown-section"
-      3. Для известных команд: неизвестные атрибуты (Store.Attribute) —
+      3. Для известных команд: неизвестные атрибуты через `Store` —
          code="unknown-attribute"; несоответствие числа/вида аргументов —
          code="bad-argument"
       4. Для каждого позиционного аргумента с имеющейся спецификацией и

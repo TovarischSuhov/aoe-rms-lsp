@@ -278,13 +278,7 @@ func (p *xparser) parseEvent() {
 
 	if p.atOp("(") {
 		if args, ok := p.parseArgs(nil); ok {
-			for _, arg := range args {
-				if arg.Kind == ExprIdent {
-					decl.Name = arg.Value
-
-					break
-				}
-			}
+			decl.Name = eventArgsName(args)
 
 			if len(args) > 0 {
 				decl.Range.End = args[len(args)-1].Range.End
@@ -300,6 +294,18 @@ func (p *xparser) parseEvent() {
 	}
 
 	p.file.Decls = append(p.file.Decls, decl)
+}
+
+// eventArgsName picks the name of an event declaration: the first
+// identifier among the parenthesized arguments.
+func eventArgsName(args []Expr) string {
+	for _, arg := range args {
+		if arg.Kind == ExprIdent {
+			return arg.Value
+		}
+	}
+
+	return ""
 }
 
 // parseTypeWords consumes one or more type words (const int, float, ...)

@@ -11,6 +11,7 @@ import (
 	"aoe2-lsp/xs"
 	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -347,7 +348,6 @@ func toSignatureHelp(hint hints.Hint) *protocol.SignatureHelp {
 	}
 }
 
-// Completion answers with the kb entries in scope: for .rms the commands of
 // Completion answers the candidates in scope: .rms positions complete
 // by the RMS context matrix, .xs and inline XS blocks by the visible
 // symbol pool over the kb functions and constants. The provider is
@@ -658,10 +658,14 @@ func (s *Server) publish(
 		return
 	}
 
-	_ = client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{
+	// A failed push must not break the session — the next change republishes
+	// the batch; record it as a WARN for the operator.
+	if err := client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{
 		URI:         docURI,
 		Diagnostics: diags,
-	})
+	}); err != nil {
+		slog.WarnContext(ctx, "publish diagnostics", "uri", docURI, "err", err)
+	}
 }
 
 // analyze runs the diagnostics pipeline for one document version: parse,

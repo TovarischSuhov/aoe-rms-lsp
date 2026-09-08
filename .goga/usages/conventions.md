@@ -2,6 +2,8 @@
 
 Mandatory rules for all Go code in this project. Strict deterministic specification.
 
+Priority: when this document conflicts with CLAUDE.md, CLAUDE.md wins.
+
 ## Engineering Principles
 
 Code in this repository MUST prioritize:
@@ -16,7 +18,7 @@ Code in this repository MUST prioritize:
 
 ## Constraints
 
-- Compatible with Go 1.23 and above only
+- Compatible with Go 1.26 and above only
 - Use `go.mod` for dependency management
 
 ## Imports
@@ -243,7 +245,7 @@ All dependencies **MUST** be declared in `go.mod` with a minimum version specifi
 
 ## Constraints
 
-- Test code must be compatible with Go 1.23 and above
+- Test code must be compatible with Go 1.26 and above
 
 ## Tools
 
@@ -340,7 +342,7 @@ All test dependencies **MUST** be declared in `go.mod`.
 
 # Validation Commands
 
-All validation commands MUST pass in CI. Go 1.23+ compatibility required.
+All validation commands MUST pass in CI. Go 1.26+ compatibility required.
 
 | Purpose                      | Command                           |
 |------------------------------|-----------------------------------|

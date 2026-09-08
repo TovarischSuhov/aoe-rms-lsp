@@ -433,18 +433,30 @@ func (f XsFile) collectLocals(
 ) {
 	for i := range stmts {
 		if stmts[i].Kind == StmtDecl {
-			for _, item := range stmts[i].Exprs {
-				if r, ok := declaredLocal(item, name); ok {
-					*out = append(*out, declCandidate{
-						nameRange: r,
-						scopeEnd:  blockEnd,
-						depth:     depth,
-					})
-				}
-			}
+			appendDeclaredLocals(stmts[i].Exprs, name, blockEnd, depth, out)
 		}
 
 		f.collectLocals(name, stmts[i].Body, stmts[i].Range.End, depth+1, out)
+	}
+}
+
+// appendDeclaredLocals appends the candidates of one declaration's
+// expression list whose declared name matches name.
+func appendDeclaredLocals(
+	exprs []Expr,
+	name string,
+	blockEnd common.Pos,
+	depth int,
+	out *[]declCandidate,
+) {
+	for _, item := range exprs {
+		if r, ok := declaredLocal(item, name); ok {
+			*out = append(*out, declCandidate{
+				nameRange: r,
+				scopeEnd:  blockEnd,
+				depth:     depth,
+			})
+		}
 	}
 }
 
@@ -554,22 +566,33 @@ func (f XsFile) appendLocals(
 ) {
 	for i := range stmts {
 		if stmts[i].Kind == StmtDecl {
-			for _, item := range stmts[i].Exprs {
-				name, r, ok := declaredLocalName(item)
-				if !ok || pos.Before(r.Start) || !pos.Before(blockEnd) {
-					continue
-				}
-
-				*out = append(*out, common.Symbol{
-					Kind:      KindLocal,
-					Name:      name,
-					Range:     r,
-					Selection: r,
-				})
-			}
+			appendVisibleLocals(out, stmts[i].Exprs, blockEnd, pos)
 		}
 
 		f.appendLocals(out, stmts[i].Body, stmts[i].Range.End, pos)
+	}
+}
+
+// appendVisibleLocals appends the local symbols of one declaration's
+// expression list that are declared before pos and in scope at blockEnd.
+func appendVisibleLocals(
+	out *[]common.Symbol,
+	exprs []Expr,
+	blockEnd common.Pos,
+	pos common.Pos,
+) {
+	for _, item := range exprs {
+		name, r, ok := declaredLocalName(item)
+		if !ok || pos.Before(r.Start) || !pos.Before(blockEnd) {
+			continue
+		}
+
+		*out = append(*out, common.Symbol{
+			Kind:      KindLocal,
+			Name:      name,
+			Range:     r,
+			Selection: r,
+		})
 	}
 }
 

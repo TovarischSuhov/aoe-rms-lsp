@@ -7,6 +7,7 @@ import (
 )
 
 func TestPos_Ordering(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		a          Pos

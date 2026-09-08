@@ -1,5 +1,7 @@
 # Кросс-файловая навигация и резолв include-ов (cross-file navigation)
 
+Status: Done — PR #4 (task/cross-file-navigation)
+
 ## Current State
 
 Навигация `aoe2-lsp` (PR #3, `docs/tasks/lsp-navigation.md`) — строго

@@ -12,14 +12,15 @@ func main() {
         os.Exit(1)
     }
 }
+```
 
-## Editor configs (see task README)
+## Editor configs
 - Neovim: lspconfig, cmd = aoe2-lsp binary, filetypes = { "aoe2rms", "aoe2xs" }
 - VS Code: generic LSP extension launching the binary over stdio
 
 Preconditions:
 - Single binary, no flags required for MVP; positionEncoding negotiated
-  in Initialize (prefer utf-8 when offered, per `lsp-protocol`).
+  in Initialize (prefer utf-8 when offered).
 
 ## Advertised capabilities
 

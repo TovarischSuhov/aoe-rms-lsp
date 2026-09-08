@@ -32,6 +32,9 @@ Annotations: |
   extraction win; mining fills only empty fields; unparseable prose silently
   keeps raw values — the load pipeline never fails.
 
+  Утилиты сборки данных (`GenKB`, `ExtractRmsCommands`) — оффлайн-этап подготовки
+  данных, вне рантайма: контракт Store («No IO after construction») их не покрывает.
+
 ---
 
 "Store()":
@@ -197,13 +200,14 @@ Annotations: |
     - непарсимая prose → пустой результат, не ошибка
     - нечисловые скобочные фрагменты ("(default: …)", "(see: …)") не матчатся
 
-"ExtractRmsCommands(path: string) -> commands: []Command, err: error":
+"ExtractRmsCommands(path: string, log: Logger) -> commands: []Command, err: error":
   location: extract.go
   annotations: |
     Разовое извлечение RMS-команд из текстового экспорта гайда Zetnus
     в rms-commands.json (формат по `kbdata`).
 
     `path`: путь к docs/ref/zetnus-rms-guide.txt
+    `log`: инжектированный логгер сборки (в Go — *slog.Logger; nil → slog.Default())
     `commands`: извлечённые команды; `err`: ошибки чтения/разбора
 
     Algorithm:
@@ -217,12 +221,39 @@ Annotations: |
 
     Constraints:
     - утилита сборки данных, не вызывается в рантайме сервера
-    - при неоднозначном разборе — пропускать фрагмент и писать WARN в slog,
+    - при неоднозначном разборе — пропускать фрагмент и писать WARN в `log`,
       не прерывать весь проход
+
+"GenKB(refDir: string, dataDir: string, log: Logger) -> err: error":
+  location: gen.go
+  annotations: |
+    Генерация файлов данных kb из исходников документации (оффлайн-сборка базы).
+
+    `refDir`: корень исходников документации (functions.json, constants.json,
+    zetnus-гайд, changelog — layout по `kbdata`)
+    `dataDir`: целевой каталог данных
+    `log`: инжектированный логгер сборки (в Go — *slog.Logger; nil → slog.Default())
+    `err`: ошибки чтения/записи; обёрнуты с путём файла
+
+    Algorithm:
+    1. Прочитать из `refDir` источники по `kbdata`: функции и константы —
+       адаптацией JSON ugc-guide; команды — `ExtractRmsCommands`(гайд, `log`)
+    2. Пополнить SinceUpdate по changelog из `refDir`
+    3. Проверить уникальность имён внутри каждого набора; коллизия — ошибка
+    4. Записать три файла данных в `dataDir` по формату `kbdata`
+
+    Requirements:
+    - сериализация детерминирована: повторный запуск на тех же исходниках
+      даёт идентичные файлы (стабильный порядок ключей)
+
+    Constraints:
+    - утилита сборки, не вызывается в рантайме сервера
+    - исходники в `refDir` не изменяются
 
 ---
 
 Author: Goga
 CreatedAt: 04/09/26
 Description: |
-  База знаний AoE2 RMS+XS: встроенные JSON, lookup API и экстракция из Zetnus.
+  База знаний AoE2 RMS+XS: встроенные JSON, lookup API, экстракция из Zetnus
+  и генерация данных.

@@ -24,8 +24,7 @@ items := completer.XsAt(xsFile, pos, externalDecls)
 
 Preconditions:
 - Parse the document first; candidates are valid for that parse only.
-- Empty slice is the designed silence — map it to an empty
-  CompletionList, never to an error.
+- Empty slice is the designed silence — never an error.
 - Source declarations win over same-name kb entries (truth model);
   same-name source symbols of different kinds both come back.
 - The cell never imports go.lsp.dev — mapping Candidate to

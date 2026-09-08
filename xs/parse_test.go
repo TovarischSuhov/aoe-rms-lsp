@@ -23,6 +23,7 @@ func loadFixture(t *testing.T, name string) string {
 // TestXsParse_Fixtures parses every fixture and checks declarations and
 // diagnostics.
 func TestXsParse_Fixtures(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		fixture    string
@@ -92,6 +93,7 @@ func TestXsParse_Fixtures(t *testing.T) {
 
 // TestXsParse_FunctionShapes checks params, locals and calls.
 func TestXsParse_FunctionShapes(t *testing.T) {
+	t.Parallel()
 	file, diags := XsParse(loadFixture(t, "functions.xs"), "functions.xs")
 	require.Empty(t, diags)
 
@@ -127,6 +129,7 @@ func TestXsParse_FunctionShapes(t *testing.T) {
 // TestXsParse_RuleBodies checks rule modifiers, condition/action sections
 // and the permissive semicolon-less statements inside them.
 func TestXsParse_RuleBodies(t *testing.T) {
+	t.Parallel()
 	file, diags := XsParse(loadFixture(t, "rules.xs"), "rules.xs")
 	require.Empty(t, diags)
 
@@ -146,6 +149,7 @@ func TestXsParse_RuleBodies(t *testing.T) {
 
 // TestXsParse_Vectors checks vector literals, members and constructors.
 func TestXsParse_Vectors(t *testing.T) {
+	t.Parallel()
 	file, diags := XsParse(loadFixture(t, "vectors.xs"), "vectors.xs")
 	require.Empty(t, diags)
 
@@ -182,6 +186,7 @@ func TestXsParse_Vectors(t *testing.T) {
 
 // TestXsParse_ControlFlow checks for/while/do/switch/case structures.
 func TestXsParse_ControlFlow(t *testing.T) {
+	t.Parallel()
 	file, diags := XsParse(loadFixture(t, "control.xs"), "control.xs")
 	require.Empty(t, diags)
 
@@ -229,6 +234,7 @@ func TestXsParse_ControlFlow(t *testing.T) {
 // TestXsParse_Prelude checks the 5k-line game dump parses with zero false
 // errors and all externs are declared.
 func TestXsParse_Prelude(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("../docs/ref/ugc-guide/xs/prelude.xs")
 	require.NoError(t, err)
 
@@ -253,6 +259,7 @@ func TestXsParse_Prelude(t *testing.T) {
 
 // TestXsParse_NeverNil checks the total-garbage path.
 func TestXsParse_NeverNil(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		src  string
@@ -276,6 +283,7 @@ func TestXsParse_NeverNil(t *testing.T) {
 // TestXsFile_SymbolAt checks hover navigation: a position on a call
 // returns the callee name, on an argument its identifier.
 func TestXsFile_SymbolAt(t *testing.T) {
+	t.Parallel()
 	src := "void main() {\n\tf(seed);\n\tg();\n}"
 	file, _ := XsParse(src, "inline")
 
@@ -298,6 +306,7 @@ func TestXsFile_SymbolAt(t *testing.T) {
 
 // TestXsParse_RecoveryTruncated checks recovery on input cut mid-call.
 func TestXsParse_RecoveryTruncated(t *testing.T) {
+	t.Parallel()
 	file, diags := XsParse("void main() {\n\txsGetMapSeed(", "truncated")
 
 	require.NotEmpty(t, file.Decls)
@@ -351,6 +360,7 @@ func messages(diags []common.Diagnostic) []string {
 // declaration list: one Decl per declarator, each with its own range,
 // no syntax diagnostics.
 func TestXsParse_TopLevelMultiDecl(t *testing.T) {
+	t.Parallel()
 	file, diags := XsParse("int a = 1, b = 2;", "t.xs")
 
 	require.Empty(t, diags)
@@ -383,6 +393,7 @@ func TestXsParse_TopLevelMultiDecl(t *testing.T) {
 // keeps its historical shape: the range starts at the type words and
 // closes at the semicolon.
 func TestXsParse_TopLevelSingleDeclUnchanged(t *testing.T) {
+	t.Parallel()
 	file, diags := XsParse("int a = 1;", "t.xs")
 
 	require.Empty(t, diags)
@@ -399,6 +410,7 @@ func TestXsParse_TopLevelSingleDeclUnchanged(t *testing.T) {
 // navigable: outline carries both names, definition jumps to the own
 // declarator.
 func TestXsParse_MultiDeclNavigation(t *testing.T) {
+	t.Parallel()
 	file, diags := XsParse("int a = 1, b = 2;", "t.xs")
 	require.Empty(t, diags)
 
@@ -417,6 +429,7 @@ func TestXsParse_MultiDeclNavigation(t *testing.T) {
 // scanner line counter: positions after the literal stay on their
 // physical lines.
 func TestXsParse_StringEscapeNewlineTracksLines(t *testing.T) {
+	t.Parallel()
 	src := "string s = \"abc\\\nDEF\";\nint z = 1;"
 
 	file, diags := XsParse(src, "t.xs")
@@ -432,6 +445,7 @@ func TestXsParse_StringEscapeNewlineTracksLines(t *testing.T) {
 // TestXsParse_StringEscapeNonNewlineUnchanged checks that escapes not
 // followed by a newline keep the previous line accounting untouched.
 func TestXsParse_StringEscapeNonNewlineUnchanged(t *testing.T) {
+	t.Parallel()
 	src := "string s = \"a\\nb\\\"c\";\nint z = 1;"
 
 	file, diags := XsParse(src, "t.xs")
@@ -444,6 +458,7 @@ func TestXsParse_StringEscapeNonNewlineUnchanged(t *testing.T) {
 // TestXsParse_StringEscapeAtEOFDoesNotPanic checks a trailing backslash
 // as the very last byte of a string literal at end of input.
 func TestXsParse_StringEscapeAtEOFDoesNotPanic(t *testing.T) {
+	t.Parallel()
 	file, diags := XsParse("string s = \"abc\\", "t.xs")
 
 	require.NotNil(t, file)

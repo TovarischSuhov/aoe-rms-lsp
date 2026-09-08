@@ -1,97 +1,226 @@
-# Plan: `master` — fix-review-defects-2 (№6–№11)
-
-<!-- По design.md; контракты материализованы и валидны (goga lint 0).
-Задача: task.md. Источник: docs/reviews/2026-09-08-full-review.md. -->
+# Plan: `claudemd-compliance-migration` (кодовая и инфраструктурная фаза)
 
 ## Purpose
 
-Исправить находки №6–№11 ревью 2026-09-08: utf-16 позиции server,
-фантомный XsBlock и строки в blankComments (rms), граница замыкания/
-URI-написание/двойной Closure (include). Только код и тесты; контракты
-уже материализованы.
+Реализовать кодовую и инфраструктурную часть миграции проекта на правила CLAUDE.md.
+Контрактная часть уже материализована (коммит 0e45c4c: kb `GenKB` +
+`ExtractRmsCommands(log)`, аннотационные чистки, `.usages`). Этот план закрывает:
+перенос генерации данных в kb, точечные дефекты server, рефакторинги вложенности,
+`t.Parallel()` в чистых тестах, CI fmt-гейт, актуализацию доков. Стратегия —
+behavior-preserving изменения с зелёными тестами после каждого шага.
+
+## Context
+
+### Contract Surface
+
+**Entity: `GenKB`** (kb, Routine)
+- Declared `location`: `gen.go` — файла ещё нет
+- Facade: `kb.GenKB` импортируем из пакета kb
+- Сигнатура: `(refDir: string, dataDir: string, log: Logger) -> err: error`;
+  в Go — `func GenKB(refDir, dataDir string, log *slog.Logger) error`
+- Поведение (аннотация): прочитать источники по `kbdata` (functions/constants
+  JSON ugc-guide; команды — `ExtractRmsCommands`(гайд, `log`)); пополнить
+  SinceUpdate по changelog; проверить уникальность имён; записать три JSON в
+  `dataDir`. Requirements: детерминированная сериализация. Constraints: утилита
+  сборки; `refDir` не изменяется.
+
+**Entity: `ExtractRmsCommands`** (kb, Routine — модификация)
+- Declared `location`: `extract.go` — существует
+- Новая сигнатура: `(path: string, log: Logger) -> commands: []Command, err: error`;
+  Go: `func ExtractRmsCommands(path string, log *slog.Logger) ([]Command, error)`;
+  `log == nil → slog.Default()`; WARN при пропуске неоднозначных фрагментов — в `log`.
+
+Прочие контракты не меняются; задачи 2–6 не затрагивают CODEMANIFEST.
+
+### Usages Context
+
+- `conventions` (.goga/usages/conventions.md): код-стиль, тесты, ошибки `%w`,
+  doc-комментарии. Приоритет: при противоречии с CLAUDE.md — CLAUDE.md.
+- `kbdata` (inline в kb/CODEMANIFEST): layout трёх JSON + правила mining —
+  источник путей для `GenKB`.
+
+### External Dependencies
+
+- stdlib: `log/slog`, `encoding/json`, `os`, `path/filepath` — новых модулей нет.
+
+## Facts
+
+- Тесты запускать ТОЛЬКО под memory-cap:
+  `timeout 300 systemd-run --user --scope -p MemoryMax=1500M -p MemorySwapMax=0 bash -c 'go test ./... -count=1'`
+- `cmd/kbgen/main.go:118-424` — переносимая логика (`run`, `genFunctions`,
+  `genConstants`, `parseUpdates`, `sinceByFunction`, `sinceByConstant`,
+  `rawValue`, `writeJSON`, `sortedKeys`); regexp-дубли:
+  `updateHeadingRe/backtickRe/wordRe` (kbgen:22-31 ≡ kb/extract.go:25-35).
+- server/server.go:350 — задвоенная строка doc-комментария; :661 —
+  `_ = client.PublishDiagnostics(...)`.
+- Вложенность: analysis/analyzer.go:84 (`walkStmts`), :249 (`collectLocals`);
+  xs/ast.go:427 (`collectLocals`), :549 (`appendLocals`); xs/parse.go:275 (`parseEvent`).
+- `TestCoerce_Table` — analysis/types_test.go:23.
+- CI (.github/workflows/ci.yml): goimports-гейт, `-race`, golangci-action v2.13.2,
+  govulncheck. fmt-гейта нет.
+- Тексты с «Go 1.23+»: CLAUDE.md:3, conventions.md:19/246/343,
+  cooks/lsp-protocol.md:266, README:74; go.mod: `go 1.26.6`.
+- docs/plans/build-lsp-rms-xs.md: 38 `[ ]`, 0 `[x]`. docs/tasks/: 5 файлов без статусов.
+- CLAUDE.md:53 объявляет `testdata/` — фактически фикстуры в rms/testdata, xs/testdata.
+
+## Gap Analysis
+
+- `kb.GenKB` — отсутствует (implementation: null в goga contract)
+- `ExtractRmsCommands` — сигнатура без log (дрейф контракту)
+- cmd/kbgen — толстый (~310 строк логики), дублирует regexp-ы kb
+- server — `_ =` на ошибке; битый doc-комментарий
+- 5 блоков вложенности 4–5 уровней — против стиля conventions
+- `t.Parallel()` — 0/25 тест-файлов
+- CI не гейтит gofumpt
+- Доки отстают от реальности (фичи, layout, версия Go, статусы, чекбоксы)
+
+---
 
 ## Tasks
 
-> Порядок: rms → include → server (листья → корень). Каждая задача —
-> своя ветка task/*, TDD (контракт-тесты первыми), PR в master.
+### Task 1: kb — `GenKB`, логгер в `ExtractRmsCommands`, тонкий cmd/kbgen (TDD coding)
 
-### Task 1: rms — пустой inline-регион #includeXS и строки в blankComments (№7, №11) (TDD)
+Контракт kb (CODEMANIFEST — read-only): `GenKB(refDir, dataDir, log) -> err`
+в `gen.go`; `ExtractRmsCommands(path, log)` в `extract.go`. Источник логики —
+`cmd/kbgen/main.go` (перенос, не копирование: regexp-ы уже в kb/extract.go).
+CLI-контракт kbgen (флаги) сохранить.
 
-`rms/parse.go`. №7: `directive` сохраняет аргументность
-(`p.xsArg`); `endXsBlock` при `xsArg && end == xsStart` выходит без
-блока (bare-директива блок создаёт всегда — регресс-тест Task 1
-batch-1 не меняется). №11: `blankComments` — трекер `inString`
-(кавычка переключает); внутри строки маркеры комментариев не
-распознаются, символы не гасятся. Контракты: Parse шаг 1, шаг 5.
+**Usages:** `conventions` (%w, doc-комментарии, table-driven тесты);
+`kbdata` (пути источников и формат выходных JSON).
 
-**CRITICAL: `CODEMANIFEST` read-only.**
+**CRITICAL: `CODEMANIFEST` — read-only. Несоответствие чинится в коде.**
 
-- [ ] STEP 0: объявить задачу
-- [ ] STEP 1 (контракт-тесты, упадут): `TestParse_IncludeXSArgEmptyRegionNoBlock` — аргументная директива + сразу секция → 1 XsIncludes, 0 XsBlocks, 0 diags; `TestParse_StringLiteralKeepsCommentMarkers` — `#include "a//b.rms"` → Path=="a//b.rms", Range.End == позиция закрывающей кавычки
-- [ ] STEP 2 (код): xsArg + guard в endXsBlock; inString в blankComments
-- [ ] STEP 3: `go test ./rms/ -run 'TestParse_(IncludeXSArgEmptyRegionNoBlock|StringLiteralKeepsCommentMarkers)' -count=1` — зелёные
-- [ ] STEP 4 (logic-тесты): guard аргументной директивы с кодом (1 блок — можно расширить существующий dual-mode тест проверкой отсутствия второго пустого блока); строка с `/*` внутри кавычек не гасится
-- [ ] STEP 5 (debug): memory-cap `go test ./... -count=1` — весь модуль
-- [ ] STEP 6: контракт-реверификация: Parse шаги 1/5; bare-EOF регресс зелёный
-- [ ] STEP 7: `goimports -w rms/`; `golangci-lint run rms/...`
-- [ ] STEP 8: отметить чекбоксы → REVIEW → APPROVAL → NEXT TASK
+- [ ] **Contract tests**: `kb/gen_test.go` — table-driven `TestGenKB_*`:
+  мини-источники в `t.TempDir()` → три JSON в `dataDir`; проверка имён файлов,
+  уникальности (дубль имени → error), детерминированности (второй запуск —
+  идентичные байты); `t.Parallel()` (ожидаемо падают — gen.go нет)
+- [ ] **Code**: `kb/extract.go` — `ExtractRmsCommands(path string, log *slog.Logger)`;
+  nil→`slog.Default()`; log-threading в `parseSkeleton/placeholderKind/readChangelog`;
+  контекст в ошибку «heading not found» (бывш. :99)
+- [ ] **Code**: `kb/gen.go` — перенос пайплайна из cmd/kbgen (`run/genFunctions/
+  genConstants/parseUpdates/sinceBy*/rawValue/writeJSON/sortedKeys`), экспорт
+  `GenKB`; переиспользование regexp-ов extract.go; doc-комментарий
+- [ ] **Code**: `cmd/kbgen/main.go` — только флаги + slog + `kb.GenKB(...)` (≤~50 строк)
+- [ ] **Interface verification**: `go build ./...`; `goga contract kb` —
+  `GenKB.implementation` != null; `ExtractRmsCommands` пара `(path, log)`
+- [ ] **Logic tests**: ошибочные пути (нет functions.json → error с путём;
+  пустой changelog → since_update=""), позитив (мини-фикстуры)
+- [ ] **Debugging**: memory-cap `go test ./... -count=1` — зелёный
+- [ ] **Contract re-verification**: сигнатуры/фасад соответствуют CODEMANIFEST
+- [ ] **Lint**: `golangci-lint fmt && golangci-lint run`
+- [ ] Коммит: `feat: kb cell — GenKB (перенос генерации из cmd/kbgen), логгер в ExtractRmsCommands`
 
-### Task 2: include — граница корня, URI запроса, один Closure (№8, №9, №10) (TDD)
+### Task 2: server — ошибка PublishDiagnostics и doc-комментарий (coding)
 
-`include/resolver.go`. №9: хелпер `resolveTarget(ownerPath, rootDir,
-rel) → (target, ok)`: filepath.Rel без `..` + Stat + IsRegular; rootDir
-прокинут из Closure() через expand/expandDirectives; definitionInRms
-использует тот же хелпер (вне границы found=false). №8: loadDisk
-cache-hit возвращает `file{uri: uriArg, …}` поверх кэшированных AST.
-№10: References — `cl := r.Closure(ctx, u)` один раз; closureContains →
-чистый `closureHas(c, target)`. Контракты: Closure шаг 3/Constraints,
-Definition Requirements.
+server/server.go: два точечных дефекта из аудита. Контракт не меняется
+(методы/поведение прежние) — контрактная проверка: сборка + существующие тесты.
 
-**CRITICAL: `CODEMANIFEST` read-only.**
+**Usages:** `conventions` (каждая ошибка обработана; doc-комментарий корректен).
 
-- [ ] STEP 0: объявить задачу
-- [ ] STEP 1 (контракт-тесты, упадут): `TestResolver_EscapeBeyondRootMissing` — tmp-дерево: root в A/, существующий файл за A; `#include ../outside.rms` → 1 Missing, 0 Resolved; `TestResolver_TwoSpellingsOwnTargetURI` — один файл, owners с `x.rms` и `./x.rms` → каждый Definition возвращает свой URI
-- [ ] STEP 2 (код): resolveTarget + прокидка rootDir; копия file в loadDisk; closureHas
-- [ ] STEP 3: тесты STEP 1 зелёные
-- [ ] STEP 4 (logic-тесты): `TestResolver_DirectoryTargetMissing` — цель-директория → Missing; guard — include в поддереве root'а резолвится; References-тесты существующие зелёные (№10)
-- [ ] STEP 5 (debug): memory-cap `go test ./... -count=1`
-- [ ] STEP 6: контракт-реверификация (Closure/Definition шаги)
-- [ ] STEP 7: `goimports -w include/`; `golangci-lint run include/...`
-- [ ] STEP 8: отметить чекбоксы → REVIEW → APPROVAL → NEXT TASK
+**CRITICAL: `CODEMANIFEST` — read-only.**
 
-### Task 3: server — byte↔UTF-16 позиции при positionEncoding=utf-16 (№6) (TDD)
+- [ ] **Code**: server.go:350 — удалить задвоенную строку doc-комментария `Completion`
+- [ ] **Code**: server.go:661 — `if err := client.PublishDiagnostics(ctx, ...); err != nil { slog.WarnContext(ctx, "publish diagnostics", "uri", uri, "err", err) }`
+- [ ] **Interface verification**: `go build ./...`; `go vet ./server`
+- [ ] **Debugging**: memory-cap `go test ./... -count=1`
+- [ ] **Lint**: `golangci-lint fmt && golangci-lint run`
+- [ ] Коммит: `fix: server cell — логировать ошибку PublishDiagnostics, убрать задвоенный doc-комментарий`
 
-`server/server.go`. Server хранит режим (`utf16`, default true;
-Initialize: utf-8 → false). Конвертеры-методы над текстом документа:
-byte→UTF-16 колонка (префикс строки, суррогатные пары), обратный —
-линейный проход; кламп в конец строки за границей. Применение: вход
-всех позиционных хендлеров (текст запрошенного документа), выход —
-диагностики, DocumentSymbol; Target'ы Definition/References — при
-открытом в DocStore документе. utf-8 — прежнее поведение (все
-существующие тесты — guard'ы). Контракт: без правок.
+### Task 3: Рефакторинг вложенности — analysis, xs (refactor)
 
-**CRITICAL: `CODEMANIFEST` read-only.**
+Behavior-preserving извлечения хелперов; контракты не затронуты (unexported).
 
-- [ ] STEP 0: объявить задачу
-- [ ] STEP 1 (контракт-тесты, упадут): `TestDocumentSymbol_Utf16Columns` — utf-16 клиент, `/* Поколение */ create_elevator 7` → Start.Character == 15; `TestHover_Utf16ClientPosition` — клиент {0,15} → hover по create_elevator
-- [ ] STEP 2 (код): поле режима + конвертеры + проводка в хендлерах
-- [ ] STEP 3: тесты STEP 1 зелёные
-- [ ] STEP 4 (logic-тесты): диагностики utf-16 (диапазон с кириллицей); beyond-end кламп; utf-8 клиент — все существующие тесты зелёные
-- [ ] STEP 5 (debug): memory-cap `go test ./... -count=1`
-- [ ] STEP 6: контракт-реверификация: Definition Requirements «с учётом positionEncoding» выполнен
-- [ ] STEP 7: `goimports -w server/`; `golangci-lint run server/...`
-- [ ] STEP 8: отметить чекбоксы → REVIEW → APPROVAL → PLAN COMPLETE
+**Usages:** `conventions` (вложенность ≤2 уровней → именованные хелперы).
+
+- [ ] **Code**: analysis/analyzer.go:249 `collectLocals` → `declareItem(item Expr)` (или доменное имя)
+- [ ] **Code**: analysis/analyzer.go:84 `walkStmts` → guard-хелпер для `checkArgValues`
+- [ ] **Code**: xs/ast.go:427 `collectLocals` → пер-элементный хелпер
+- [ ] **Code**: xs/ast.go:549 `appendLocals` → выровнять ≤3 уровней
+- [ ] **Code**: xs/parse.go:275 `parseEvent` → `eventArgsName(args)` хелпер
+- [ ] **Debugging**: memory-cap `go test ./... -count=1` — поведение идентично
+- [ ] **Lint**: `golangci-lint fmt && golangci-lint run`
+- [ ] Коммит: `refactor: analysis/xs — извлечение хелперов для вложенности 4-5 уровней`
+
+### Task 4: Тесты — t.Parallel в чистых пакетах, нейминг (tests)
+
+CLAUDE.md: `t.Parallel()` для тестов без общего состояния. Границы: чистые пакеты
+(common, rms, xs, analysis, kb, complete, hints) + docstore/resolver; НЕ трогаем
+server serve-харнессы.
+
+**Usages:** `conventions` (test naming `Test<Component>_<Scenario>`).
+
+- [ ] **Code**: func-level `t.Parallel()` во всех тест-функциях: common/*_test.go,
+  rms/parse_test.go, rms/navigation_test.go, xs/parse_test.go, xs/navigation_test.go,
+  analysis/{analyzer,types,values}_test.go, kb/{mine,store,extract,gen}_test.go,
+  complete/{candidate,completer}_test.go, hints/computer_test.go,
+  server/docstore_test.go, include/resolver_test.go
+- [ ] **Code**: в устойчивых таблицах — `t.Parallel()` и в `t.Run`-замыканиях
+  (семантика переменных цикла Go 1.22+); при малейшем сомнении — только func-level
+- [ ] **Code**: `TestCoerce_Table` → `TestCoerce_ValueShapes`
+- [ ] **Debugging**: memory-cap `go test ./... -count=1` дважды (проверка на флак)
+- [ ] **Lint**: `golangci-lint fmt && golangci-lint run`
+- [ ] Коммит: `test: t.Parallel для тестов без общего состояния; TestCoerce_ValueShapes`
+
+### Task 5: CI — gofumpt fmt-гейт (infrastructure)
+
+CLAUDE.md: «Формат — golangci-lint fmt (gofumpt)». CI сейчас гейтит только goimports.
+
+**Usages:** `cooks/github-actions` (пины, permissions — не менять).
+
+- [ ] **Code**: .github/workflows/ci.yml — шаг после goimports:
+  `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2` +
+  `test -z "$(golangci-lint fmt --diff .)"`
+- [ ] **Verify**: `golangci-lint fmt --diff .` локально пуст (exit 0)
+- [ ] **Verify**: YAML валиден (`python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/ci.yml'))"`)
+- [ ] Коммит: `ci: гейт gofumpt (golangci-lint fmt --diff)`
+
+### Task 6: Доки — реальность (infrastructure)
+
+Синхронизация текстов с фактом: версия Go, фичи README, layout, статусы, чекбоксы.
+Приоритет правил фиксируется в conventions.md.
+
+- [ ] **Docs**: CLAUDE.md — «Go 1.23+»→«Go 1.26+»; Structure: «`testdata/`» →
+  «`<cell>/testdata/` — фикстуры ячеек (rms/testdata, xs/testdata)»
+- [ ] **Docs**: conventions.md — версия → 1.26+ (3 места); в шапку строку
+  «При противоречии с CLAUDE.md приоритет у CLAUDE.md.»
+- [ ] **Docs**: cooks/lsp-protocol.md:266 — «Go 1.26+»
+- [ ] **Docs**: cooks/github-actions.md — примечание к Matrix cross-compile:
+  single-job sequential вариант благословлён для малых модулей (как release.yml)
+- [ ] **Docs**: README.md — фичи (+definition, references, document symbols,
+  signature help), layout-блок (+cmd/, hints/, complete/, include/), релизная
+  формулировка, «Go 1.26+»
+- [ ] **Docs**: docs/plans/build-lsp-rms-xs.md — отметить выполненные чекбоксы `[x]`,
+  шапка: статус реализовано + ссылка на задачи-продолжения
+- [ ] **Docs**: docs/tasks/*.md — `Status: Done (PR #N)` по git-истории (5 файлов)
+- [ ] **Verify**: grep — не осталось «1.23» в правилах; `[ ]` в плане = 0
+- [ ] Коммит: `docs: актуализация под реальность — Go 1.26+, фичи README, статусы задач, чекбоксы плана`
+
+### Task 7: Финальная валидация и PR (integration)
+
+- [ ] memory-cap `go test ./... -count=1` — зелёный (повторно)
+- [ ] `golangci-lint fmt` (без диффа) → `golangci-lint run` → `goga lint` →
+  `goga contract kb common rms xs analysis hints complete include server` — без новых расхождений
+- [ ] Acceptance criteria task.md — все 9 пунктов выполнены
+- [ ] Push ветки, PR в master (не мерджить), тело PR — сводка миграции
+
+---
 
 ## Validation Commands
 
-- `timeout 300 systemd-run --user --scope -p MemoryMax=1500M -p MemorySwapMax=0 bash -c 'go test ./... -count=1'`: все тесты
-- `goimports -w .`; `golangci-lint run`; `goga lint`;
-  `goga contract rms include server` — все exit 0
+- `timeout 300 systemd-run --user --scope -p MemoryMax=1500M -p MemorySwapMax=0 bash -c 'go test ./... -count=1'`: все тесты (memory-cap обязателен)
+- `golangci-lint run`: линт
+- `golangci-lint fmt --diff .`: gofumpt-формат
+- `goga lint`: DSL-контракты
+- `goga contract <cell>`: соответствие контракту
 
 ## Completion Criteria
 
-- [ ] Репро №6–№11 дают корректный результат, каждое — тест
-- [ ] Существующие тесты не ломаются (utf-8 клиенты, bare-EOF блок,
-      обычные комментарии, include в поддереве)
-- [ ] Каждая задача TDD (шаги 0–8); ветки/PR по протоколу
-- [ ] CODEMANIFEST не модифицировались
+- [ ] `kb.GenKB` реализован в gen.go, cmd/kbgen тонкий, regexp без дублей
+- [ ] `ExtractRmsCommands` принимает логгер; WARN-ы не в глобальный slog
+- [ ] server: ошибка PublishDiagnostics логируется; doc-комментарий цел
+- [ ] Вложенность ≤3 уровней в 5 отмеченных местах
+- [ ] Чистые тесты с `t.Parallel()`; двойной прогон без флака
+- [ ] CI содержит fmt-гейт; локально `fmt --diff` пуст
+- [ ] Доки синхронны с реальностью; правило приоритета CLAUDE.md зафиксировано
+- [ ] Все validation commands зелёные; CODEMANIFEST не менялись после 0e45c4c
+- [ ] Один PR из task/claudemd-compliance-migration

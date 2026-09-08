@@ -263,7 +263,7 @@ The package integrates with `log/slog`:
 
 ## Constraints
 
-- Go 1.23+ compatible; LSP 3.18 types.
+- Go 1.26+ compatible; LSP 3.18 types.
 - Positions are zero-based `uint32` line/character. Negotiate `PositionEncodingKind`
   in `Initialize` (default utf-16; prefer utf-8 when the client offers it).
 - Custom language IDs (`aoe2rms`, `aoe2xs`) arrive in `TextDocumentItem.LanguageID`;

@@ -12,6 +12,7 @@ import (
 // json tags (one type serves model and wire), and the Range field on
 // CommandArg.
 func TestMineKindRange_APIShape(t *testing.T) {
+	t.Parallel()
 	// Signature: func MineKindRange(desc string) (kind string, r ValueRange);
 	// unparseable prose yields the empty pair, never an error.
 	kind, r := MineKindRange("nothing to mine here")
@@ -47,6 +48,7 @@ func jsonTags(v any) map[string]string {
 // bounds right after the kind word, with an unrelated "(default: …)"
 // fragment behind it that must not match.
 func TestMineKindRange_BoundedNumber(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		desc string
@@ -83,6 +85,7 @@ func TestMineKindRange_BoundedNumber(t *testing.T) {
 // TestMineKindRange_DecimalAndNegativeBounds covers decimals and the
 // optional leading minus on either bound.
 func TestMineKindRange_DecimalAndNegativeBounds(t *testing.T) {
+	t.Parallel()
 	kind, r := MineKindRange("float (-1.5-2.5) range")
 
 	assert.Equal(t, "float", kind)
@@ -91,6 +94,7 @@ func TestMineKindRange_DecimalAndNegativeBounds(t *testing.T) {
 
 // TestMineKindRange_NoBounds covers prose without any bounds fragment.
 func TestMineKindRange_NoBounds(t *testing.T) {
+	t.Parallel()
 	kind, r := MineKindRange("plain description without bounds")
 
 	assert.Empty(t, kind)
@@ -101,6 +105,7 @@ func TestMineKindRange_NoBounds(t *testing.T) {
 // parentheticals: the parenthesized content must be exactly <num>-<num>.
 // The third input is a real corpus string (create_elevation's Desc).
 func TestMineKindRange_DefaultAndSeeFragmentsIgnored(t *testing.T) {
+	t.Parallel()
 	tests := []string{
 		"(default: 5)",
 		"(see: create_elevation)",
@@ -120,6 +125,7 @@ func TestMineKindRange_DefaultAndSeeFragmentsIgnored(t *testing.T) {
 // TestMineKindRange_EmptyDesc covers flag attributes (34 corpus entries
 // carry empty Desc): empty result, no panic.
 func TestMineKindRange_EmptyDesc(t *testing.T) {
+	t.Parallel()
 	kind, r := MineKindRange("")
 
 	assert.Empty(t, kind)
@@ -129,6 +135,7 @@ func TestMineKindRange_EmptyDesc(t *testing.T) {
 // TestMineKindRange_BoundsWithoutKindWord covers bounds with no preceding
 // word: kind stays empty while the bounds still mine.
 func TestMineKindRange_BoundsWithoutKindWord(t *testing.T) {
+	t.Parallel()
 	kind, r := MineKindRange("(0-5) picks randomly")
 
 	assert.Empty(t, kind)
@@ -138,6 +145,7 @@ func TestMineKindRange_BoundsWithoutKindWord(t *testing.T) {
 // TestMineKindRange_FirstBoundsFragmentWins covers leftmost-match
 // semantics; a refactor to last-match would flip this.
 func TestMineKindRange_FirstBoundsFragmentWins(t *testing.T) {
+	t.Parallel()
 	kind, r := MineKindRange("number (0-5) or (10-20)")
 
 	assert.Equal(t, "number", kind)

@@ -14,6 +14,7 @@ import (
 var _ func(spec kb.CommandArg, kind, value string, r common.Range) (common.Diagnostic, bool) = CheckRmsValue
 
 func TestCheckRmsValue_PercentOutOfRange(t *testing.T) {
+	t.Parallel()
 	r := common.Range{Start: common.Pos{Line: 1, Column: 2}, End: common.Pos{Line: 1, Column: 5}}
 	spec := kb.CommandArg{Kind: "percent"}
 
@@ -42,6 +43,7 @@ func TestCheckRmsValue_PercentOutOfRange(t *testing.T) {
 }
 
 func TestCheckRmsValue_PercentBoundaries(t *testing.T) {
+	t.Parallel()
 	spec := kb.CommandArg{Kind: "percent"}
 
 	values := []struct {
@@ -64,6 +66,7 @@ func TestCheckRmsValue_PercentBoundaries(t *testing.T) {
 }
 
 func TestCheckRmsValue_ExpressionSkipped(t *testing.T) {
+	t.Parallel()
 	r := common.Range{}
 
 	tests := []struct {

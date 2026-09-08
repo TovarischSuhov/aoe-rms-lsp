@@ -9,8 +9,11 @@ Definitive Edition languages:
 - **XS** — External Subroutines (C-like scripting used inside RMS and scenarios)
 
 MVP feature set: **diagnostics** (syntax + semantic), **hover** (signatures +
-descriptions from the knowledge base), **completion** (RMS commands/attributes,
-XS functions/constants). Editor-agnostic: connection configs for Neovim
+descriptions from the knowledge base), **completion** (RMS
+commands/attributes, XS functions/constants, visible params/locals),
+**signature help** (argument hints on `(` and `,`), **navigation** —
+go-to-definition, references and document symbols across the include
+closure. Editor-agnostic: connection configs for Neovim
 (lspconfig) and VS Code (generic LSP extension) — see
 [`server/.usages/lifecycle.md`](server/.usages/lifecycle.md).
 
@@ -20,16 +23,24 @@ a pre-DE grammar, and fresh editor extensions provide highlighting only.
 ## Project layout
 
 ```
-common/    positions, ranges, diagnostics (shared data types)
+cmd/       thin entrypoints: aoe2-lsp (server binary), kbgen (KB regeneration)
+common/    positions, ranges, diagnostics, outline symbols (shared data types)
 kb/        knowledge base: embedded JSON (XS functions, constants, RMS commands)
+           + data pipeline (GenKB extraction from the reference docs)
 rms/       RMS parser (lexer → AST with error recovery)
 xs/        XS parser (C-like grammar, rules/events, externs)
-analysis/  semantic checks (unknown symbols, arity, deprecations)
+analysis/  semantic checks (unknown symbols, arity, value types)
+hints/     signature-help computation (protocol-agnostic)
+complete/  completion candidates (protocol-agnostic)
+include/   #include/#includeXS closure, cross-file navigation
 server/    LSP server over go.lsp.dev/protocol (stdio)
 docs/
-  tasks/lsp-rms-xs.md    task definition & acceptance criteria
-  arch/lsp-rms-xs.md     architecture plan (cells, CODEMANIFEST contracts)
-  ref/                   local copies of all data sources (see below)
+  tasks/     task definitions & acceptance criteria
+  plans/     execution plans (build-lsp-rms-xs.md is the root one)
+  arch/      architecture plans (cells, CODEMANIFEST contracts)
+  design/    design documents per feature
+  reviews/   review notes
+  ref/       local copies of all data sources (see below)
 ```
 
 The repository follows the [goga](https://pypi.org/project/goga/) CODEMANIFEST
@@ -68,19 +79,19 @@ Studios; this project is not affiliated with or endorsed by them.
 
 Prebuilt binaries (Windows, Linux, macOS Intel/Apple Silicon) are attached to
 [GitHub Releases](https://github.com/TovarischSuhov/aoe-rms-lsp/releases) —
-archives plus `SHA256SUMS`; each release tag is pushed by CI. Check the
-version with `aoe2-lsp --version`.
+archives plus `SHA256SUMS`; releases are built and published by CI when a
+`v*` tag is pushed. Check the version with `aoe2-lsp --version`.
 
-Or build from source; requires Go 1.23+.
+Or build from source; requires Go 1.26+.
 
 ```sh
 go build -o aoe2-lsp ./cmd/aoe2-lsp
 ./aoe2-lsp   # speaks LSP over stdio; logs go to stderr
 ```
 
-No other flags: capabilities are declared in `initialize`, full-text sync,
-hover and completion. Position encoding is negotiated per client (utf-8
-preferred).
+No other flags: capabilities are declared in `initialize` — full-text sync,
+hover, completion, signature help, definition, references and document
+symbols. Position encoding is negotiated per client (utf-8 preferred).
 
 ## Editor setup
 

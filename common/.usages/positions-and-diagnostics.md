@@ -14,10 +14,11 @@ end := common.Pos{Line: 3, Column: 13, Offset: 55}
 r := common.Range{Start: start, End: end}
 
 if r.Contains(common.Pos{Line: 3, Column: 7, Offset: 49}) { ... }
+```
 
 ## Diagnostics
 
-One shape for every producer (rms.Parse, xs.Parse, Analyzer). Construct with a
+One shape for every producer (rms.Parse, xs.XsParse, Analyzer). Construct with a
 stable `code` — tests assert on codes, not on message text.
 
 ```go
@@ -27,6 +28,7 @@ d := common.Diagnostic{
     Message:  "unknown command 'create_elefant'",
     Code:     "unknown-command",
 }
+```
 
 Preconditions:
 - `Range.End` >= `Range.Start` for diagnostics you emit; the editor drops invalid ranges.

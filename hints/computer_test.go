@@ -15,6 +15,7 @@ import (
 // TestHint_APIShape pins the contract surface of the render result: the
 // hints package with the exported Hint entity.
 func TestHint_APIShape(t *testing.T) {
+	t.Parallel()
 	hint := Hint{Label: "l", Params: []string{"p"}, Active: 0}
 
 	require.IsType(t, "", hint.Label)
@@ -25,6 +26,7 @@ func TestHint_APIShape(t *testing.T) {
 // TestHint_ConstructAndUse covers the data entity: construction is the
 // behavior (the contract's canonical RMS example round-trips).
 func TestHint_ConstructAndUse(t *testing.T) {
+	t.Parallel()
 	hint := Hint{
 		Label:  "percent_chance(%: percent 0..99)",
 		Params: []string{"%: percent 0..99"},
@@ -39,6 +41,7 @@ func TestHint_ConstructAndUse(t *testing.T) {
 // TestComputer_APIShape pins the computer contract surface: the
 // NewComputer constructor and the two query methods.
 func TestComputer_APIShape(t *testing.T) {
+	t.Parallel()
 	store, err := kb.NewStore()
 	require.NoError(t, err)
 
@@ -78,6 +81,7 @@ func newTestComputer(t *testing.T) *Computer {
 // TestXsAt_KbFunction covers the contract's canonical XS example
 // verbatim: kb fallback path and active-parameter mapping.
 func TestXsAt_KbFunction(t *testing.T) {
+	t.Parallel()
 	src := "void r() { xsVectorSet(1.0, 2.0, 3.0); }"
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -93,6 +97,7 @@ func TestXsAt_KbFunction(t *testing.T) {
 // declarations beat kb; the unclosed call also proves in-progress calls
 // feed the computer (SC1 end-to-end at hints level).
 func TestXsAt_SourceDeclWinsOverKb(t *testing.T) {
+	t.Parallel()
 	src := "int xsVectorSet(int q) { return 0; }\n" +
 		"void r() { xsVectorSet(1 "
 	file, _ := xs.XsParse(src, "t.xs")
@@ -109,6 +114,7 @@ func TestXsAt_SourceDeclWinsOverKb(t *testing.T) {
 // TestXsAt_ClosureDeclPool covers the closure pool: external
 // declarations render with no return type when undeclared.
 func TestXsAt_ClosureDeclPool(t *testing.T) {
+	t.Parallel()
 	src := "void r() { helper(1, "
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -128,6 +134,7 @@ func TestXsAt_ClosureDeclPool(t *testing.T) {
 // TestXsAt_OptionalKbParamBracketed covers the bracket form for kb
 // optional parameters (Required=false) via the real xsCreateFile entry.
 func TestXsAt_OptionalKbParamBracketed(t *testing.T) {
+	t.Parallel()
 	src := "void r() { xsCreateFile("
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -142,6 +149,7 @@ func TestXsAt_OptionalKbParamBracketed(t *testing.T) {
 // TestXsAt_UnknownFunction covers silence for unknown names (trust
 // rule).
 func TestXsAt_UnknownFunction(t *testing.T) {
+	t.Parallel()
 	src := "void r() { nosuchfn(1 "
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -153,6 +161,7 @@ func TestXsAt_UnknownFunction(t *testing.T) {
 // TestXsAt_ConflictingSourceDecls covers the conflict rule: a
 // wrong-signature hint is worse than none.
 func TestXsAt_ConflictingSourceDecls(t *testing.T) {
+	t.Parallel()
 	src := "void h(int a) {}\n" + "void r() { h("
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -172,6 +181,7 @@ func TestXsAt_ConflictingSourceDecls(t *testing.T) {
 // TestXsAt_NoCallContext covers the call-context requirement:
 // identifiers route to hover/completion instead.
 func TestXsAt_NoCallContext(t *testing.T) {
+	t.Parallel()
 	src := "int q = 1;\n" + "void r() { int w = q; }"
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -185,6 +195,7 @@ func TestXsAt_NoCallContext(t *testing.T) {
 // TestXsAt_EqualParamsMerged covers the «единая декларация» rule and the
 // deterministic pool-first order (Applied Fixes §1).
 func TestXsAt_EqualParamsMerged(t *testing.T) {
+	t.Parallel()
 	src := "int h(int a) {}\n" + "void r() { h("
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -207,6 +218,7 @@ func TestXsAt_EqualParamsMerged(t *testing.T) {
 // TestXsAt_ActiveNoneOnCallee covers onArg=false: the hint renders with
 // no active parameter.
 func TestXsAt_ActiveNoneOnCallee(t *testing.T) {
+	t.Parallel()
 	src := "void r() { xsVectorSet("
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -220,6 +232,7 @@ func TestXsAt_ActiveNoneOnCallee(t *testing.T) {
 // no highlight beats a wrong highlight (xsCreateFile declares one
 // optional param; the cursor is on the second argument).
 func TestXsAt_ArgIndexBeyondParams(t *testing.T) {
+	t.Parallel()
 	src := "void r() { xsCreateFile(true, false "
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -233,6 +246,7 @@ func TestXsAt_ArgIndexBeyondParams(t *testing.T) {
 // range in labels, flag-attr name-only form, optional bracketing — the
 // RMS rendering contract in one test.
 func TestRmsAt_FullListArgsThenAttrs(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -249,6 +263,7 @@ func TestRmsAt_FullListArgsThenAttrs(t *testing.T) {
 // TestRmsAt_PercentChanceMinedRange covers the contract's canonical RMS
 // example verbatim: structured kind + mined range compose in one label.
 func TestRmsAt_PercentChanceMinedRange(t *testing.T) {
+	t.Parallel()
 	src := "percent_chance 45"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -263,6 +278,7 @@ func TestRmsAt_PercentChanceMinedRange(t *testing.T) {
 // TestRmsAt_ActiveOnAttribute covers the attr active mapping: the
 // len(Args) offset lands on the rendered attribute's own slot.
 func TestRmsAt_ActiveOnAttribute(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3 {\n  spacing 5\n}\n"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -277,6 +293,7 @@ func TestRmsAt_ActiveOnAttribute(t *testing.T) {
 // TestRmsAt_UnknownCommand covers RMS hints being kb-gated: no invented
 // signatures.
 func TestRmsAt_UnknownCommand(t *testing.T) {
+	t.Parallel()
 	src := "create_elefant 5"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -288,6 +305,7 @@ func TestRmsAt_UnknownCommand(t *testing.T) {
 // TestRmsAt_ActiveAttrNotInKb covers a document attribute absent from
 // the kb list: the full list still renders, the active is unset.
 func TestRmsAt_ActiveAttrNotInKb(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3 {\n  number_of_objectz 5\n}\n"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -301,6 +319,7 @@ func TestRmsAt_ActiveAttrNotInKb(t *testing.T) {
 // TestRmsAt_ActiveIndexPassesThrough covers RMS never-clamp: an index
 // beyond the declared args passes through (the client shows no mark).
 func TestRmsAt_ActiveIndexPassesThrough(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 1 2 3"
 	file, _ := rms.Parse(src, "t.rms")
 

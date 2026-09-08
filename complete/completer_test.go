@@ -41,6 +41,7 @@ func newTestCompleter(t *testing.T) *Completer {
 }
 
 func TestCompleter_Contract(t *testing.T) {
+	t.Parallel()
 	c := newTestCompleter(t)
 
 	require.IsType(t, &Completer{}, c)
@@ -51,6 +52,7 @@ func TestCompleter_Contract(t *testing.T) {
 }
 
 func TestRmsAt_CommandNamePosition(t *testing.T) {
+	t.Parallel()
 	src := "<land_generation>\ncreate_land\n</land_generation>\n"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -79,6 +81,7 @@ func TestRmsAt_CommandNamePosition(t *testing.T) {
 }
 
 func TestRmsAt_ArgValuePosition_Constants(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -102,6 +105,7 @@ func TestRmsAt_ArgValuePosition_Constants(t *testing.T) {
 }
 
 func TestRmsAt_AttrNameVsValue(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3 {\n  spacing 5\n}\n"
 	file, _ := rms.Parse(src, "t.rms")
 	c := newTestCompleter(t)
@@ -128,6 +132,7 @@ func TestRmsAt_AttrNameVsValue(t *testing.T) {
 }
 
 func TestRmsAt_GlobalSection_AllCommands(t *testing.T) {
+	t.Parallel()
 	src := "percent_chance 25\n"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -147,6 +152,7 @@ func TestRmsAt_GlobalSection_AllCommands(t *testing.T) {
 }
 
 func TestRmsAt_NoContext_Empty(t *testing.T) {
+	t.Parallel()
 	src := "#include \"a.rms\"\n"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -156,6 +162,7 @@ func TestRmsAt_NoContext_Empty(t *testing.T) {
 }
 
 func TestRmsAt_UnknownOwner_NoAttributes(t *testing.T) {
+	t.Parallel()
 	src := "create_landz 5\n"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -173,6 +180,7 @@ func TestRmsAt_UnknownOwner_NoAttributes(t *testing.T) {
 }
 
 func TestRmsAt_AttributeWithoutValue_DefaultsToName(t *testing.T) {
+	t.Parallel()
 	src := "create_elevation 3 {\n  set_scale_by_size\n}\n"
 	file, _ := rms.Parse(src, "t.rms")
 
@@ -186,6 +194,7 @@ func TestRmsAt_AttributeWithoutValue_DefaultsToName(t *testing.T) {
 }
 
 func TestCompleter_XsAt_Contract(t *testing.T) {
+	t.Parallel()
 	c := newTestCompleter(t)
 
 	file, _ := xs.XsParse("void f() {}", "t.xs")
@@ -194,6 +203,7 @@ func TestCompleter_XsAt_Contract(t *testing.T) {
 }
 
 func TestXsAt_SourceShadowsKb(t *testing.T) {
+	t.Parallel()
 	src := "int xsGetGoal() { return 1; }"
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -215,6 +225,7 @@ func TestXsAt_SourceShadowsKb(t *testing.T) {
 }
 
 func TestXsAt_ExternalDeclsMerged(t *testing.T) {
+	t.Parallel()
 	src := "void main() { }"
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -248,6 +259,7 @@ func TestXsAt_ExternalDeclsMerged(t *testing.T) {
 }
 
 func TestXsAt_VisibleAtFalse_Empty(t *testing.T) {
+	t.Parallel()
 	src := "void f() { string s = \"ab\"; }"
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -257,6 +269,7 @@ func TestXsAt_VisibleAtFalse_Empty(t *testing.T) {
 }
 
 func TestXsAt_SameNameDifferentKinds_BothKept(t *testing.T) {
+	t.Parallel()
 	src := "int foo = 1;"
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -277,6 +290,7 @@ func TestXsAt_SameNameDifferentKinds_BothKept(t *testing.T) {
 }
 
 func TestXsAt_ExternalNoReturnType_DetailWithoutRet(t *testing.T) {
+	t.Parallel()
 	src := "void main() { }"
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -297,6 +311,7 @@ func TestXsAt_ExternalNoReturnType_DetailWithoutRet(t *testing.T) {
 }
 
 func TestXsAt_RuleExcludedExternIsFunction(t *testing.T) {
+	t.Parallel()
 	src := "rule r { condition 1 }\nextern int ex();"
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -316,6 +331,7 @@ func TestXsAt_RuleExcludedExternIsFunction(t *testing.T) {
 }
 
 func TestXsAt_ParamAndLocalEmptyDetail(t *testing.T) {
+	t.Parallel()
 	src := "void f(int p) {\n  int loc = 1;\n  loc = p;\n}\n"
 	file, _ := xs.XsParse(src, "t.xs")
 
@@ -334,6 +350,7 @@ func TestXsAt_ParamAndLocalEmptyDetail(t *testing.T) {
 }
 
 func TestXsAt_ForInitCandidate(t *testing.T) {
+	t.Parallel()
 	src := "void main() {\n" +
 		"  for (int i = 0; i < 10; i++) {\n" +
 		"    i = i + 1;\n" +

@@ -15,10 +15,6 @@ Annotations: |
   annotations: |
     Позиция в исходном файле: zero-based, координаты LSP.
 
-    `line`: zero-based номер строки
-    `column`: zero-based смещение в строке
-    `offset`: байтовое смещение от начала файла
-
     Requirements:
     - сравнение по (line, column); Pos упорядочиваем
 
@@ -36,9 +32,6 @@ Annotations: |
   location: range.go
   annotations: |
     Полуоткрытый промежуток [Start, End).
-
-    `start`: начало, включительно
-    `end`: конец, исключительно
 
     Requirements:
     - End >= Start для корректно построенного диапазона
@@ -60,12 +53,7 @@ Annotations: |
 "Diagnostic(r: Range, severity: int, message: string, code: string)":
   location: diagnostic.go
   annotations: |
-    Проблема в файле: единое представление для rms.Parse, xs.Parse и Analyzer.
-
-    `r`: диапазон, к которому относится проблема
-    `severity`: 1 error / 2 warning / 3 info / 4 hint
-    `message`: человекочитаемый текст
-    `code`: стабильный идентификатор правила ("unknown-command", ...)
+    Проблема в файле: единое представление для rms.Parse, xs.XsParse и Analyzer.
 
     Requirements:
     - code стабилен между релизами — на него опираются тесты
@@ -76,7 +64,7 @@ Annotations: |
     "Range -> Range": |
       Диапазон проблемы.
     "Severity -> int": |
-      Важность: 1..4 по LSP.
+      Важность: 1 error / 2 warning / 3 info / 4 hint (нумерация LSP).
     "Message -> string": |
       Текст проблемы.
     "Code -> string": |
@@ -88,12 +76,6 @@ Annotations: |
     Узел outline-дерева документа: единая форма для xs.Symbols и
     rms.Symbols; потребитель (server) мапит в LSP DocumentSymbol.
 
-    `kind`: вид узла — набор значений у ячейки-производителя
-    (xs: function/variable/rule/event/extern; rms: section/command/xs)
-    `name`: отображаемое имя узла
-    `r`: диапазон узла целиком
-    `selection`: диапазон имени узла
-
     Requirements:
     - Selection ⊆ Range — инвариант LSP SelectionRange, нарушение
       клиенты отбрасывают
@@ -103,7 +85,8 @@ Annotations: |
     - чистый тип данных: construct-and-use, без методов
   properties:
     "Kind -> string": |
-      Вид узла; словарь значений — у ячейки-производителя.
+      Вид узла; словарь значений — у ячейки-производителя
+      (xs: function/variable/rule/event/extern; rms: section/command/xs).
     "Name -> string": |
       Отображаемое имя.
     "Range -> Range": |

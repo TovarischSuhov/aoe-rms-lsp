@@ -7,6 +7,7 @@ import (
 )
 
 func TestSymbol_FieldsAndShape(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		sym  Symbol

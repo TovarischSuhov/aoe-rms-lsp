@@ -1,8 +1,15 @@
 # Build Plan: aoe2-lsp (LSP server for AoE2 RMS + XS)
 
+> **Status: реализовано** (все чекбоксы отмечены по факту сделанного).
+> План описывал стартовые шесть ячеек; проект вырос до девяти —
+> продолжения: `docs/tasks/lsp-navigation.md` (навигация),
+> `docs/tasks/cross-file-navigation.md` (include-замыкание),
+> `docs/tasks/analysis-deepening.md` (значения/типы),
+> signature help и completion-фичи (PR #5–#6).
+
 ## Overview
 
-- [ ] Реализовать LSP-сервер `aoe2-lsp` на Go по контрактам CODEMANIFEST шести
+- [x] Реализовать LSP-сервер `aoe2-lsp` на Go по контрактам CODEMANIFEST шести
       ячеек: common, kb, rms, xs, analysis, server
 
 ## Context
@@ -15,7 +22,7 @@
 - **Авторитетный план архитектуры**: `docs/arch/lsp-rms-xs.md` (порядок,
   зависимости, полные контракты, диаграмма).
 - **Практики проекта**: `.goga/usages/conventions.md` (обязательные правила
-  Go: 1.23+, goimports, DI-конструкторы, context-first, `%w`, slog,
+  Go: 1.26+, goimports, DI-конструкторы, context-first, `%w`, slog,
   testify/cmp, table-driven тесты), `.goga/usages/rms-grammar.md`,
   `.goga/usages/xs-grammar.md` (грамматики языков),
   `.goga/usages/cooks/lsp-protocol.md` (паттерны go.lsp.dev для server).
@@ -36,105 +43,105 @@
 
 ## Success criteria
 
-- [ ] `go test ./...` зелёный, `golangci-lint run` без замечаний
-- [ ] `goga contract` проходит для всех шести ячеек
-- [ ] XS-парсер разбирает `docs/ref/ugc-guide/xs/prelude.xs` без ложных ошибок
-- [ ] RMS-парсер разбирает реальные RMS-фикстуры без ложных ошибок
-- [ ] Completion возвращает все 204 XS-функции из kb
-- [ ] Диагностика (unknown-command, unknown-attribute, undefined-symbol,
+- [x] `go test ./...` зелёный, `golangci-lint run` без замечаний
+- [x] `goga contract` проходит для всех шести ячеек
+- [x] XS-парсер разбирает `docs/ref/ugc-guide/xs/prelude.xs` без ложных ошибок
+- [x] RMS-парсер разбирает реальные RMS-фикстуры без ложных ошибок
+- [x] Completion возвращает все 204 XS-функции из kb
+- [x] Диагностика (unknown-command, unknown-attribute, undefined-symbol,
       bad-arity, deprecated-effect-percent) выдаётся с корректными range
-- [ ] Бинарник `aoe2-lsp` стартует по stdio и отвечает на initialize/hover/
+- [x] Бинарник `aoe2-lsp` стартует по stdio и отвечает на initialize/hover/
       completion/didChange-диагностику (проверка LSP-клиентом из теста)
 
 ## Task sections
 
 ### Task 1: Ячейка common — позиции и диагностика
 
-- [ ] Прочитать `common/CODEMANIFEST` и `common/.usages/positions-and-diagnostics.md`
-- [ ] Реализовать `common/pos.go` (Pos: Line, Column, Offset; упорядоченность),
+- [x] Прочитать `common/CODEMANIFEST` и `common/.usages/positions-and-diagnostics.md`
+- [x] Реализовать `common/pos.go` (Pos: Line, Column, Offset; упорядоченность),
       `common/range.go` (Range + Contains), `common/diagnostic.go`
       (Diagnostic + константы Severity 1..4)
-- [ ] Table-driven тесты: упорядоченность Pos, Contains (границы/вне/на концах),
+- [x] Table-driven тесты: упорядоченность Pos, Contains (границы/вне/на концах),
       инвариант severity
-- [ ] `go test ./common/...`, `goimports -w .`, `golangci-lint run`,
+- [x] `go test ./common/...`, `goimports -w .`, `golangci-lint run`,
       `goga lint`, `goga contract common` — все зелёные
 
 ### Task 2: Ячейка kb — база знаний
 
-- [ ] Прочитать `kb/CODEMANIFEST` (включая inline-практику `kbdata`),
+- [x] Прочитать `kb/CODEMANIFEST` (включая inline-практику `kbdata`),
       `kb/.usages/lookups.md`, `kb/.usages/data-pipeline.md`
-- [ ] Реализовать `kb/model.go` (Function, Param, Constant, Command,
+- [x] Реализовать `kb/model.go` (Function, Param, Constant, Command,
       CommandArg) и `kb/store.go` (NewStore: go:embed + валидация схемы,
       дубликатов, пустых имён; 7 lookup-методов)
-- [ ] Сгенерировать `kb/data/xs-functions.json` (адаптация
+- [x] Сгенерировать `kb/data/xs-functions.json` (адаптация
       docs/ref/ugc-guide/xs/functions/functions.json: категории развёрнуты,
       поля name/category/return_type/params/desc/since_update; 204 записи)
       и `kb/data/xs-constants.json` (name/section/value/desc/since_update)
-- [ ] Реализовать `kb/extract.go` — ExtractRmsCommands(path) по Algorithm из
+- [x] Реализовать `kb/extract.go` — ExtractRmsCommands(path) по Algorithm из
       контракта (Zetnus txt → []Command); сгенерировать
       `kb/data/rms-commands.json` (обогащение since_update из changelog)
-- [ ] Тесты: NewStore валидация (дубликат/пустое имя → ошибка), все lookup-ы
+- [x] Тесты: NewStore валидация (дубликат/пустое имя → ошибка), все lookup-ы
       (found/не found), счётчики (204 функции; константы 27 секций)
-- [ ] `go test ./kb/...`, `goimports -w .`, `golangci-lint run`,
+- [x] `go test ./kb/...`, `goimports -w .`, `golangci-lint run`,
       `goga lint`, `goga contract kb` — зелёные
 
 ### Task 3: Ячейка rms — парсер RMS
 
-- [ ] Прочитать `rms/CODEMANIFEST`, `rms/.usages/rms-parsing.md`,
+- [x] Прочитать `rms/CODEMANIFEST`, `rms/.usages/rms-parsing.md`,
       `.goga/usages/rms-grammar.md`
-- [ ] Реализовать `rms/parse.go` (лексер + Parse с recovery по Algorithm из
+- [x] Реализовать `rms/parse.go` (лексер + Parse с recovery по Algorithm из
       контракта) и `rms/ast.go` (RmsFile, Section, Statement, Attribute,
       Expr, XsBlock + SectionAt/StatementAt)
-- [ ] Фикстуры в `rms/testdata/`: минимум 6 .rms-файлов, покрывающих секции,
+- [x] Фикстуры в `rms/testdata/`: минимум 6 .rms-файлов, покрывающих секции,
       позиционную семантику атрибутов, start_random/percent_chance,
       if/elseif/else, DE-выражения с операторами и float, #include,
       #includeXS-блок, повреждённый вход (recovery)
-- [ ] Тесты: все фикстуры парсятся с ожидаемым набором диагностик;
+- [x] Тесты: все фикстуры парсятся с ожидаемым набором диагностик;
       StatementAt возвращает команду-владельца для позиции на атрибуте;
       Parse никогда не возвращает nil-файл
-- [ ] `go test ./rms/...`, `goimports -w .`, `golangci-lint run`,
+- [x] `go test ./rms/...`, `goimports -w .`, `golangci-lint run`,
       `goga lint`, `goga contract rms` — зелёные
 
 ### Task 4: Ячейка xs — парсер XS
 
-- [ ] Прочитать `xs/CODEMANIFEST`, `xs/.usages/xs-parsing.md`,
+- [x] Прочитать `xs/CODEMANIFEST`, `xs/.usages/xs-parsing.md`,
       `.goga/usages/xs-grammar.md`
-- [ ] Реализовать `xs/parse.go` (XsParse с recovery) и `xs/ast.go`
+- [x] Реализовать `xs/parse.go` (XsParse с recovery) и `xs/ast.go`
       (XsFile + SymbolAt, Decl, Param, Stmt, Expr)
-- [ ] Фикстуры: `docs/ref/ugc-guide/xs/prelude.xs` (тест: 0 ложных ошибок) +
+- [x] Фикстуры: `docs/ref/ugc-guide/xs/prelude.xs` (тест: 0 ложных ошибок) +
       `xs/testdata/`: функции, правила/события, vector-литералы,
       switch/for/while, обрезанный вход
-- [ ] Тесты: prelude.xs без ложных ошибок; SymbolAt на call возвращает
+- [x] Тесты: prelude.xs без ложных ошибок; SymbolAt на call возвращает
       callee; recovery на обрезанном входе
-- [ ] `go test ./xs/...`, `goimports -w .`, `golangci-lint run`,
+- [x] `go test ./xs/...`, `goimports -w .`, `golangci-lint run`,
       `goga lint`, `goga contract xs` — зелёные
 
 ### Task 5: Ячейка analysis — семантические проверки
 
-- [ ] Прочитать `analysis/CODEMANIFEST`, `analysis/.usages/checks.md`,
+- [x] Прочитать `analysis/CODEMANIFEST`, `analysis/.usages/checks.md`,
       `kb/.usages/lookups.md`
-- [ ] Реализовать `analysis/analyzer.go` (NewAnalyzer, AnalyzeRms,
+- [x] Реализовать `analysis/analyzer.go` (NewAnalyzer, AnalyzeRms,
       AnalyzeXs по Algorithm из контракта; коды: unknown-command,
       unknown-section, unknown-attribute, bad-argument,
       deprecated-effect-percent, undefined-symbol, bad-arity)
-- [ ] Тесты: каждая проверка покрывается позитивным и негативным случаем;
+- [x] Тесты: каждая проверка покрывается позитивным и негативным случаем;
       диангностики отсортированы; AST не мутируется
-- [ ] `go test ./analysis/...`, `goimports -w .`, `golangci-lint run`,
+- [x] `go test ./analysis/...`, `goimports -w .`, `golangci-lint run`,
       `goga lint`, `goga contract analysis` — зелёные
 
 ### Task 6: Ячейка server + бинарник + README
 
-- [ ] Прочитать `server/CODEMANIFEST`, `server/.usages/lifecycle.md`,
+- [x] Прочитать `server/CODEMANIFEST`, `server/.usages/lifecycle.md`,
       `.goga/usages/cooks/lsp-protocol.md`
-- [ ] Реализовать `server/docstore.go`, `server/server.go`
+- [x] Реализовать `server/docstore.go`, `server/server.go`
       (protocol.UnimplementedServer + методы Initialize/DidOpen/DidChange/
       DidClose/Hover/Completion/Shutdown/Exit), `server/serve.go` (Serve)
-- [ ] `cmd/aoe2-lsp/main.go` — точка входа (вызов Serve, slog, exit code)
-- [ ] Интеграционный тест: LSP-клиент из теста стартует сервер по stdio,
+- [x] `cmd/aoe2-lsp/main.go` — точка входа (вызов Serve, slog, exit code)
+- [x] Интеграционный тест: LSP-клиент из теста стартует сервер по stdio,
       initialize → didOpen(.rms с unknown-command) → publishDiagnostics
       содержит код unknown-command; hover возвращает сигнатуру xsGetMapSeed;
       completion возвращает 204 функции
-- [ ] README: секция установки/запуска + конфиги Neovim (lspconfig,
+- [x] README: секция установки/запуска + конфиги Neovim (lspconfig,
       filetypes aoe2rms/aoe2xs) и VS Code (generic LSP extension)
-- [ ] `go test ./...`, `goimports -w .`, `golangci-lint run`,
+- [x] `go test ./...`, `goimports -w .`, `golangci-lint run`,
       `goga lint`, `goga contract server` — зелёные; `go build ./cmd/aoe2-lsp`

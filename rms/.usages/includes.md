@@ -32,10 +32,3 @@ Preconditions:
 inc.Range.Contains(pos) reports whether a cursor sits on the include
 path — the trigger for go-to-definition into the target file.
 
-## By-name references
-
-```go
-for _, r := range file.References(name) { ... }
-// every word-token equal to name (section/command/attribute/ident words),
-// sorted by position; ReferencesAt(pos) ≡ References(word under pos)
-```

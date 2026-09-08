@@ -20,7 +20,8 @@ var (
 	_ func(store *kb.Store, env *TypeEnv, e xs.Expr) string  = InferType
 )
 
-func TestCoerce_Table(t *testing.T) {
+func TestCoerce_ValueShapes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		expected string
@@ -47,6 +48,7 @@ func TestCoerce_Table(t *testing.T) {
 }
 
 func TestTypeEnv_ScopeShadowing(t *testing.T) {
+	t.Parallel()
 	file := xs.XsFile{Decls: []xs.Decl{
 		{Kind: xs.DeclVariable, Name: "x", Type: "int"},
 		{Kind: xs.DeclFunction, Name: "f", Type: "void", Params: []xs.Param{{Name: "x", Type: "float"}}},
@@ -99,6 +101,7 @@ func TestTypeEnv_ScopeShadowing(t *testing.T) {
 }
 
 func TestTypeEnv_PopRootNoOp(t *testing.T) {
+	t.Parallel()
 	env := NewTypeEnv(xs.XsFile{Decls: []xs.Decl{
 		{Kind: xs.DeclVariable, Name: "x", Type: "int"},
 	}})
@@ -112,6 +115,7 @@ func TestTypeEnv_PopRootNoOp(t *testing.T) {
 }
 
 func TestTypeEnv_Undeclared(t *testing.T) {
+	t.Parallel()
 	env := NewTypeEnv(xs.XsFile{})
 
 	env.Declare("tmp", "int")
@@ -127,6 +131,7 @@ func TestTypeEnv_Undeclared(t *testing.T) {
 }
 
 func TestInferType_Literals(t *testing.T) {
+	t.Parallel()
 	env := NewTypeEnv(xs.XsFile{Decls: []xs.Decl{
 		{Kind: xs.DeclVariable, Name: "n", Type: "int"},
 	}})
@@ -157,6 +162,7 @@ func TestInferType_Literals(t *testing.T) {
 }
 
 func TestInferType_CallFromKb(t *testing.T) {
+	t.Parallel()
 	store, err := kb.NewStore()
 	require.NoError(t, err)
 
@@ -182,6 +188,7 @@ func TestInferType_CallFromKb(t *testing.T) {
 }
 
 func TestInferType_Operators(t *testing.T) {
+	t.Parallel()
 	store, err := kb.NewStore()
 	require.NoError(t, err)
 

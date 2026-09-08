@@ -113,17 +113,20 @@ Annotations: |
       согласовать positionEncoding (utf-8 при поддержке клиентом).
     "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |
       Algorithm:
-      1. DocStore.Put(uri, text, version)
+      1. Сохранить текст и версию документа в `DocStore`
       2. Пересчитать диагностики (общая функция с DidChange):
          вычислить `Closure` для uri; записи `MissingInclude` с Owner==uri →
          Diagnostic (code="missing-include", range директивы); RMS:
-         синтаксис + AnalyzeRms; inline XsBlock: XsParse + AnalyzeXs(xsFile,
-         ExternalDecls("")); .xs: AnalyzeXs(file, ExternalDecls(uri))
+         синтаксис + `Analyzer`; inline `XsBlock`: пропустить код через
+         `XsParse` и передать в `Analyzer` с внешними декларациями
+         замыкания (пустыми для inline-блока); .xs: `Analyzer` с внешними
+         декларациями замыкания uri
       3. PublishDiagnostics по `lsp-protocol` (одна пачка)
     "DidChange(ctx: Context, params: DidChangeTextDocumentParams) -> err: error": |
       Algorithm:
       1. Взять весь текст из ContentChanges (WholeDocument)
-      2. DocStore.Put; пересчитать (как в DidOpen); PublishDiagnostics
+      2. Сохранить в `DocStore`; пересчитать (как в DidOpen);
+         PublishDiagnostics
     "DidClose(ctx: Context, params: DidCloseTextDocumentParams) -> err: error": |
       DocStore.Remove(uri); опубликовать пустой список диагностик.
     "Hover(ctx: Context, params: HoverParams) -> hover: Hover, err: error": |
@@ -139,11 +142,12 @@ Annotations: |
 
       Algorithm:
       1. Язык по расширению URI (общий шаблон Hover/SignatureHelp)
-      2. .xs: XsParse(text) + Closure(uri).ExternalDecls(uri) →
-         completer.XsAt(file, pos, decls)
-      3. .rms: Parse(text); позиция внутри XsBlock (Range.Contains) →
-         трансляция в block-local координаты + XsParse(block.Code) +
-         ExternalDecls("") → XsAt; иначе completer.RmsAt(file, pos)
+      2. .xs: разобрать через `XsParse`; внешние декларации из `Closure`
+         uri → получить кандидатов у `Completer` для позиции
+      3. .rms: разобрать через `Parse`; позиция внутри `XsBlock` →
+         перевести в координаты блока, пропустить код через `XsParse`
+         и получить кандидатов у `Completer` (внешние декларации
+         замыкания — пустые); иначе кандидаты у `Completer` для позиции
       4. `Candidate`-список → []CompletionItem по `lsp-protocol`
          (Completion Items): Label; Kind по таблице; Detail; SortText=Sort;
          InsertText опущен; InsertTextFormat plain text
@@ -159,14 +163,13 @@ Annotations: |
 
       Algorithm:
       1. Язык по расширению URI (общий шаблон с Hover)
-      2. .xs: XsParse(text) + Closure(uri).ExternalDecls(uri) →
-         computer.XsAt(file, pos, decls)
-      3. .rms: Parse(text); external = Closure(uri).ExternalDecls("")
-         (как DidOpen для inline-блоков); позиция внутри XsBlock
-         (Range.Contains) →
-         трансляция в block-local координаты (шаблон include.Definition) +
-         XsParse(block.Code) → computer.XsAt(xsFile, blockPos, external);
-         иначе computer.RmsAt(file, pos)
+      2. .xs: разобрать через `XsParse`; внешние декларации из `Closure`
+         uri → получить хинт у `Computer` для позиции
+      3. .rms: разобрать через `Parse`; внешние декларации замыкания —
+         пустые (как DidOpen для inline-блоков); позиция внутри `XsBlock` →
+         перевести в координаты блока (шаблон include.Definition), пропустить
+         код через `XsParse` и получить хинт у `Computer`; иначе хинт у
+         `Computer` для позиции
       4. `Hint` → protocol.SignatureInformation по `lsp-protocol` (Signature Help):
          Label=hint.Label; Parameters — метки строкой; Documentation опускается;
          ровно одна сигнатура, ActiveSignature=0; ActiveParameter=uint32(active)
@@ -253,7 +256,8 @@ Annotations: |
     1. Собрать зависимости: NewStore, NewAnalyzer, NewComputer(store)
        из hints, NewCompleter(store) из complete,
        Server(store, analyzer, computer, completer), DocStore
-    2. protocol.NewServer(ctx, srv, stream); ждать conn.Done()
+    2. Поднять сервер протокола по `lsp-protocol` и дождаться
+       завершения соединения
 
 ---
 

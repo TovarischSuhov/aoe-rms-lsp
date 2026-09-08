@@ -124,12 +124,6 @@ Annotations: |
   annotations: |
     Протоколо-независимый кандидат completion (чистые данные, стиль Hint).
 
-    `label`: текст кандидата; `kind`: вид из словаря command /
-    attribute / constant / function / variable / param / local;
-    `detail`: одна строка (секция / границы / мини-сигнатура / значение;
-    пустая — когда данные недоступны); `sort`: основа SortText —
-    детерминированный порядок групп контекста
-
     Requirements:
     - чистые данные: construct-and-use, без мутации
     - маппинг kind в CompletionItemKind — ответственность server
@@ -140,9 +134,10 @@ Annotations: |
       Вид: command / attribute / constant / function / variable /
       param / local.
     "Detail -> string": |
-      Одна строка описания; пустая — когда данные недоступны.
+      Одна строка: секция / границы / мини-сигнатура / значение;
+      пустая — когда данные недоступны.
     "Sort -> string": |
-      Основа SortText: группа контекста + Label.
+      Основа SortText: детерминированный порядок групп контекста + Label.
 
 ---
 
