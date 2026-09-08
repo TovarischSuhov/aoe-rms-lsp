@@ -11,6 +11,13 @@ analysis → type map → type detail → cell distribution → contracts →
 assembly; каждый гейт утверждён пользователем). Вход — `task.md`
 топика (сформулирован через `/goga-propose`).
 
+Материализация (2026-09-08, `goga lint` 9/0): коллизии имён с hints
+решены переименованиями — тип `Completer` (не `Computer`), файл
+`completer.go`, usage `completing.md` (не `computing.md`); аннотации
+дополнены бэктиками на импортированные типы (`ArgSite`, `Statement`,
+`Attribute`, `Expr`, `Command`, `Symbol`). План ниже отражает
+материализованное состояние.
+
 ## Implementation Order
 
 1. **`xs`** *(modify)* — лист: импортирует только `common`; метод
@@ -139,7 +146,7 @@ Annotations: |
   Use `xs-parsing` from Imports для семантики VisibleAt.
   Use `rms-parsing` from Imports для семантики ArgAt/SectionAt.
   Use `positions-and-diagnostics` from Imports для Pos.
-  Use `symbols` from Imports для Symbol (visible-набор).
+  Use `symbols` from Imports для `Symbol` (visible-набор).
 
   Ячейка вычисляет кандидатов completion над готовыми AST и kb:
   stateless — результат зависит только от аргументов метода;
@@ -150,13 +157,13 @@ Annotations: |
 
 ---
 
-"Computer(store: Store)":
-  location: computer.go
+"Completer(store: Store)":
+  location: completer.go
   annotations: |
     Вычислитель кандидатов completion: контекстная матрица RMS +
     пул видимых символов XS + рендер.
 
-    `store`: база знаний (DI; NewComputer)
+    `store`: база знаний (DI; NewCompleter)
 
     Requirements:
     - stateless: без мутабельного состояния между вызовами
@@ -171,15 +178,16 @@ Annotations: |
       1. ArgAt по `rms-parsing` не нашёл владельца → SectionAt: секция
          есть → команды секции (Store.Commands; синтетическая "global" →
          Commands("") — все); нет → пусто
-      2. ArgSite.Kind=none (имя команды/хвост/неоднозначно) → команды
-         секции (как шаг 1) + атрибуты команды-владельца: Store.Command
-         по ArgSite.Stmt.Name → Attributes; нет в kb → без атрибутов
-      3. ArgSite.Kind=arg → константы: Store.Constants("")
-      4. ArgSite.Kind=attr → по диапазонам атрибута: `pos` в
-         Attribute.Value.Range → константы; иначе (на имени) →
-         атрибуты владельца (как шаг 2)
+      2. `ArgSite`.Kind=none (имя команды/хвост/неоднозначно) → команды
+         секции (как шаг 1) + атрибуты команды-владельца: `Command`
+         lookup в Store по имени владельца (`Statement` из
+         `ArgSite`.Stmt) → Attributes; нет в kb → без атрибутов
+      3. `ArgSite`.Kind=arg → константы: Store.Constants("")
+      4. `ArgSite`.Kind=attr → по диапазонам атрибута: `pos` в
+         `Attribute`.Value (`Expr`).Range → константы; иначе (на
+         имени) → атрибуты владельца (как шаг 2)
       5. Рендер: Kind = command/attribute/constant; Detail: команда →
-         Command.Section; атрибут (`CommandArg`) → «Kind Min..Max» при
+         `Command`.Section; атрибут (`CommandArg`) → «Kind Min..Max» при
          непустом `ValueRange`, иначе «Kind», флаги (пустой Kind) →
          пусто; константа → Constant.Value; Sort = группа (атрибуты 0,
          команды 1, константы 2) + Label
@@ -250,7 +258,7 @@ Description: |
   над kb/xs/rms.
 ```
 
-**`.usages` `complete/.usages/computing.md`** — create:
+**`.usages` `complete/.usages/completing.md`** — create:
 
 ````markdown
 # Complete Computing — consuming the complete cell
@@ -260,7 +268,7 @@ Target audience: implementers of the server cell (the LSP handler).
 
 ## Construct once, share everywhere
 
-completer := complete.NewComputer(store) // kb.Store via constructor DI
+completer := complete.NewCompleter(store) // kb.Store via constructor DI
 
 ## RMS candidates at a position
 
@@ -296,10 +304,10 @@ Preconditions:
 
 ```yaml
   - Types:
-      - Computer AS Completer
+      - Completer
       - Candidate
     Usages:
-      - computing
+      - completing
     From: complete
 ```
 
@@ -310,9 +318,9 @@ Preconditions:
   молчание found=false → nil, nil (конвенция Hover); триггеры «(» и «,»
   не пересекаются с completion'ыми « » и «<».
 
-  Use `computing` from Imports (complete) для вычисления кандидатов
-  completion: пустой []Candidate → CompletionList с пустыми items,
-  не nil и не ошибка. Kind-маппинг Candidate.Kind → CompletionItemKind
+  Use `completing` from Imports (complete) для вычисления кандидатов
+  completion: пустой `Candidate`-список → CompletionList с пустыми
+  items, не nil и не ошибка. Kind-маппинг `Candidate`.Kind → CompletionItemKind
   (таблица паритетна DocumentSymbol): command→Function,
   attribute→Field, constant→Constant, function→Function,
   variable→Variable, param→Variable, local→Variable. Существующий
@@ -344,8 +352,8 @@ Preconditions:
       3. .rms: Parse(text); позиция внутри XsBlock (Range.Contains) →
          трансляция в block-local координаты + XsParse(block.Code) +
          ExternalDecls("") → XsAt; иначе completer.RmsAt(file, pos)
-      4. []Candidate → []CompletionItem по `lsp-protocol` (Completion
-         Items): Label; Kind по таблице; Detail; SortText=Sort;
+      4. `Candidate`-список → []CompletionItem по `lsp-protocol`
+         (Completion Items): Label; Kind по таблице; Detail; SortText=Sort;
          InsertText опущен; InsertTextFormat plain text
       5. Пусто → CompletionList с пустыми items (не nil, не ошибка)
 
@@ -355,8 +363,8 @@ Preconditions:
 ```
 
 5. Метод `Serve` — Algorithm шаг 1 дополнить сборкой
-   `NewComputer(store)` из complete (DI-имя `Completer`) рядом с
-   `NewComputer(store)` из hints.
+   `NewCompleter(store)` из complete рядом с `NewComputer(store)`
+   из hints.
 
 `Initialize` — без изменений (capability `CompletionProvider`
 с триггерами « » и «<» уже заявлена).
@@ -372,7 +380,7 @@ kb ─────┤ (Store, Function, Command, CommandArg, Constant,
 rms ────┤ (RmsFile, ArgSite, Statement, Attribute, Expr, rms-parsing)
 xs ─────┘ (XsFile, Decl, xs-parsing)          [xs += VisibleAt]
 
-complete ──(Computer AS Completer, Candidate, computing)──> server
+complete ──(Completer, Candidate, completing)──────────────> server
 hints ────(Computer, Hint, computing)───────────────────────┘
 ```
 
@@ -386,7 +394,7 @@ hints ────(Computer, Hint, computing)───────────�
 - [ ] `goga lint` — 0 ошибок по всем ячейкам
 - [ ] `goga contract xs` — exit 0 (VisibleAt сигнатура совпадает:
       `(pos: Pos) -> (visible: []Symbol, found: bool)`)
-- [ ] `goga contract complete` — exit 0 (`NewComputer(store)`,
+- [ ] `goga contract complete` — exit 0 (`NewCompleter(store)`,
       `RmsAt`/`XsAt`-ресиверы, `Candidate`-структ с 4 полями)
 - [ ] `goga contract server` — exit 0 (DI-параметр completer,
       пере-аннотированный `Completion`)

@@ -30,6 +30,12 @@ Imports:
       - computing
     From: hints
   - Types:
+      - Completer
+      - Candidate
+    Usages:
+      - completing
+    From: complete
+  - Types:
       - Symbol
     Usages:
       - symbols
@@ -75,15 +81,25 @@ Annotations: |
   молчание found=false → nil, nil (конвенция Hover); триггеры «(» и «,»
   не пересекаются с completion'ыми « » и «<».
 
+  Use `completing` from Imports (complete) для вычисления кандидатов
+  completion: пустой `Candidate`-список → CompletionList с пустыми
+  items, не nil и не ошибка. Kind-маппинг `Candidate`.Kind → CompletionItemKind
+  (таблица паритетна DocumentSymbol): command→Function,
+  attribute→Field, constant→Constant, function→Function,
+  variable→Variable, param→Variable, local→Variable. Существующий
+  MVP-алгоритм Completion (прямые Store-запросы в server) упраздняется —
+  вычисление уходит в complete.
+
 ---
 
-"Server(store: Store, analyzer: Analyzer, computer: Computer)":
+"Server(store: Store, analyzer: Analyzer, computer: Computer, completer: Completer)":
   location: server.go
   annotations: |
-    LSP-сервер: протокол поверх kb/rms/xs/analysis/hints.
+    LSP-сервер: протокол поверх kb/rms/xs/analysis/hints/complete.
 
     `store`: база знаний; `analyzer`: семантические проверки;
-    `computer`: вычислитель хинтов (DI)
+    `computer`: вычислитель хинтов; `completer`: вычислитель
+    кандидатов completion (DI)
 
     Requirements:
     - паттерны протокола строго по `lsp-protocol` (UnimplementedServer, Full sync)
@@ -116,10 +132,26 @@ Annotations: |
          GameVersions/SinceUpdate); для .xs: SymbolAt → Store.Function
       2. nil, nil когда под курсором ничего нет
     "Completion(ctx: Context, params: CompletionParams) -> result: CompletionResult, err: error": |
+      Кандидаты для позиции в документе (stateless, read-only).
+
+      `params`: позиция и контекст запроса; `result`: список кандидатов
+      (возможно пустой — не ошибка)
+
       Algorithm:
-      1. .rms: SectionAt → Store.Commands(section) + константы;
-         .xs: префикс слова → Store.Functions + Store.Constants
-      2. CompletionList: label, kind, detail=сигнатура, documentation=desc
+      1. Язык по расширению URI (общий шаблон Hover/SignatureHelp)
+      2. .xs: XsParse(text) + Closure(uri).ExternalDecls(uri) →
+         completer.XsAt(file, pos, decls)
+      3. .rms: Parse(text); позиция внутри XsBlock (Range.Contains) →
+         трансляция в block-local координаты + XsParse(block.Code) +
+         ExternalDecls("") → XsAt; иначе completer.RmsAt(file, pos)
+      4. `Candidate`-список → []CompletionItem по `lsp-protocol`
+         (Completion Items): Label; Kind по таблице; Detail; SortText=Sort;
+         InsertText опущен; InsertTextFormat plain text
+      5. Пусто → CompletionList с пустыми items (не nil, не ошибка)
+
+      Requirements:
+      - stateless: TriggerKind/TriggerCharacter/IsRetrigger не влияют
+      - read-only (R10); существующие хендлеры не меняются (SC8)
     "SignatureHelp(ctx: Context, params: SignatureHelpParams) -> help: SignatureHelp, err: error": |
       Параметрические хинты для позиции в документе (stateless, read-only).
 
@@ -218,8 +250,9 @@ Annotations: |
     `ctx`: контекст процесса; `err`: причина завершения
 
     Algorithm:
-    1. Собрать зависимости: NewStore, NewAnalyzer, NewComputer(store),
-       Server(store, analyzer, computer), DocStore
+    1. Собрать зависимости: NewStore, NewAnalyzer, NewComputer(store)
+       из hints, NewCompleter(store) из complete,
+       Server(store, analyzer, computer, completer), DocStore
     2. protocol.NewServer(ctx, srv, stream); ждать conn.Done()
 
 ---

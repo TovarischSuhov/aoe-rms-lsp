@@ -89,3 +89,28 @@ Preconditions:
 - ArgIndex may exceed the declared parameter count — the consumer decides
   (signature-help policy: never clamp, show no active parameter instead).
 
+## Visible symbols (completion)
+
+VisibleAt answers "which named symbols can be referenced at this
+position" — for completion providers. It combines file-scope
+declarations with the parameters and locals of the function enclosing
+the cursor.
+
+```go
+if syms, ok := xsFile.VisibleAt(pos); ok {
+    // ok=false → cursor inside a string or comment: render nothing.
+    // sym.Kind — "function" | "variable" | "rule" | "event" | "extern"
+    //             | "param" | "local"; sym.Name — the symbol name
+    // pair with kb functions/constants for the full candidate set;
+    // the consumer decides priority when one name appears twice
+}
+```
+
+Preconditions:
+- Parse the document first; visibility answers from the body index
+  recorded at parse time.
+- Shadowing is not resolved: an outer top-level `int x` and an inner
+  `float x` both come back — deduplication policy belongs to the
+  consumer.
+- `include` declarations are skipped (not name-bearing for completion).
+
