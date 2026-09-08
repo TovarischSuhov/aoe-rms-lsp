@@ -1,5 +1,7 @@
 # LSP Server for AoE2 RMS + XS
 
+Status: Done — первичная сборка шести ячеек (см. план docs/plans/build-lsp-rms-xs.md); продолжения PR #3–#6
+
 ## Current State
 
 Project repository is empty except for `.goga/` config (Go 1.26 image, `conventions` usage mandatory). No code, no cells, `goga schema` returns `[]`.

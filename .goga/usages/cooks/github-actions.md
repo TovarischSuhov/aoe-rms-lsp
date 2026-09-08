@@ -84,6 +84,11 @@ CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build \
   -o "aoe2-lsp-${GOOS}-${GOARCH}${EXT}" ./cmd/aoe2-lsp
 ```
 
+A single job building the targets sequentially is an accepted variant for
+small modules — it produces the same archives and avoids artifact passing
+between matrix jobs (this repo's release.yml uses it; add `-trimpath` for
+reproducible builds).
+
 Upload archives + a combined `SHA256SUMS` to the release created with
 `gh release create "$GITHUB_REF_NAME" --generate-notes`.
 

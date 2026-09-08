@@ -1,6 +1,6 @@
 # aoe_maps / aoe2-lsp
 
-LSP-сервер `aoe2-lsp` для AoE2 RMS + XS (Go 1.23+, module `aoe2-lsp`).
+LSP-сервер `aoe2-lsp` для AoE2 RMS + XS (Go 1.26+, module `aoe2-lsp`).
 Авторитетный план — `docs/plans/build-lsp-rms-xs.md`, контракты ячеек —
 `CODEMANIFEST` в каждой директории (.goga).
 
@@ -37,7 +37,7 @@ Race-прогон — в CI (`go test -race ./...`).
 - Публичная поверхность ячейки — её `CODEMANIFEST` (read-only в кодовых
   задачах). Принимай интерфейсы (`Source`), возвращай структуры.
 - Тесты table-driven, same package; `t.Parallel()` для новых тестов без
-  общего состояния.
+  общего состояния. Тесты для тривиальных функций и методов не нужны.
 - `any` вместо `interface{}`; без `github.com/pkg/errors` и `io/ioutil`.
 - Комментарий — «почему», не пересказ кода; doc-комментарий обязателен
   на экспортах (`.goga/usages/conventions.md`).
@@ -50,7 +50,8 @@ Race-прогон — в CI (`go test -race ./...`).
   `complete`, `include`, `server` — контракт каждой в её `CODEMANIFEST`,
   потребительские практики в `<cell>/.usages/`
 - `docs/` — планы, дизайн, задачи, ревью, справочники
-- `testdata/` — фикстуры ячеек
+- `<cell>/testdata/` — фикстуры ячеек (сейчас `rms/testdata`, `xs/testdata`;
+  корневого `testdata/` нет)
 
 ## Git-политика (переопределение глобальной)
 

@@ -1,5 +1,7 @@
 # Navigation in aoe2-lsp (definition / references / documentSymbol)
 
+Status: Done — PR #3 (task/lsp-navigation)
+
 ## Current State
 
 MVP `aoe2-lsp` реализует только diagnostics + hover + completion. В контракте

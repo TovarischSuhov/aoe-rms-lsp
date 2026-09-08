@@ -1,5 +1,7 @@
 # Углубление analysis: значения аргументов RMS и типы XS
 
+Status: Done — влито в master; регрессии — PR #12
+
 ## Current State
 
 Ячейка `analysis` реализована по базовому плану (`docs/plans/build-lsp-rms-xs.md`,

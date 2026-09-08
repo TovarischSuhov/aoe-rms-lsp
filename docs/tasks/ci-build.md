@@ -1,5 +1,7 @@
 # CI: Cross-Platform Build & Release (win/mac/linux)
 
+Status: Done — PR #1 (task/ci-checks), PR #2 (task/ci-release)
+
 ## Current State
 
 Repository lives on GitHub (`TovarischSuhov/aoe-rms-lsp`, branch `master`) with **no CI at all** — no `.github/` directory, no workflows. All validation (`goimports`, `go test`, `golangci-lint`) runs manually on the author's Linux machine.
