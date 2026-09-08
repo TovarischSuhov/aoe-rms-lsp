@@ -1,0 +1,259 @@
+Usages:
+  conventions: .goga/usages/conventions.md
+  kbdata: |
+    Embedded knowledge base files under internal/kb/data/ (go:embed, no runtime downloads):
+    - xs-functions.json  — adapted from docs/ref/ugc-guide/xs/functions/functions.json
+      (categories flattened; fields: name, category, return_type, params[], desc, since_update)
+    - xs-constants.json — from constants/constants.json (fields: name, section, value, desc, since_update)
+    - rms-commands.json — extracted from docs/ref/zetnus-rms-guide.txt
+      (fields: name, section, args[], attributes[], desc, game_versions, since_update)
+    since_update sourced from docs/ref/aoe2de-xs-rms-changelog.md; empty string when unknown.
+    Names must be unique within each file — validated on load.
+
+    Desc prose mining (signature help):
+    - Value bounds appear as "(<num>-<num>)" right after the kind word:
+      "number (0-99)", "number (1-16)", "number (36-480)"; decimals and negative
+      bounds allowed; often followed by unrelated "(default: …)" / "(see: …)"
+      parenthesized fragments — only numeric bounds match.
+    - The kind word in prose is "number" even for percent-typed args
+      (cliff_curliness %: kind=percent, desc="number (0-100)") — mined kind fills
+      only empty Kind entries, never overwrites structured ones.
+    - Flag attributes (34 entries: set_circular_base, make_indestructible, …) carry
+      empty Desc — nothing to mine; they stay name-only by design.
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `kbdata` for the embedded JSON file layout and schema.
+
+  Cell is the AoE2 RMS+XS knowledge base: loads embedded JSON once at
+  construction and serves read-only lookups. No IO after construction.
+
+  Mined data (kind/range) follows the provenance rule: structured values from
+  extraction win; mining fills only empty fields; unparseable prose silently
+  keeps raw values — the load pipeline never fails.
+
+  Утилиты сборки данных (`GenKB`, `ExtractRmsCommands`) — оффлайн-этап подготовки
+  данных, вне рантайма: контракт Store («No IO after construction») их не покрывает.
+
+---
+
+"Store()":
+  location: store.go
+  annotations: |
+    Загруженная база знаний; единственная точка lookup для всех потребителей.
+
+    Requirements:
+    - конструктор NewStore() читает файлы по `kbdata` и валидирует схему:
+      неизвестные ключи, дубликаты имён, пустые name — ошибка загрузки
+    - после построения Store потокобезопасен для чтения (immutable данные)
+    - при загрузке CommandArg с пустым Range или пустым Kind —
+      `MineKindRange`(Desc); идемпотентно с экстракцией (заполнение только
+      пустых), непарсимое молча остаётся сырым
+  methods:
+    "Function(name: string) -> fn: Function, found: bool": |
+      Lookup XS-функции по точному имени.
+
+      `name`: точное имя функции (case-sensitive); found=false при отсутствии
+    "Functions() -> fns: []Function": |
+      Все XS-функции (для completion); порядок — как в файле данных.
+    "Constant(name: string) -> c: Constant, found: bool": |
+      Lookup XS-константы по точному имени; found=false при отсутствии.
+    "Constants(section: string) -> cs: []Constant": |
+      Константы одной секции ("" — все секции).
+    "Command(name: string) -> cmd: Command, found: bool": |
+      Lookup RMS-команды по точному имени; found=false при отсутствии.
+    "Commands(section: string) -> cmds: []Command": |
+      Команды одной секции RMS ("" — все).
+    "Attribute(command: string, attr: string) -> arg: CommandArg, found: bool": |
+      Спецификация атрибута команды; found=false если команда или атрибут неизвестен.
+
+      `command`: имя команды; `attr`: имя атрибута
+
+"Function()":
+  location: model.go
+  annotations: |
+    XS-функция из базы (данные).
+  properties:
+    "Name -> string": |
+      Имя функции.
+    "ReturnType -> string": |
+      Тип возврата.
+    "Params -> []Param": |
+      Параметры функции.
+    "Desc -> string": |
+      Описание.
+    "SinceUpdate -> string": |
+      Апдейт добавления ("" если неизвестен).
+
+"Param()":
+  location: model.go
+  annotations: |
+    Параметр XS-функции (данные). Required=false — есть значение по умолчанию.
+  properties:
+    "Name -> string": |
+      Имя параметра.
+    "Type -> string": |
+      Тип параметра.
+    "Required -> bool": |
+      Обязательность.
+    "Desc -> string": |
+      Описание параметра.
+
+"Constant()":
+  location: model.go
+  annotations: |
+    XS-константа из базы (данные).
+  properties:
+    "Name -> string": |
+      Имя константы.
+    "Section -> string": |
+      Секция констант.
+    "Value -> string": |
+      Строковое представление значения.
+    "Desc -> string": |
+      Описание.
+    "SinceUpdate -> string": |
+      Апдейт добавления ("" если неизвестен).
+
+"Command()":
+  location: model.go
+  annotations: |
+    RMS-команда из базы (данные).
+
+    Requirements:
+    - Args — позиционные аргументы; Attributes — допустимые атрибуты команды
+  properties:
+    "Name -> string": |
+      Имя команды.
+    "Section -> string": |
+      Секция синтаксиса.
+    "Args -> []CommandArg": |
+      Позиционные аргументы.
+    "Attributes -> []CommandArg": |
+      Допустимые атрибуты.
+    "Desc -> string": |
+      Описание.
+    "GameVersions -> string": |
+      Версии игры, где работает.
+    "SinceUpdate -> string": |
+      Апдейт добавления ("" если неизвестен).
+
+"CommandArg()":
+  location: model.go
+  annotations: |
+    Спецификация аргумента/атрибута RMS-команды (данные).
+
+    Requirements:
+    - Kind после загрузки: пустой заполняется замайненным (`MineKindRange`),
+      непустой (из экстракции) не перезаписывается
+  properties:
+    "Name -> string": |
+      Имя аргумента/атрибута.
+    "Kind -> string": |
+      Ожидаемая форма значения: number / percent / const / terrain / object / ...
+      Пустой после загрузки — только если prose не парсится (флаг-атрибуты).
+    "Range -> ValueRange": |
+      Замайненные границы значения; пустая — не замайнено.
+    "Required -> bool": |
+      Обязательность.
+    "Desc -> string": |
+      Описание.
+
+"ValueRange(min: string, max: string)":
+  location: model.go
+  annotations: |
+    Замайненные границы значения аргумента из Desc-prose (данные).
+
+    `min`: нижняя граница как в prose ("" — не замайнено)
+    `max`: верхняя граница ("" — не замайнено)
+
+    Requirements:
+    - чистые данные: construct-and-use, без мутации
+    - границы — строки: текст prose без преобразования точности
+  properties:
+    "Min -> string": |
+      Нижняя граница ("" — не замайнено).
+    "Max -> string": |
+      Верхняя граница ("" — не замайнено).
+
+"MineKindRange(desc: string) -> kind: string, r: ValueRange":
+  location: mine.go
+  annotations: |
+    Разбор Desc-prose в структурированные kind и границы значения.
+
+    `desc`: prose-описание аргумента/атрибута из базы
+    `kind`: замайненный kind ("" — не найден); `r`: границы (пустая — не найдены)
+
+    Algorithm:
+    1. Найти в `desc` первый фрагмент "(<num>-<num>)" — целые или десятичные,
+       опциональный минус; нет — вернуть "", пустую `ValueRange`
+    2. Слово непосредственно перед фрагментом — замайненный kind
+       (в корпусе: number); слова нет — kind=""
+    3. Вернуть kind и `ValueRange` с границами как записаны в prose
+       (только обрезка окружающих пробелов)
+
+    Requirements:
+    - паттерны prose — по `kbdata` (Desc prose mining)
+    - детерминированность: одинаковый вход → одинаковый результат
+
+    Constraints:
+    - непарсимая prose → пустой результат, не ошибка
+    - нечисловые скобочные фрагменты ("(default: …)", "(see: …)") не матчатся
+
+"ExtractRmsCommands(path: string, log: Logger) -> commands: []Command, err: error":
+  location: extract.go
+  annotations: |
+    Разовое извлечение RMS-команд из текстового экспорта гайда Zetnus
+    в rms-commands.json (формат по `kbdata`).
+
+    `path`: путь к docs/ref/zetnus-rms-guide.txt
+    `log`: инжектированный логгер сборки (в Go — *slog.Logger; nil → slog.Default())
+    `commands`: извлечённые команды; `err`: ошибки чтения/разбора
+
+    Algorithm:
+    1. Прочитать файл по `path`
+    2. Найти секции Syntax Skeleton и пройтись по блокам команд
+    3. Для каждой команды собрать Name, Section, Args, Attributes, Desc,
+       GameVersions; для каждого CommandArg — `MineKindRange`(Desc) →
+       заполнить Range, Kind пуст → замайненный kind
+    4. Обогатить SinceUpdate по changelog (docs/ref/aoe2de-xs-rms-changelog.md)
+    5. Проверить дубликаты имён; вернуть []Command
+
+    Constraints:
+    - утилита сборки данных, не вызывается в рантайме сервера
+    - при неоднозначном разборе — пропускать фрагмент и писать WARN в `log`,
+      не прерывать весь проход
+
+"GenKB(refDir: string, dataDir: string, log: Logger) -> err: error":
+  location: gen.go
+  annotations: |
+    Генерация файлов данных kb из исходников документации (оффлайн-сборка базы).
+
+    `refDir`: корень исходников документации (functions.json, constants.json,
+    zetnus-гайд, changelog — layout по `kbdata`)
+    `dataDir`: целевой каталог данных
+    `log`: инжектированный логгер сборки (в Go — *slog.Logger; nil → slog.Default())
+    `err`: ошибки чтения/записи; обёрнуты с путём файла
+
+    Algorithm:
+    1. Прочитать из `refDir` источники по `kbdata`: функции и константы —
+       адаптацией JSON ugc-guide; команды — `ExtractRmsCommands`(гайд, `log`)
+    2. Пополнить SinceUpdate по changelog из `refDir`
+    3. Проверить уникальность имён внутри каждого набора; коллизия — ошибка
+    4. Записать три файла данных в `dataDir` по формату `kbdata`
+
+    Requirements:
+    - сериализация детерминирована: повторный запуск на тех же исходниках
+      даёт идентичные файлы (стабильный порядок ключей)
+
+    Constraints:
+    - утилита сборки, не вызывается в рантайме сервера
+    - исходники в `refDir` не изменяются
+
+---
+
+Author: Goga
+CreatedAt: 04/09/26
+Description: |
+  База знаний AoE2 RMS+XS: встроенные JSON, lookup API, экстракция из Zetnus
+  и генерация данных.

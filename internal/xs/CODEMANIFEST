@@ -1,0 +1,285 @@
+Imports:
+  - Types:
+      - Pos
+      - Range
+      - Diagnostic
+      - Symbol
+    Usages:
+      - positions-and-diagnostics
+      - symbols
+    From: internal/common
+
+Usages:
+  conventions: .goga/usages/conventions.md
+  xs_grammar: .goga/usages/xs-grammar.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `xs_grammar` for the XS language structure being parsed.
+  Use `positions-and-diagnostics` from Imports for building positions and diagnostics.
+  Use `symbols` from Imports for building outline nodes in Symbols.
+
+  Parser never fails hard: every problem becomes a Diagnostic; recovery
+  resynchronizes to the next statement/declaration. Every AST node carries a Range.
+
+  Call-контекст для signature help создаётся только узлами Expr Kind=call:
+  векторные литералы «(1,2,3)» по `xs_grammar`, условия if/while/for, списки
+  параметров деклараций и скобки группировки вызовом не являются.
+
+---
+
+"XsParse(source: string, name: string) -> file: XsFile, diags: []Diagnostic":
+  location: parse.go
+  annotations: |
+    Разбор XS-кода (C-like + rules/events) в AST с восстановлением.
+
+    `source`: текст (файл .xs или inline-блок из rms.XsBlock)
+    `name`: имя для сообщений
+
+    Algorithm:
+    1. Лексер по `xs_grammar`: идентификаторы, числа (int/float/hex), строки,
+       векторные литералы (x,y,z), операторы, комментарии // и /* */
+    2. Верхний уровень: объявления — functions (с Params), variables
+       (мультидекларация int a = 1, b = 2; — N деклараций, по одной на
+       имя, Range каждой — по своей под-конструкции), rules (условие+тело),
+       events, include, extern
+    3. Тела: statements (if/else, while, for, do, switch, return, break,
+       выражения-стейтменты, блоки) и выражения
+    4. При ошибке: Diagnostic, sync на следующий ';' или '}', продолжить
+
+    Requirements:
+    - File всегда не-nil; diags отсортированы по позиции
+
+    Constraints:
+    - не паниковать; err не возвращается для некорректного входа
+
+"XsFile()":
+  location: ast.go
+  annotations: |
+    Корень XS: Decls верхнего уровня. Имя — как передано в Parse.
+  properties:
+    "Name -> string": |
+      Имя файла/блока.
+    "Decls -> []Decl": |
+      Объявления верхнего уровня.
+  methods:
+    "SymbolAt(pos: Pos) -> name: string, found: bool": |
+      Идентификатор под позицией (для hover и completion-триггера).
+
+      `pos`: позиция в файле
+
+      Requirements:
+      - для позиции на call возвращает имя вызываемой функции
+
+    "Definition(pos: Pos) -> r: Range, found: bool": |
+      Определение символа под позицией: вхождение → name-range декларирующего
+      объявления (LSP textDocument/definition).
+
+      `pos`: позиция в файле
+      `r`: диапазон имени декларации (не всей декларации)
+      `found`: локальная декларация существует
+
+      Algorithm:
+      1. Найти вхождение идентификатора, содержащее `pos` (как SymbolAt);
+         нет вхождения — found=false
+      2. Среди деклараций файла, объявляющих это имя, взять самую внутреннюю,
+         чью область (тело функции/блока или оператора for с его
+         init-декларацией) объемлет позицию вхождения;
+         при равной вложенности — ближайшую, предшествующую вхождению
+         (параметр/локаль затеняют топ-левел)
+      3. Позиция на имени декларации — вернуть её собственный name-range
+      4. Локальной декларации нет (builtin/неизвестное) — found=false
+
+      Requirements:
+      - детерминированность: одинаковый вход → одинаковый результат
+
+    "ReferencesAt(pos: Pos) -> ranges: []Range": |
+      Все вхождения имени под позицией (LSP textDocument/references).
+
+      `pos`: позиция в файле
+      `ranges`: все вхождения имени, включая декларацию, по позиции
+
+      Algorithm:
+      1. Имя под `pos` (как SymbolAt); нет — пустой список
+      2. Собрать диапазоны вхождений имени из индекса вхождений
+      3. Отсортировать по позиции
+
+      Requirements:
+      - совпадение синтаксическое, по имени: одноимённые символы разных
+        областей видимости не различаются
+
+    "References(name: string) -> ranges: []Range": |
+      Вхождения имени без позиции (кросс-файловые references: у вызывающей
+      стороны нет позиции в чужом файле).
+
+      `name`: имя символа
+      `ranges`: все вхождения имени, включая декларацию, по позиции
+
+      Algorithm:
+      1. Собрать диапазоны вхождений `name` из индекса вхождений
+      2. Отсортировать по позиции
+
+      Requirements:
+      - ReferencesAt(pos) эквивалентен References(SymbolAt(pos))
+      - отсутствие имени — пустой список
+
+    "Symbols() -> symbols: []Symbol": |
+      Outline файла: декларации верхнего уровня (LSP documentSymbol).
+
+      `symbols`: узлы топ-деклараций в исходном порядке
+
+      Algorithm:
+      1. Каждый Decl из Decls, кроме include, → `Symbol` по `symbols`
+         из Imports: Kind и Name из декларации, Range=Range декларации,
+         Selection=name-range из внутреннего индекса, Children пусты
+
+      Requirements:
+      - Selection ⊆ Range для каждого узла
+      - плоский список: тела деклараций не раскрываются
+      - include-декларации пропускаются: словарь kind их не содержит
+
+    "CallAt(pos: Pos) -> call: CallSite, found: bool": |
+      Внутренний (innermost) вызов, объемлющий позицию (signature help).
+
+      `pos`: позиция в файле; `call`: контекст вызова; `found`: объемлющий вызов есть
+
+      Algorithm:
+      1. Позиция внутри строки или комментария → found=false
+      2. Найти внутренний call-узел, чей span — от имени callee до конца списка
+         аргументов — содержит `pos`; span списка аргументов тянется до фронта
+         восстановления (для незакрытого вызова — до конца доступного ввода),
+         не ограничен Range выражения
+      3. Объемлющего вызова нет → found=false
+      4. `pos` на имени callee или между именем и «(» → вернуть `CallSite`
+         с argIndex=0 и onArg=false
+      5. Внутри скобок: подсчитать запятые верхнего уровня (не внутри вложенных
+         вызовов/скобок/строк) до `pos` → argIndex=k, onArg=true
+
+      Requirements:
+      - in-progress (незакрытые) вызовы дают результат — жёсткое требование SC1:
+        первый символ после «(» — ключевой момент фичи
+      - вложенные вызовы: внутренний побеждает (f(g(x| → g, аргумент 0)
+      - только Expr Kind=call создаёт контекст вызова — см. глобальные Annotations
+      - детерминированность: одинаковый вход → одинаковый результат
+
+      Constraints:
+      - argIndex не клампится: выход за границы списка параметров — решение
+        потребителя, не навигации
+
+    "VisibleAt(pos: Pos) -> visible: []Symbol, found: bool": |
+      Символы, видимые в точке (completion): топ-левел декларации +
+      параметры и локали объемлющей функции.
+
+      `pos`: позиция в файле; `visible`: видимые именованные символы;
+      `found`: позиция в коде (false — строка/комментарий)
+
+      Algorithm:
+      1. Позиция внутри строки или комментария → found=false
+      2. Топ-левел именованные декларации (Kind=function/variable/rule/
+         event/extern; include пропускается) → `Symbol` по `symbols`
+      3. Внутренняя функция, чьё тело объемлет `pos`: её параметры →
+         kind=param; локальные декларации блоков её тела, объемлющих
+         `pos` (блоки { } по `xs_grammar`) → kind=local; init-декларация
+         оператора for — локаль с областью всего оператора for:
+         видима в init, условии, шаге и теле; после оператора не видна
+         → kind=local
+      4. Порядок: топ-левел по объявлению, затем параметры по списку,
+         затем локали по позиции декларации
+
+      Requirements:
+      - детерминированность: одинаковый вход → одинаковый результат
+      - Selection ⊆ Range для каждого узла (инвариант `symbols`)
+
+      Constraints:
+      - параметры/локали функций, не объемлющих `pos`, не возвращаются
+      - конфликты имён не резолвятся: одноимённые символы разных областей
+        возвращаются оба; приоритизация — решение потребителя
+
+"CallSite(callee: string, argIndex: int, onArg: bool)":
+  location: ast.go
+  annotations: |
+    Контекст вызова под курсором — данные для signature help.
+
+    Requirements:
+    - чистые данные: construct-and-use, без мутации
+  properties:
+    "Callee -> string": |
+      Имя вызываемой функции внутреннего вызова.
+    "ArgIndex -> int": |
+      0-based ординал аргумента под курсором (валиден при onArg=true:
+      сразу после «(» — 0; после k запятых верхнего уровня — k).
+    "OnArg -> bool": |
+      Курсор внутри списка аргументов (false — на имени callee).
+
+"Decl()":
+  location: ast.go
+  annotations: |
+    Объявление.
+
+    Requirements:
+    - Kind=function — Params и Body заполнены; Kind=rule — условие в Body[0]
+      как Exprs; Kind=extern — только сигнатура (prelude.xs)
+  properties:
+    "Kind -> string": |
+      Вид: function / variable / rule / event / include / extern.
+    "Name -> string": |
+      Имя объявленного символа.
+    "Type -> string": |
+      Тип (переменной или возврата функции).
+    "Params -> []Param": |
+      Параметры функции.
+    "Body -> []Stmt": |
+      Тело.
+    "Range -> Range": |
+      Диапазон объявления.
+
+"Param()":
+  location: ast.go
+  annotations: |
+    Параметр XS-функции.
+  properties:
+    "Name -> string": |
+      Имя параметра.
+    "Type -> string": |
+      Тип (int/float/bool/string/vector/void/...).
+
+"Stmt()":
+  location: ast.go
+  annotations: |
+    Оператор; Kind определяет смысл Exprs (условие) и Body (ветки/тело).
+  properties:
+    "Kind -> string": |
+      Вид оператора.
+    "Exprs -> []Expr": |
+      Выражения (условие/значение).
+    "Body -> []Stmt": |
+      Вложенные операторы.
+    "Range -> Range": |
+      Диапазон оператора.
+
+"Expr()":
+  location: ast.go
+  annotations: |
+    Выражение.
+
+    Requirements:
+    - Kind=call: Callee=имя функции, Children=аргументы; Kind=vector:
+      Children=3 операнда; Kind=binary: Value=оператор
+  properties:
+    "Kind -> string": |
+      Вид: call / binary / unary / literal / vector / ident.
+    "Callee -> string": |
+      Имя вызываемой функции (для call).
+    "Value -> string": |
+      Литерал или оператор.
+    "Children -> []Expr": |
+      Операнды/аргументы.
+    "Range -> Range": |
+      Диапазон выражения.
+
+---
+
+Author: Goga
+CreatedAt: 04/09/26
+Description: |
+  Парсер XS (External Subroutines): C-like грамматика с rules/events, AST с восстановлением.

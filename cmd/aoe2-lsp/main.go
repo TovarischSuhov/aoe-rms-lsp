@@ -3,7 +3,7 @@
 package main
 
 import (
-	"aoe2-lsp/server"
+	"aoe2-lsp/internal/server"
 	"context"
 	"fmt"
 	"log/slog"

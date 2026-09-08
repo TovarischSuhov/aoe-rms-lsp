@@ -58,17 +58,17 @@ Race-прогон — в CI (`go test -race ./...`).
 ## Structure
 
 - `cmd/` — тонкие entrypoints (`aoe2-lsp`, `kbgen`)
-- ячейки-пакеты: `common`, `kb`, `rms`, `xs`, `analysis`, `hints`,
-  `complete`, `include`, `server` — контракт каждой в её `CODEMANIFEST`,
-  потребительские практики в `<cell>/.usages/` (отступление от шаблона
-  new-go-project: вместо `internal/`/`pkg/` — goga-ячейки в корне,
-  инкапсуляция контрактами)
+- ячейки-пакеты под `internal/`: `common`, `kb`, `rms`, `xs`, `analysis`,
+  `hints`, `complete`, `include`, `server` — контракт каждой в её
+  `CODEMANIFEST`, потребительские практики в `<cell>/.usages/`
+  (по шаблону new-go-project: `internal/` — вся логика; ячейка =
+  `internal/<pkg>`)
 - `scripts/` — релизный скрипт (`release.sh`: версия + CHANGELOG.md + тег)
 - `openapi/` — спецификации; HTTP-код — openapi → oapi-codegen
   (заводится, когда появится HTTP-поверхность; сейчас её нет)
 - `docs/` — планы, дизайн, задачи, ревью, справочники
-- `<cell>/testdata/` — фикстуры ячеек (сейчас `rms/testdata`, `xs/testdata`;
-  корневого `testdata/` нет)
+- `<cell>/testdata/` — фикстуры ячеек (сейчас `internal/rms/testdata`,
+  `internal/xs/testdata`; корневого `testdata/` нет)
 
 ## Git-политика (переопределение глобальной)
 
