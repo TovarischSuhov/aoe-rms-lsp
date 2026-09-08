@@ -1331,7 +1331,10 @@ const singleOps = "+-*/%=<>!&|^~?:;,(){}[]."
 // scan tokenizes the whole source into p.toks with an EOF sentinel and
 // collects the non-code spans (strings, comments) into p.noncode.
 func (p *xparser) scan(source string) {
-	s := &xscanner{src: []byte(source)}
+	// the source stays a string: token texts are substrings that share
+	// the backing array (zero-copy), not per-token conversions of a
+	// byte-slice copy of the whole input.
+	s := &xscanner{src: source}
 
 	for {
 		tok := s.next()
@@ -1346,7 +1349,7 @@ func (p *xparser) scan(source string) {
 
 // xscanner walks the source producing tokens.
 type xscanner struct {
-	src       []byte
+	src       string
 	pos       int
 	line      uint32
 	lineStart int
@@ -1365,7 +1368,7 @@ func (s *xscanner) span(start int) common.Range {
 
 // token builds a token for [start, s.pos).
 func (s *xscanner) token(kind xtokKind, start int) xtoken {
-	return xtoken{kind: kind, text: string(s.src[start:s.pos]), at: s.span(start)}
+	return xtoken{kind: kind, text: s.src[start:s.pos], at: s.span(start)}
 }
 
 // next returns the next token, skipping whitespace and comments.
@@ -1531,7 +1534,7 @@ func (s *xscanner) scanOp() (xtoken, bool) {
 	rest := s.src[s.pos:]
 
 	for _, op := range multiCharOps {
-		if len(rest) >= len(op) && string(rest[:len(op)]) == op {
+		if len(rest) >= len(op) && rest[:len(op)] == op {
 			start := s.pos
 			s.pos += len(op)
 
