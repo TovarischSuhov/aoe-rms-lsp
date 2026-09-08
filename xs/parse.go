@@ -923,7 +923,7 @@ func (p *xparser) parsePrimary() (Expr, bool) {
 			return p.parseParenExpr(tok)
 		case "{":
 			// bare block as expression: tolerated, skip to matching }
-			p.skipBlock(tok)
+			p.skipBlock()
 
 			return Expr{Kind: ExprLiteral, Value: "{}", Range: tok.at}, true
 		}
@@ -1045,7 +1045,7 @@ func (p *xparser) openCall(operand Expr, lparen common.Pos) *callRec {
 }
 
 // skipBlock consumes a { ... } region (used for permissive recovery).
-func (p *xparser) skipBlock(open xtoken) {
+func (p *xparser) skipBlock() {
 	depth := 1
 
 	for depth > 0 && !p.at(xEOF) {
@@ -1073,7 +1073,7 @@ func (p *xparser) syncStmt() {
 		}
 
 		if tok.text == "{" { // unbalanced block: skip it whole
-			p.skipBlock(tok)
+			p.skipBlock()
 
 			return
 		}
@@ -1099,7 +1099,7 @@ func (p *xparser) syncDecl() {
 		}
 
 		if tok.text == "{" {
-			p.skipBlock(tok)
+			p.skipBlock()
 
 			return
 		}
@@ -1526,13 +1526,7 @@ func (s *xscanner) scanOp() (xtoken, bool) {
 
 // indexByte reports whether c is a single-character operator.
 func (s *xscanner) indexByte(c byte) bool {
-	for i := 0; i < len(singleOps); i++ {
-		if singleOps[i] == c {
-			return true
-		}
-	}
-
-	return false
+	return strings.IndexByte(singleOps, c) >= 0
 }
 
 // isIdentStart reports whether c can start an identifier.
