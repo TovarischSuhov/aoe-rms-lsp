@@ -139,6 +139,13 @@ elevation/terrain: значит на `create_object` они, скорее все
 `effect_percent` (36× / 3) — документирован, но **deprecated** с DE
 (гайд: «use effect_amount instead») — работает, предупреждение уместно.
 
+**`terrain_type`/`base_terrain` как команды вне create_-контекста** —
+[REDv1](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/REDv1.rms)/REDv2:
+внутри `start_random/percent_chance`-веток на верхнем уровне секции, без
+create_terrain-обёртки — 50×. Это атрибуты, а не команды: движок молча
+игнорирует, выбор террейна не работает (❓/💬 мёртвый код — находка
+расширенного корпуса).
+
 ## 5. XS (по vendored UGC Guide, `docs/ref/ugc-guide/xs`)
 
 - `const int x = …` внутри тела функции — встречено в

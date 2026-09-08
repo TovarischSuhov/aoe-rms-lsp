@@ -579,10 +579,15 @@ func (p *xparser) parseFor() Stmt {
 			p.expect(";")
 		}
 
-		// condition and step
-		stmt.Range.End = p.forPart(stmt, 1)
-		p.expect(";")
-		stmt.Range.End = p.forPart(stmt, 2)
+		// condition: XS for-conditions may start with the operator —
+		// `for (i = 1; <= size)` repeats the init variable implicitly
+		stmt.Range.End = p.forCond(stmt)
+
+		// step: the XS for has two sections; a third (C-style) is optional
+		if !p.atOp(")") {
+			p.expect(";")
+			stmt.Range.End = p.forPart(stmt, 2)
+		}
 
 		p.expect(")")
 	}
@@ -598,6 +603,61 @@ func (p *xparser) parseFor() Stmt {
 	stmt.Range.End = stmt.Body[len(stmt.Body)-1].Range.End
 
 	return *stmt
+}
+
+// forCondOps are the comparison operators an XS for-condition may start
+// with (`for (i = 1; <= size)`).
+var forCondOps = map[string]bool{
+	"<": true, "<=": true, ">": true, ">=": true, "==": true, "!=": true,
+}
+
+// forCond parses the condition of a for clause. An operator-headed
+// condition (`<= size`) takes the loop variable of the init assignment as
+// its implicit left operand — the real-world XS for shape
+// (`for (i = 1; <= size)`); a full expression parses as-is.
+func (p *xparser) forCond(stmt *Stmt) common.Pos {
+	end := stmt.Range.End
+
+	if op := p.peek(); op.kind == xOp && forCondOps[op.text] {
+		if left := loopVarOf(stmt); left != nil {
+			p.next()
+
+			if e, ok := p.parseExpr(); ok {
+				cond := Expr{
+					Kind:     ExprBinary,
+					Value:    op.text,
+					Children: []Expr{*left, e},
+					Range:    common.Range{Start: left.Range.Start, End: e.Range.End},
+				}
+				stmt.Exprs = append(stmt.Exprs, cond)
+
+				if e.Range.End.After(end) {
+					end = e.Range.End
+				}
+			}
+
+			return end
+		}
+	}
+
+	return p.forPart(stmt, 1)
+}
+
+// loopVarOf returns the identifier of the last init assignment of the
+// for statement, when there is one (`for (i = 1; ...)` → i).
+func loopVarOf(stmt *Stmt) *Expr {
+	for i := len(stmt.Exprs) - 1; i >= 0; i-- {
+		e := &stmt.Exprs[i]
+
+		if e.Kind == ExprBinary && e.Value == "=" && len(e.Children) > 0 &&
+			e.Children[0].Kind == ExprIdent {
+			left := e.Children[0]
+
+			return &left
+		}
+	}
+
+	return nil
 }
 
 // forPart parses one optional for-clause part (0=init when not a declaration,
