@@ -416,3 +416,119 @@ func TestReferences_ByName(t *testing.T) {
 
 	assert.Empty(t, file.References("missing"))
 }
+
+func TestVisibleAt_APIShape(t *testing.T) {
+	file, _ := XsParse("void f() {}", "shape.xs")
+
+	syms, found := file.VisibleAt(common.Pos{Line: 0, Column: 6})
+
+	require.True(t, found, "code position must resolve")
+	require.IsType(t, []common.Symbol{}, syms)
+	require.IsType(t, "", syms[0].Kind)
+	require.IsType(t, "", syms[0].Name)
+	require.IsType(t, common.Range{}, syms[0].Range)
+	require.IsType(t, common.Range{}, syms[0].Selection)
+}
+
+func TestVisibleAt_TopLevelDecls(t *testing.T) {
+	src := "int g = 1;\n" +
+		"void f(float a) { a = 2; }\n" +
+		"extern int e();\n" +
+		"include \"x.xs\"\n"
+
+	file, _ := XsParse(src, "top.xs")
+
+	syms, found := file.VisibleAt(common.Pos{Line: 1, Column: 18})
+
+	require.True(t, found)
+
+	kinds := make(map[string]string)
+
+	for _, s := range syms {
+		kinds[s.Name] = s.Kind
+		require.True(t, rangeWithin(s.Selection, s.Range),
+			"Selection must be inside Range: %s", s.Name)
+		require.NotEqual(t, "x.xs", s.Name, "include is not name-bearing")
+	}
+
+	require.Equal(t, DeclVariable, kinds["g"])
+	require.Equal(t, DeclFunction, kinds["f"])
+	require.Equal(t, DeclExtern, kinds["e"])
+	require.Equal(t, KindParam, kinds["a"])
+}
+
+func TestVisibleAt_ParamAndLocalScopes(t *testing.T) {
+	src := "void f(int p) {\n" +
+		"  int a1 = 1;\n" +
+		"  {\n" +
+		"    int b1 = 2;\n" +
+		"  }\n" +
+		"  int a2;\n" +
+		"}\n"
+
+	file, _ := XsParse(src, "scopes.xs")
+
+	syms, found := file.VisibleAt(common.Pos{Line: 5, Column: 2})
+
+	require.True(t, found)
+
+	names := make([]string, 0, len(syms))
+
+	for _, s := range syms {
+		names = append(names, s.Name)
+	}
+
+	// Top-level first, then parameters, then locals declared at or
+	// before pos; b1's block closed before pos, a2 is declared after.
+	require.Equal(t, []string{"f", "p", "a1"}, names)
+}
+
+func TestVisibleAt_InStringAndComment(t *testing.T) {
+	src := "void f() {\n" +
+		"  string s = \"abcd\";\n" +
+		"}\n" +
+		"// tail\n"
+
+	file, _ := XsParse(src, "noncode.xs")
+
+	for _, pos := range []common.Pos{
+		{Line: 1, Column: 15},
+		{Line: 3, Column: 3},
+	} {
+		_, found := file.VisibleAt(pos)
+
+		require.False(t, found, "position %v must not resolve", pos)
+	}
+}
+
+func TestVisibleAt_EmptyFile_TrueEmpty(t *testing.T) {
+	file, _ := XsParse("", "empty.xs")
+
+	syms, found := file.VisibleAt(common.Pos{Line: 0, Column: 0})
+
+	require.True(t, found, "empty file is still code")
+	require.Empty(t, syms)
+}
+
+func TestVisibleAt_ShadowingBothKept(t *testing.T) {
+	src := "int x = 1;\n" +
+		"void f() {\n" +
+		"  float x = 2;\n" +
+		"  x = 3;\n" +
+		"}\n"
+
+	file, _ := XsParse(src, "shadow.xs")
+
+	syms, found := file.VisibleAt(common.Pos{Line: 3, Column: 2})
+
+	require.True(t, found)
+
+	kinds := make(map[string]int)
+
+	for _, s := range syms {
+		kinds[s.Kind]++
+	}
+
+	require.Equal(t, 1, kinds[DeclVariable], "top-level x kept")
+	require.Equal(t, 1, kinds[KindLocal], "local x kept")
+}
