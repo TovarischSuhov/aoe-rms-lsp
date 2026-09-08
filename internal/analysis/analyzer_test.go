@@ -415,3 +415,43 @@ func TestAnalyzeXs_ForLoopVarUsedAfterNotFlagged(t *testing.T) {
 
 	assert.Equal(t, []string{}, codes(a.AnalyzeXs(file, nil)))
 }
+
+func TestAnalyzeXs_TwoSectionForImplicitVar(t *testing.T) {
+	t.Parallel()
+	// the real-world XS for (`for (i = 1; <= size)`): the implicit loop
+	// variable is declared, the operator-headed condition parses
+	// (xslibs corpus: 100+ false undefined-symbol/syntax before the fix)
+	src := `void main() {
+	int size = 10;
+	for (i = 1; <= size) {
+		xsSetGoal(1, i);
+	}
+}
+`
+
+	file, _ := xs.XsParse(src, "fortwo.xs")
+	a := newAnalyzer(t)
+
+	assert.Equal(t, []string{}, codes(a.AnalyzeXs(file, nil)))
+}
+
+func TestAnalyzeXs_ConstQualifierCompatible(t *testing.T) {
+	t.Parallel()
+	// const is a qualifier, not a distinct type: const declarations are
+	// returned and assigned freely (xslibs: 490 false bad-type before)
+	src := `extern const int cOk = 0;
+int status() {
+	return cOk;
+}
+void main() {
+	int last = status();
+	_stringLast = cOk;
+}
+int _stringLast = 0;
+`
+
+	file, _ := xs.XsParse(src, "const.xs")
+	a := newAnalyzer(t)
+
+	assert.Equal(t, []string{}, codes(a.AnalyzeXs(file, nil)))
+}

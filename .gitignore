@@ -7,3 +7,7 @@
 
 # corpus downloads (scripts/corpus-fetch.sh)
 .corpus/
+.corpus-ext/
+
+# codegraph index (codegraph init)
+.codegraph/

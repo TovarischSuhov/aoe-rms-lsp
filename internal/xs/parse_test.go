@@ -283,6 +283,41 @@ func TestXsParse_ConstLocalDecl(t *testing.T) {
 	assert.Equal(t, "cGenghisKhan", first.Exprs[0].Children[0].Value)
 }
 
+// TestXsParse_ForTwoSections covers the real-world XS for shape:
+// two sections with an operator-headed condition repeating the loop
+// variable implicitly (`for (i = 1; <= size)` — xslibs, splitattention).
+func TestXsParse_ForTwoSections(t *testing.T) {
+	t.Parallel()
+
+	src := `void main() {
+	int size = 10;
+	for (i = 1; <= size) {
+		xsSetGoal(1, i);
+	}
+}
+`
+
+	file, diags := XsParse(src, "fortwo.xs")
+
+	require.Empty(t, diags, messages(diags))
+
+	body := file.Decls[0].Body
+	require.Len(t, body, 2)
+
+	forStmt := body[1]
+	assert.Equal(t, StmtFor, forStmt.Kind)
+
+	// Exprs hold the init assignment and the rebuilt condition
+	require.Len(t, forStmt.Exprs, 2)
+	assert.Equal(t, "=", forStmt.Exprs[0].Value)
+
+	cond := forStmt.Exprs[1]
+	assert.Equal(t, ExprBinary, cond.Kind)
+	assert.Equal(t, "<=", cond.Value)
+	assert.Equal(t, "i", cond.Children[0].Value, "implicit loop variable")
+	assert.Equal(t, "size", cond.Children[1].Value)
+}
+
 // TestXsParse_NeverNil checks the total-garbage path.
 func TestXsParse_NeverNil(t *testing.T) {
 	t.Parallel()

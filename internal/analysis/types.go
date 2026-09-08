@@ -17,11 +17,20 @@ import (
 // does not. Neither argument may be the unknown type "": callers skip the
 // check instead of passing an empty expected or actual.
 func Coerce(expected, actual string) bool {
+	expected, actual = baseType(expected), baseType(actual)
+
 	if expected == actual {
 		return true
 	}
 
 	return actual == "int" && expected == "float"
+}
+
+// baseType drops the const qualifier: `const int` is an int for every
+// compatibility question (real-world XS assigns and returns const
+// declarations freely).
+func baseType(typ string) string {
+	return strings.TrimPrefix(typ, "const ")
 }
 
 // TypeEnv is the symbol table of one XS pass: symbol names mapped to their

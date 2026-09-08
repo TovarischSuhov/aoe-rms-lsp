@@ -28,6 +28,12 @@ repos=(
 	"rohanport/aoe2rms"
 	"Maboey/aoe2_rms"
 	"matsaraiva/AOE2-RMS"
+	# XS libraries — the pool's only real-world .xs sources
+	"mardaravicius/aoe2de_xslibs"
+	"GoKuModder/AoE2_AI_Modder"
+	"qferre/aoe2-xs-comm"
+	"SpiRaL-network/xs-lecuyer-rng"
+	"patgarz/aoe2de"
 )
 
 if [[ "${1:-}" == "--update" ]]; then
@@ -73,8 +79,10 @@ mkdir -p "$dest"
 
 # Deterministic sample: fixed random source, stable sort by URL first so
 # pool reordering cannot shift the selection. The walk continues past
-# rejected entries (fetch failures, binary payloads such as aoe2map.net
-# "ZR@" zip random maps) until the requested count of text scripts lands.
+# rejected entries (fetch failures, unusable archives) until the
+# requested count of text scripts lands. Zip random maps (aoe2map.net
+# "ZR@", PK magic) are unpacked: every inner .rms/.xs becomes its own
+# sample entry under its own index; the archive itself never lands.
 shuffled=$(grep -v '^#' "$sources" | sort -u | shuf --random-source=<(yes aoe2-corpus-v1))
 
 i=0
@@ -97,10 +105,59 @@ while IFS=$'\t' read -r url display; do
 		continue
 	fi
 
-	# Zip random maps (PK magic) are archives, not scripts — skip them.
 	if [[ $(head -c 2 "$out") == "PK" ]]; then
-		echo "WARN: zip payload skipped: $display" >&2
+		unpacked=$(mktemp -d)
+
+		if ! python3 - "$out" "$unpacked" <<'PY'
+import os
+import re
+import sys
+import zipfile
+
+zip_path, dest = sys.argv[1], sys.argv[2]
+
+
+def safe(name):
+    return re.sub(r"[^A-Za-z0-9_.@-]", "_", name)
+
+
+try:
+    with zipfile.ZipFile(zip_path) as zf:
+        infos = [info for info in zf.infolist() if not info.is_dir()]
+        if len(infos) > 64 or sum(i.file_size for i in infos) > 10 * 1024 * 1024:
+            sys.exit(3)  # junk/zip-bomb guard
+        extracted = 0
+        for info in infos:
+            # basename only: paths inside the archive are never honored
+            base = safe(os.path.basename(info.filename))
+            if not base.lower().endswith((".rms", ".xs")):
+                continue
+            with open(os.path.join(dest, base), "wb") as out:
+                out.write(zf.read(info))
+            extracted += 1
+        sys.exit(0 if extracted else 2)
+except zipfile.BadZipFile:
+    sys.exit(1)
+PY
+		then
+			echo "WARN: zip payload unusable: $display" >&2
+			rm -rf "$unpacked" "$out"
+
+			continue
+		fi
+
 		rm -f "$out"
+
+		for inner in "$unpacked"/*; do
+			[[ -f "$inner" ]] || continue
+			(( accepted >= count )) && break
+
+			i=$((i + 1))
+			mv "$inner" "$dest/$(printf '%03d' "$i")__$(basename "$inner")"
+			accepted=$((accepted + 1))
+		done
+
+		rm -rf "$unpacked"
 
 		continue
 	fi

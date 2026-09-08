@@ -260,6 +260,13 @@ func collectLocals(stmts []xs.Stmt, declared map[string]bool) {
 			declareItems(stmt.Exprs, declared)
 		}
 
+		if stmt.Kind == xs.StmtFor {
+			// a two-section XS for keeps its init assignment in Exprs
+			// (`for (i = 1; <= size)`) — the loop variable is declared
+			// all the same
+			declareItems(stmt.Exprs, declared)
+		}
+
 		collectLocals(stmt.Body, declared)
 	}
 }
@@ -286,6 +293,10 @@ func (a *Analyzer) walkStmtsXs(stmts []xs.Stmt, declared map[string]bool, env *T
 		stmt := &stmts[i]
 
 		if stmt.Kind == xs.StmtDecl {
+			env.declareLocals(stmt.Exprs)
+		}
+
+		if stmt.Kind == xs.StmtFor {
 			env.declareLocals(stmt.Exprs)
 		}
 
