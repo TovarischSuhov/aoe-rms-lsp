@@ -62,6 +62,7 @@ type parser struct {
 
 	inXs    bool
 	xsStart int
+	xsArg   bool // the open inline region was started by an argumented #includeXS
 }
 
 // newParser creates a parser for the named file.
@@ -468,10 +469,12 @@ func (p *parser) directive(line string, idx int) {
 
 		p.file.Includes = append(p.file.Includes, inc)
 	case "#includeXS":
-		if inc, ok := p.includeArg(directive, line, idx); ok {
+		inc, ok := p.includeArg(directive, line, idx)
+		if ok {
 			p.file.XsIncludes = append(p.file.XsIncludes, inc)
 		}
 
+		p.xsArg = ok
 		p.inXs = true
 		p.xsStart = idx + 1
 	default:
@@ -518,6 +521,14 @@ func (p *parser) endXsBlock(idx int) {
 
 	for end > p.xsStart && strings.TrimSpace(p.lines[end-1]) == "" {
 		end--
+	}
+
+	if p.xsArg && end == p.xsStart {
+		// an argumented #includeXS with an empty inline region owns no
+		// block; the bare directive always does
+		p.inXs = false
+
+		return
 	}
 
 	code := strings.Join(p.lines[p.xsStart:end], "\n")
@@ -745,9 +756,16 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 
 	for i := range out {
 		line := out[i]
+		inString := false
 
 		for j := 0; j < len(line); j++ {
 			switch {
+			case inString:
+				if line[j] == '"' {
+					inString = false
+				}
+			case line[j] == '"':
+				inString = true
 			case inBlock:
 				if line[j] == '*' && j+1 < len(line) && line[j+1] == '/' {
 					line = line[:j] + "  " + line[j+2:]
