@@ -97,10 +97,21 @@ func (s *Server) Initialize(
 		}
 	}
 
+	slog.DebugContext(ctx, "initialized", "encoding", s.encodingName())
+
 	return &protocol.InitializeResult{
 		Capabilities: caps,
 		ServerInfo:   protocol.ServerInfo{Name: serverName},
 	}, nil
+}
+
+// encodingName reports the negotiated position encoding for debug logs.
+func (s *Server) encodingName() string {
+	if s.utf16.Load() {
+		return "utf-16"
+	}
+
+	return "utf-8"
 }
 
 // negotiateEncoding picks utf-8 when the client offers it — parser columns
@@ -128,6 +139,7 @@ func (s *Server) DidOpen(
 ) error {
 	doc := params.TextDocument
 	s.docs.Put(string(doc.URI), doc.Text, int(doc.Version))
+	slog.DebugContext(ctx, "did_open", "uri", doc.URI, "version", doc.Version, "bytes", len(doc.Text))
 	s.publishDiagnostics(ctx, doc.URI)
 
 	return nil
@@ -149,6 +161,7 @@ func (s *Server) DidChange(
 	}
 
 	s.docs.Put(string(docURI), text, int(params.TextDocument.Version))
+	slog.DebugContext(ctx, "did_change", "uri", docURI, "version", params.TextDocument.Version, "bytes", len(text))
 	s.publishDiagnostics(ctx, docURI)
 
 	return nil
@@ -161,6 +174,7 @@ func (s *Server) DidClose(
 ) error {
 	docURI := params.TextDocument.URI
 	s.docs.Remove(string(docURI))
+	slog.DebugContext(ctx, "did_close", "uri", docURI)
 	s.publish(ctx, docURI, nil)
 
 	return nil
@@ -189,8 +203,14 @@ func (s *Server) Hover(
 	}
 
 	if markdown == "" {
+		slog.DebugContext(ctx, "hover", "uri", params.TextDocument.URI,
+			"line", params.Position.Line, "col", params.Position.Character, "hit", false)
+
 		return nil, nil
 	}
+
+	slog.DebugContext(ctx, "hover", "uri", params.TextDocument.URI,
+		"line", params.Position.Line, "col", params.Position.Character, "hit", true)
 
 	return &protocol.Hover{
 		Contents: &protocol.MarkupContent{
@@ -263,6 +283,9 @@ func (s *Server) SignatureHelp(
 	case strings.HasSuffix(name, ".xs"):
 		hint, found = s.signatureHelpXs(ctx, text, name, pos, docURI)
 	}
+
+	slog.DebugContext(ctx, "signature_help", "uri", params.TextDocument.URI,
+		"line", params.Position.Line, "col", params.Position.Character, "hit", found)
 
 	if !found {
 		return nil, nil
@@ -375,6 +398,9 @@ func (s *Server) Completion(
 		cands = s.completionXs(ctx, text, name, pos, docURI)
 	}
 
+	slog.DebugContext(ctx, "completion", "uri", params.TextDocument.URI,
+		"line", params.Position.Line, "col", params.Position.Character, "items", len(cands))
+
 	return &protocol.CompletionList{IsIncomplete: false, Items: toCompletionItems(cands)}, nil
 }
 
@@ -478,6 +504,9 @@ func (s *Server) Definition(
 		string(params.TextDocument.URI),
 		s.fromProtocolPos(text, params.Position),
 	)
+	slog.DebugContext(ctx, "definition", "uri", params.TextDocument.URI,
+		"line", params.Position.Line, "col", params.Position.Character, "hit", found)
+
 	if !found {
 		return protocol.LocationSlice{}, nil
 	}
@@ -514,6 +543,9 @@ func (s *Server) References(
 			Range: s.targetRange(t.URI, t.Range),
 		})
 	}
+
+	slog.DebugContext(ctx, "references", "uri", params.TextDocument.URI,
+		"line", params.Position.Line, "col", params.Position.Character, "count", len(out))
 
 	return out, nil
 }
@@ -569,6 +601,8 @@ func (s *Server) DocumentSymbol(
 	for _, sym := range syms {
 		out = append(out, s.toDocumentSymbol(text, sym))
 	}
+
+	slog.DebugContext(ctx, "document_symbol", "uri", params.TextDocument.URI, "symbols", len(out))
 
 	return out, nil
 }
@@ -643,7 +677,10 @@ func (s *Server) publishDiagnostics(ctx context.Context, docURI uri.URI) {
 	uriArg := string(docURI)
 	closure := s.resolver.Closure(ctx, uriArg)
 
-	s.publish(ctx, docURI, s.analyze(uriArg, text, closure))
+	diags := s.analyze(uriArg, text, closure)
+	slog.DebugContext(ctx, "diagnostics", "uri", uriArg, "count", len(diags))
+
+	s.publish(ctx, docURI, diags)
 }
 
 // publish pushes a diagnostics batch for docURI via the client dispatcher

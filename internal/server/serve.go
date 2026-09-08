@@ -38,6 +38,8 @@ func serve(ctx context.Context, rwc io.ReadWriteCloser) error {
 
 	// The client dispatcher reaches handlers via the request context
 	// (protocol.ClientFromContext), so nothing races the serving start.
+	slog.DebugContext(ctx, "serve started")
+
 	ctx = protocol.WithLogger(ctx, slog.Default())
 	_, conn, _ := protocol.NewServer(ctx, srv, jsonrpc2.NewStream(rwc))
 

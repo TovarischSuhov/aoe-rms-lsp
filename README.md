@@ -101,6 +101,21 @@ No other flags: capabilities are declared in `initialize` — full-text sync,
 hover, completion, signature help, definition, references and document
 symbols. Position encoding is negotiated per client (utf-8 preferred).
 
+## Debugging
+
+Launch the server with `-debug` to get verbose tracing on stderr (stdout
+stays reserved for the protocol):
+
+```sh
+./aoe2-lsp -debug 2>lsp.log
+```
+
+Debug events cover the lifecycle (`serve started`, `initialized`) and every
+request (`did_open`, `did_change`, `diagnostics`, `hover`, `completion`,
+`signature_help`, `definition`, `references`, `document_symbol`) with
+metadata only — uri, version, sizes, counts; document contents never enter
+the logs. Without the flag the server stays silent apart from errors.
+
 ## Editor setup
 
 ### Neovim (nvim-lspconfig)
