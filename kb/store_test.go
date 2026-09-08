@@ -214,3 +214,71 @@ func TestIndexCommands_InvalidPayload(t *testing.T) {
 		})
 	}
 }
+
+// TestStore_LoadMines_APIShape pins the load-time mining contract: an
+// arg whose desc carries bounds and whose payload has no range key (the
+// committed-JSON shape) is served with the mined kind and range.
+func TestStore_LoadMines_APIShape(t *testing.T) {
+	s := newStore()
+
+	payload := `[{"name":"set_gaia_civilization","args":[` +
+		`{"name":"N","kind":"","required":true,"desc":"number (0-53)"}]}]`
+	require.NoError(t, s.indexCommands([]byte(payload)))
+
+	cmd, found := s.Command("set_gaia_civilization")
+	require.True(t, found)
+
+	assert.Equal(t, "number", cmd.Args[0].Kind)
+	assert.Equal(t, ValueRange{Min: "0", Max: "53"}, cmd.Args[0].Range)
+}
+
+// TestStore_LoadMinesRangeAndEmptyKind proves load-time mining works on
+// the committed (unmined) JSON shape — the shipping path for the
+// existing data file.
+func TestStore_LoadMinesRangeAndEmptyKind(t *testing.T) {
+	s := newStore()
+
+	payload := `[{"name":"set_gaia_civilization","args":[` +
+		`{"name":"N","kind":"","required":true,"desc":"number (0-53)"}]}]`
+	require.NoError(t, s.indexCommands([]byte(payload)))
+
+	cmd, found := s.Command("set_gaia_civilization")
+	require.True(t, found)
+
+	assert.Equal(t, "number", cmd.Args[0].Kind)
+	assert.Equal(t, ValueRange{Min: "0", Max: "53"}, cmd.Args[0].Range)
+	assert.Equal(t, "0", cmd.Args[0].Range.Min)
+}
+
+// TestStore_LoadKeepsStructuredKindOverMined covers the provenance rule:
+// a structured kind from extraction is never overwritten by the mined
+// word — the percent set analysis gates on depends on it.
+func TestStore_LoadKeepsStructuredKindOverMined(t *testing.T) {
+	s := newStore()
+
+	payload := `[{"name":"cliff_curliness","args":[` +
+		`{"name":"%","kind":"percent","required":true,"desc":"number (0-100)"}]}]`
+	require.NoError(t, s.indexCommands([]byte(payload)))
+
+	cmd, found := s.Command("cliff_curliness")
+	require.True(t, found)
+
+	assert.Equal(t, "percent", cmd.Args[0].Kind)
+	assert.Equal(t, ValueRange{Min: "0", Max: "100"}, cmd.Args[0].Range)
+}
+
+// TestStore_FlagAttributesStayNameOnly covers flag attributes (empty
+// Desc): nothing to mine, the name-only form survives the load pipeline.
+func TestStore_FlagAttributesStayNameOnly(t *testing.T) {
+	s := newStore()
+
+	payload := `[{"name":"create_elevation","attributes":[` +
+		`{"name":"set_scale_by_size","kind":"","required":false,"desc":""}]}]`
+	require.NoError(t, s.indexCommands([]byte(payload)))
+
+	attr, found := s.Attribute("create_elevation", "set_scale_by_size")
+	require.True(t, found)
+
+	assert.Empty(t, attr.Kind)
+	assert.Equal(t, ValueRange{}, attr.Range)
+}
