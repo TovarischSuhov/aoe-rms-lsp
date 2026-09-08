@@ -1,173 +1,134 @@
-# Completion (textDocument/completion) для AoE2 RMS + XS
+# Fix parse/analysis defects from 2026-09-08 review (№1–№5)
 
 ## Current State
 
-Сервер aoe2-lsp реализует: `definition`, `references`, `documentSymbol`,
-`signatureHelp`, диагностику (push), include-замыкание и кросс-файловую
-навигацию. **Completion есть только в виде базового MVP прямо в `server`**
-(handler `Server.Completion`, контракт-green): `.rms` — команды секции
-(`SectionAt` → `Store.Commands`) + все константы; `.xs` — функции/константы
-по префиксу слова; inline-XS-блоки, атрибуты, значения аргументов и локальные
-символы XS не поддерживаются; вычислители зашиты в server, отдельной
-протоколо-независимой ячейки нет. *(Уточнено на этапе brainstorm-context:
-изначальная формулировка «отсутствует полностью» была неточна.)*
+Полное ревью кода (`docs/reviews/2026-09-08-full-review.md`, master 09161d8)
+зафиксировало 11 дефектов. Автопроверки зелёные (go test, -race, vet,
+golangci-lint, goimports, govulncheck, goga lint, goga contract × 9) —
+дефекты семантические, контракты ячеек их уже запрещают (например,
+«не паниковать» в rms). Находки №1–№3 воспроизведены независимо
+репро-скриптами (репро включены в ревью-документ).
 
-Вход для задачи уже подготовлен (в том числе работой над signature help):
+Неисправленное состояние:
 
-- `kb.Store` — команды RMS (с атрибутами и аргументами), XS-функции и
-  константы, `ValueRange` + kind words (намайнены из Desc);
-- `rms.RmsFile.ArgAt` — позиционный контекст: команда-владелец, аргумент vs
-  атрибут (band-owner, записанные спаны);
-- `xs.XsFile` — `Decl` (символы пользователя: функции/константы/переменные)
-  + parser-индексы.
+- `rms.Parse("#includeXS\nvoid main() { int x = 1; }")` — паника
+  index out of range (падение всего LSP-сервера на didOpen/didChange).
+- `for (int i = 0; …)` — 4 ложных `undefined symbol "i"` на каждый цикл;
+  Definition/VisibleAt/completion не видят переменную цикла.
+- `\` + `\n` в строковом литерале сдвигает все последующие позиции
+  на строку вверх.
+- `int a = 1, b = 2;` на top level — 2 ошибки, `b` теряется.
+- Warning о неявном закрытии незакрытого блока в closeScopes —
+  недостижим (мёртвый код).
 
 ## Description
 
-Реализовать `textDocument/completion` для `.rms` и `.xs` (+ inline-XS-блоки
-внутри RMS):
+Исправить дефекты №1–№5 из ревью 2026-09-08 в рамках существующих
+контрактов ячеек. CODEMANIFEST не меняются: все исправления —
+приведение реализации к уже задекларированному поведению.
 
-1. **Новая протоколо-независимая ячейка `complete`** (по образцу `hints` —
-   одна зона ответственности, одна ячейка): вычислитель кандидатов
-   - **RMS**: имена команд (по префиксу и секции), атрибуты команды
-     (`<...>`), слова-значения аргументов (kind words из kb), константы;
-   - **XS**: встроенные функции/константы из kb + символы пользователя из
-     `XsFile` (видимые в точке).
-2. **server**: handler `Completion`, capability `CompletionProvider`,
-   роутинг `.rms` / `.xs` / inline-XS (`unshiftPos`) — по образцу
-   signature help.
-3. Рендер: кандидаты → `protocol.CompletionItem` (Kind-маппинг, `Detail`
-   одной строкой, `SortText`), plain text без snippets, фильтрация по
-   префиксу — на клиенте.
+- **№1** `rms/parse.go` `endXsBlock`: обрабатывать `end == len(p.lines)`
+  (конечная позиция = конец последней строки, без индексации `starts`).
+- **№2** `xs` + `analysis`: переменная `for (int i = …)` собирается
+  в локали; семантика области — как в C/XS: видима в init/cond/step/body,
+  не видима после цикла. Убирает ложные `undefined`, чинит
+  `Definition`/`VisibleAt`/кандидаты complete.
+- **№3** `xs/parse.go` `scanString`: `\` + `\n` инкрементирует счётчик
+  строк (`s.line++`, `lineStart`), позиции после литерала корректны.
+- **№4** `xs/parse.go` `parseTypedDecl`: top-level мультидекларации
+  `int a = 1, b = 2;` парсятся симметрично `parseLocalDecl`.
+- **№5** `rms/parse.go` `closeScopes`: сравнение с исходной длиной
+  среза до усечения — warning реально выдаётся при неявном закрытии.
 
 ## Scope
 
 **In scope:**
-- Ячейка `complete`: CODEMANIFEST, bootstrap, Computer (RmsAt/XsAt),
-  протоколо-независимая модель кандидата;
-- RMS-контексты: позиция команды, позиция атрибута, позиция значения
-  аргумента (kind words), константы;
-- XS-контексты: встроенные функции/константы kb + пользовательские символы;
-- inline-XS-блоки в RMS (координатная трансляция unshiftPos);
-- server: handler `Completion`, capability, DI;
-- Тесты: unit по контекстам + integration full stack (по образцу
-  signature help).
+
+- №1 паника endXsBlock — rms
+- №2 for-loop локали — xs, analysis (+ регрессионный тест в complete)
+- №3 сдвиг строк scanString — xs
+- №4 top-level мультидекларации — xs
+- №5 мёртвый warning closeScopes — rms
+- Регрессионные тесты на каждую находку: репро из ревью → table-driven
+  тесты по конвенции проекта (`Test<Component>_<Scenario>`)
 
 **Out of scope:**
-- Hover (отдельная задача);
-- `completionItem/resolve` (lazy detail/documentation);
-- auto-import, добавление отсутствующих include;
-- snippets-инфраструктура (`InsertTextFormat` — только plain text);
-- расширенная документация в `Documentation` у items (concise-items).
+
+- Находки №6–№11 ревью (utf-16 конвертация, фантомный XsBlock,
+  include-resolver, blankComments)
+- Изменения CODEMANIFEST (read-only)
+- Рефакторинг и новые фичи
 
 ## Acceptance Criteria
 
-- `Initialize` анонсирует `CompletionProvider`.
-- В `.rms`: кандидаты на позицию имени команды (из kb, по секции/префиксу
-  контекста), на позицию атрибута команды, на позицию значения аргумента
-  (kind words), константы.
-- В `.xs` и inline-XS: встроенные функции/константы из kb + символы
-  пользователя, видимые в точке; inline-XS использует unshiftPos.
-- Stateless-правило: результат зависит только от (документ, позиция), не от
-  `params.Context` и предыдущих ответов.
-- Нет кандидатов → `CompletionList` с пустыми items (не nil, не ошибка).
-- Метрики items: `Label` = текст кандидата, `Kind` из маппинга, `Detail`
-  одной строкой, `SortText` задан; `InsertText` опущен, когда совпадает с
-  Label.
-- Валидация: `go test ./...` (memory cap), `goimports`, `golangci-lint`,
-  `goga lint`, `goga contract` по затронутым ячейкам — зелёные; существующие
-  тесты не меняются (SC8-правило signature help).
+- Все пять репро из ревью дают корректный результат (нет паники,
+  0 ложных undefined, корректные Line, обе декларации, warning выдан)
+- Репро оформлены регрессионными тестами в соответствующих пакетах
+- Существующие тесты не ломаются (SC-правило: менять только ожидания,
+  прямо связанные с исправляемым поведением)
+- `timeout 300 systemd-run --user --scope -p MemoryMax=1500M
+  -p MemorySwapMax=0 bash -c 'go test ./... -count=1'` — зелёный
+- `goimports -w .`, `golangci-lint run`, `goga lint`,
+  `goga contract rms xs analysis complete` — все exit 0
 
 ## Stack
 
-- **Frameworks:** —
-- **Libraries:** `go.lsp.dev/protocol` + `go.lsp.dev/jsonrpc2` +
-  `go.lsp.dev/uri` (в go.mod), `testify` (тесты)
-- **Infrastructure:** — (stdio LSP-сервер, без новых компонентов)
+- **Frameworks:** Go 1.23+ (стандартная библиотека)
+- **Libraries:** testify (assert/require) — уже в go.mod
+- **Infrastructure:** нет
 
 ## External Dependencies
 
 | Component | Usage file | Status |
 |-----------|------------|--------|
-| go.lsp.dev/protocol | `.goga/usages/cooks/lsp-protocol.md` | updated (секция «Completion Items») |
+| — | — | новых внешних зависимостей нет |
 
-Новых внешних зависимостей нет.
+Файлы практик (`cooks`) не требуются: правки внутри существующих
+ячеек, новых библиотек/инструментов не появляется.
 
 ## Risks and Constraints
 
-- Дискриминация RMS-контекстов (команда vs атрибут vs значение) опирается на
-  `ArgAt` band-owner — пограничные случаи на стыках band'ов требуют
-  отдельного внимания в дизайне.
-- Scope-резолюция XS (какие символы видимы в точке): `XsFile` может не
-  хранить блочных scope'ов — на design-этапе решить (худший случай —
-  файловый уровень видимости).
-- Объём кандидатов: сервер отдаёт полный контекстный набор, фильтрация на
-  клиенте — проверить поведение на больших списках kb.
-- Kind-маппинг (какой CompletionItemKind какому типу кандидата соответствует)
-  — зафиксировать в дизайне, не в рантайме.
-- Go 1.23+ совместимость; conventions.md обязателен.
+- №2 затрагивает сразу три ячейки (xs, analysis, complete):
+  изменение сбора локалей может сместить ожидания существующих тестов
+  — менять только те, что прямо связаны с областью видимости for.
+- №5 включает ранее мёртвый warning: реальные .rms с неаккуратными
+  блоками начнут получать диагностику — проверить на тестовых
+  fixture проекта, чтобы не устроить «диагностический шум».
+- №1: тщательно покрыть граничные случаи (пустой файл, только
+  `#includeXS`, блок в конце/начале файла) — парсер обязан
+  обрабатывать произвольный вход без паники (контракт rms).
+- Тесты — только под memory cap (CLAUDE.md).
 
 ## Scope Estimate
 
-Одна задача-топик `completion` (прецедент — signature help: один топик →
-brainstorm контрактов → design → план). Ожидаемая декомпозиция в плане:
-~5–8 задач (bootstrap ячейки + CODEMANIFEST, RMS-компьютер, XS-компьютер,
-модель кандидата/сортировка, server handler + capability, integration-тесты).
+Разбиение на 3 подзадачи по ячейкам, каждая — самостоятельная ценность,
+ветка `task/fix-parse-bugs` (или три ветки по подзадаче — по протоколу
+task → branch → PR):
+
+1. **rms**: №1 (паника) + №5 (мёртвый warning)
+2. **xs**: №3 (scanString) + №4 (мультидекларации)
+3. **xs + analysis + регрессия complete**: №2 (for-loop локали)
 
 ## Existing Architecture
 
-- Новая ячейка `complete` (deps: `kb`, `rms`, `xs`, `common` — read-only
-  Imports, как у `hints`).
-- `server` импортирует `complete` (как импортирует `hints`); обратные
-  импорты запрещены DSL.
-- Контракт `hints` не меняется; `complete` не встраивает `Hint` — у
-  completion своя модель кандидата.
-- `.goga/usages/cooks/lsp-protocol.md` уже дополнен секцией «Completion
-  Items» (kinds, SortText, stateless, фильтрация на клиенте).
+Затрагиваемые ячейки и контракты (все — корректировка реализации
+внутри контракта, без правки CODEMANIFEST):
+
+- `rms` — `Parse`, RmsFile/XsBlock (№1, №5)
+- `xs` — `XsParse`, XsFile.VisibleAt/collectLocals, scanString,
+  parseTypedDecl (№2, №3, №4)
+- `analysis` — Analyzer.AnalyzeXs/collectLocals (№2)
+- `complete` — только регрессионный тест: кандидаты содержат
+  переменную цикла (№2, без правок кода, если VisibleAt починен в xs)
+
+Направление зависимостей: complete → xs/analysis → common; правки
+не меняют сигнатур, только поведение.
 
 ## Notes
 
-Решения, принятые при формулировке (2026-09-08):
-
-- Одна задача, не две (RMS+XS делят ячейку, рендер и роутинг).
-- Новая ячейка `complete`, не расширение `hints` (разные зоны
-  ответственности).
-- Фильтрация по префиксу — на клиенте; сервер отдаёт контекстный набор.
-- Snippets, resolve, auto-import — вне области.
-
-Целевое API (sketch, Go; контракты зафиксирует brainstorm):
-
-```go
-// Пакет complete — протоколо-независимый вычислитель кандидатов.
-// Образец — hints.Computer.
-
-// Candidate — один протоколо-независимый кандидат completion.
-type Candidate struct {
-	Label  string // текст кандидата; InsertText опускается, когда равен Label
-	Kind   Kind   // протоколо-независимый вид: Command, Attribute, Value,
-	//        Constant, Function, Variable (маппинг в CompletionItemKind — в server)
-	Detail string // одна строка: диапазон значений, сводка параметров
-	Sort   string // основа SortText: стабильный порядок контекстных групп
-}
-
-// Computer вычисляет кандидатов для RMS- и XS-контекстов.
-type Computer struct { /* kb.Store — constructor DI */ }
-
-func NewComputer(store *kb.Store) *Computer
-
-// RmsAt — кандидаты в точке RMS-документа: имена команд (контекст секции),
-// атрибуты команды-владельца, слова-значения аргумента (kind words), константы.
-func (c *Computer) RmsAt(f *rms.RmsFile, pos common.Pos) []Candidate
-
-// XsAt — кандидаты в точке XS-документа: встроенные функции/константы kb +
-// символы пользователя, видимые в точке.
-func (c *Computer) XsAt(f *xs.XsFile, pos common.Pos) []Candidate
-```
-
-```go
-// server — handler и роутинг по образцу SignatureHelp.
-func (s *Server) Completion(ctx context.Context, params *protocol.CompletionParams) (protocol.CompletionResult, error) {
-	// роутинг: .xs | inline-XS блок (unshiftPos) | .rms
-	// Candidate → protocol.CompletionItem (Kind-маппинг, Detail, SortText)
-	return &protocol.CompletionList{IsIncomplete: false, Items: items}, nil
-}
-```
+- Источник задачи: `/goga-propose docs/reviews/2026-09-08-full-review.md`
+- Пользователь утвердил: объём №1–№5, разбиение на 3 подзадачи,
+  стек без новых зависимостей.
+- Репро №1–№3 уже проверены независимо (раздел «Репро» в ревью) —
+  использовать их как заготовки тестов.
+- Приоритет мерджа: подзадача 1 (паника) — первая.

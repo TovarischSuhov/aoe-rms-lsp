@@ -1,781 +1,611 @@
-# Design Document: `master` — Completion (textDocument/completion)
+# Design Document: `master` — fix-review-defects (№1–№5 из ревью 2026-09-08)
 
 <!-- Топик: `master` (`.goga/history/2026/master/`). Основа: материализованные
-контракты `8c77336` (ячейка complete + xs VisibleAt + server), план
-`arch.md`, задача `task.md`. Прецедент архитектуры — signature help
-(design/plan 2026-09, PR #5). -->
+контрактные дельты `arch.md` (rms/xs/analysis + xs-parsing.md), задача
+`task.md`, источник `docs/reviews/2026-09-08-full-review.md`. Репро №1–№3
+независимо верифицированы 2026-09-08. -->
 
 ## Contract Changes
 
 ### Changed CODEMANIFEST Files
 
-- `complete/CODEMANIFEST` — **новая ячейка**: `Completer(store)` с
-  `RmsAt`/`XsAt`, `Candidate(label, kind, detail, sort)`; usage
-  `completing.md`.
-- `xs/CODEMANIFEST` — `XsFile` += метод `VisibleAt(pos) -> (visible
-  []Symbol, found bool)`; kind-словарь outline расширен `param`/`local`.
-- `server/CODEMANIFEST` — импорт `complete` (`Completer`, `Candidate`,
-  `completing`); `Server(store, analyzer, computer, completer)`;
-  переписан `Completion`; `Serve` собирает `NewCompleter(store)`;
-  глобальные аннотации += kind-таблица и правило пустого списка.
+- `rms/CODEMANIFEST` — `Parse` Algorithm: шаг 5 += «или конца файла»
+  (№1); шаг 6 += «неявное закрытие незакрытого вложенного блока →
+  Diagnostic severity=warning» (№5).
+- `xs/CODEMANIFEST` — `XsParse` Algorithm шаг 2 += мультидекларации
+  (№4); `XsFile.Definition` шаг 2 += «…или оператора for с его
+  init-декларацией» (№2); `XsFile.VisibleAt` шаг 3 += for-init локаль
+  области оператора (№2).
+- `analysis/CODEMANIFEST` — `Analyzer.AnalyzeXs` шаг 3 += init-декларация
+  for в собранных локалях, консервативно (№2).
+- `xs/.usages/xs-parsing.md` — VisibleAt Preconditions += строка о
+  for-init локали.
 
 ### New Entities
 
-- `complete.Completer` — вычислитель кандидатов (completer.go)
-- `complete.Candidate` — протоколо-независимый кандидат (candidate.go)
+Нет — задача поведенческая, все типы существуют.
 
 ### Changed Entities
 
-- `xs.XsFile` — +`VisibleAt` (навигационное семейство SymbolAt/Definition/CallAt)
-- `server.Server` — DI `completer`; `Completion` делегирует в complete
+- `rms.Parse` — поведение (№1, №5), сигнатура неизменна.
+- `xs.XsParse` — поведение (№3, №4), сигнатура неизменна.
+- `xs.XsFile.VisibleAt` / `Definition` — поведение (№2), сигнатуры
+  неизменны.
+- `analysis.Analyzer.AnalyzeXs` — поведение (№2), сигнатура неизменна.
 
 ### Deleted Entities
 
-- `server.completionsRms`, `server.completionsXs` (реализация, не контракт) —
-  MVP-вычислители упраздняются вместе с хелперами `wordPrefix`,
-  `matchesPrefix`, `commandSignature`, `functionSignature` (используются
-  только старым completion; hover рендерит Markdown отдельно).
+Нет.
 
 ### Usages and Annotations Changes
 
-- `xs/.usages/xs-parsing.md` += секция «Visible symbols (completion)».
-- `complete/.usages/completing.md` — создан.
-- `server` глобальные аннотации: `completing` (complete), kind-таблица
-  `Candidate.Kind → CompletionItemKind`, правило «пустой список — не nil».
-- `.goga/usages/cooks/lsp-protocol.md` += «Completion Items» (сделано на
-  propose-этапе, `e864192`).
+- Аннотации перечисленных методов — см. Changed CODEMANIFEST Files.
+- Практик в заголовках не добавлено/не удалено.
 
 ## Applied Fixes
 
 ### Fixed CODEMANIFEST Defects
 
-- Дефектов Phase 3 не обнаружено (`goga lint` 9/0; интерфейсные
-  чекпойнты трассировки — все passed, см. Code Stack Trace).
-- Материализационные переименования (по требованию линтера, внесены до
-  design-фазы): `Computer`→`Completer`, `computing.md`→`completing.md`
-  (коллизия с hints), бэктики на импортированные типы.
+- `xs/CODEMANIFEST` VisibleAt: `` `for (int i = …)` `` в backticks
+  признано линтером неразрешимой ссылкой (`annotation_links_exists`) →
+  формулировка без backtick-обёртки (reason: DSL reference rules).
+- `analysis/CODEMANIFEST` AnalyzeXs: строгая формулировка «Push перед
+  оператором / Pop после» заменена консервативной «входит в собранные
+  локали… не маркируется» — трассировка показала: строгая область для
+  for несимметрична существующим вложенным блокам (if/{}) и меняет
+  диагностическое поведение существующих карт (решение пользователя,
+  см. Session Decisions).
 
 ## Entity Interaction and Data Flow
 
 ### Interaction Diagram
 
 ```
-                    ┌──────────────────────── server (LSP) ────────────────────────┐
- textDocument/      │  Completion(ctx, params)                                     │
- completion ───────►│    │ язык по расширению URI                                  │
-                    │    ├─ .xs ──► XsParse(text) ──────────┐                       │
-                    │    │        Closure.ExternalDecls(uri)│                      │
-                    │    │                                  ▼                      │
-                    │    │                        Completer.XsAt(file,pos,ext)     │
-                    │    ├─ .rms ─► Parse(text) ─┐           ▲                      │
-                    │    │   pos ∈ XsBlock ──────┼─ unshift ┘                       │
-                    │    │        └──────────────► XsParse(block.Code)+Ext("")     │
-                    │    │                  else ─► Completer.RmsAt(file,pos)       │
-                    │    │                              ▼                          │
-                    │    │                       []Candidate                       │
-                    │    └──────────────► render → []protocol.CompletionItem ──────┼──► CompletionList
-                    └──────────────────────────────────────────────────────────────┘
-                                             internal complete:
-  RmsAt ─► rms.RmsFile.ArgAt / SectionAt ─► kb.Store.Commands/Command/Constants
-  XsAt  ─► xs.XsFile.VisibleAt ──────────► kb.Store.Functions/Constants
-                                           + external []xs.Decl (передан server'ом)
+rms.Parse ──── RmsFile.XsBlocks ────→ server (didOpen/didChange)
+   │  №1: endXsBlock без паники на EOF
+   │  №5: closeScopes warning
+
+xs.XsParse ──── XsFile ──┬──→ XsFile.VisibleAt ──→ complete.Completer.XsAt ──→ server.Completion
+   │  №3: scanString     │         №2: for-init локаль        (регрессия, kind=local)
+   │  №4: parseTypedDecl ├──→ XsFile.Definition ──→ server/навигация
+   │                     └──→ analysis.Analyzer.AnalyzeXs ──→ server (диагностика)
+   │  №2: parseFor сохраняет init-декларацию        №2: ложные undefined уходят
 ```
 
 ### Data Flows
 
-1. **RMS-команда**: editor → Server.Completion → rms.Parse → RmsAt:
-   ArgAt(pos) → (ArgSite{Stmt,Kind}) → Store.Command(stmt.Name) /
-   SectionAt → Store.Commands(sec) → []Candidate → CompletionItem[].
-2. **RMS-значение**: ArgSite.Kind=arg|attr(+Value.Range) →
-   Store.Constants("") → []Candidate(kind=constant, Detail=Value).
-3. **XS**: VisibleAt(pos) → []common.Symbol (top+param+local) ∪
-   external []Decl → вытеснение kb ∪ Store.Functions()+Constants("")
-   → []Candidate.
-4. **inline-XS**: pos∈XsBlock.Range → unshiftPos → XsParse(Code) →
-   поток 3 с ExternalDecls("").
+1. **№1/№5 (rms)**: `Parse(source, name)` → line-split → директивы →
+   `endXsBlock(idx)` на директиве/EOF; `closeScopes(closer, stops)` на
+   `end_*`. Потребитель: server.didOpen → диагностики + XsBlocks →
+   `xs.XsParse(block.Code)`.
+2. **№3/№4 (xs)**: `XsParse(source, name)` → `xscanner.next()` →
+   `scanString()` (line-учёт); `parseTypedDecl()` (мультидекларации) →
+   `file.Decls` → Symbols/Definition/VisibleAt/analysis/complete.
+3. **№2 (xs→analysis/complete)**: `parseFor()` сохраняет init-декларацию
+   как первый statement тела for → существующие обходы
+   (`collectLocals`/`appendLocals` в xs; `collectLocals`/
+   `walkStmtsXs` в analysis) подхватывают её автоматически.
 
 ### Entity Dependencies
 
-Инициализация (Serve): `kb.NewStore()` → `analysis.NewAnalyzer(store)` →
-`hints.NewComputer(store)` → `complete.NewCompleter(store)` →
-`NewServer(store, analyzer, computer, completer)` → `NewDocStore()`.
-Все зависимости immutable после построения; порядок не влияет.
+Порядок инициализации не меняется (DI конструкторы без изменений):
+`NewAnalyzer(store)`, `NewCompleter(store)`. Новых зависимостей нет.
 
 ## Code Stack Trace
 
-### Trace: `xs.XsFile.VisibleAt(pos)`
+### Trace: `rms.Parse` — путь №1 (endXsBlock, EOF без `\n`)
 
 #### Chain
 
-1. **Input**: `pos common.Pos` в координатах файла (или block-local —
-   трансляция у вызывающей стороны).
-2. Проверка `noncode` (строки/комментарии, индекс с парс-времени —
-   тот же, что у `CallAt`) → contains → **return (nil, false)**.
-   → checkpoint: типы ✓ (существующий `[]common.Range`-индекс).
-3. Топ-левел: для каждого `Decls[i]` с `Kind != DeclInclude` →
-   `common.Symbol{Kind: decl.Kind, Name: decl.Name, Range: decl.Range,
-   Selection: declNameRange(decl)}` (существующий хелпер `Symbols()`
-   использует тот же рендер). → checkpoint: Selection ⊆ Range ✓
-   (declNameRange — первое вхождение имени внутри Range).
-4. Параметры: для каждого function-Decl, чей `decl.Range` объемлет
-   `pos` (внутренний при вложенности невозможна — топ-левел плоский),
-   каждый `Params[j]` → `Symbol{Kind: "param", Name, Range: r,
-   Selection: r}`, где `r = paramNameRange(decl, p.Name)` (существующий;
-   skip-логика для имени функции = имени параметра уже учтена).
-   → checkpoint: ✓ переиспользование существующих хелперов.
-5. Локали: обход `collectVisibleLocals(decl.Body, pos, depth=1)` —
-   вариант существующего `collectLocals` без фильтра по имени:
-   `StmtDecl` → каждый item `declaredLocal(item, "")`-обобщённый →
-   candidate{nameRange, scopeEnd=blockEnd, depth}; включаются только
-   те, чей scope покрывает `pos` (`!pos.Before(nameRange.Start) &&
-   pos.Before(scopeEnd)` — семантика `declCandidate.covers`).
-   → `Symbol{Kind: "local", Name, Range: r, Selection: r}`.
-   → checkpoint: ✓ модель scope идентична `bestDeclarer` (Definition) —
-   никакой второй интерпретации видимости.
-6. **Output**: `(symbols, true)`; порядок: топ-левел по объявлению →
-   параметры по списку → локали по позиции декларации.
+1. **Input**: `source = "#includeXS\nvoid main() { int x = 1; }"`
+   (нет финального `\n`), `name = "t.rms"`.
+2. `Parse` → `p.lines = Split(source, "\n")` → 2 строки;
+   `p.starts = [0, 12]` → checkpoint: длины согласованы ✓.
+3. Строка 0 — директива `#includeXS` (без аргумента): `p.inXs = true`,
+   `p.xsStart = 1` → checkpoint: xsStart < len(lines) ✓.
+4. Строка 1 — не директива/секция, `p.inXs` — пропускается как код
+   блока (без терминатора) → до конца входа.
+5. `closeAll()`: `p.inXs` → `endXsBlock(len(p.lines))` →
+   `end = min(2, 2) = 2`; цикл обрезки пустых строк:
+   `p.lines[1]` непуста → end остаётся 2 → **дефект**: `p.pos(2, 0)`
+   читает `p.starts[2]` — index out of range → panic. Устраняется
+   хелпером `lineStartPos` (см. Algorithm Design).
+6. **Output** (после фикса): `RmsFile` c 1 `XsBlock{Code: "void main()
+   { int x = 1; }", Range: [pos(1,0), конец строки 1]}`; diags пуст;
+   паники нет → checkpoint ✓.
 
 #### Checkpoint Summary
 
-- noncode-индекс существует (`f.noncode`) — passed.
-- Параметры/локали уже имеют machinery (`paramNameRange`,
-  `collectLocals`, `declaredLocal`, `declCandidate.covers`) — passed:
-  VisibleAt = инверсия bestDeclarer (перечислить всех candidates,
-  покрывающих pos, вместо выбора лучшего для одного имени).
-- Контракт «локали — блоки, объемлющие pos» уточнён: локаль видима,
-  если её декларация **предшествует или совпадает** с pos в объемлющем
-  блоке (семантика covers). Локаль, объявленная после курсора, не
-  видима — согласовано с Definition (затенение). Дефектов нет.
+- Вектор A (блок с кодом, EOF): panic → фикс `lineStartPos(end)` ✓
+- Вектор B (bare `#includeXS` последней строкой): `xsStart = len(lines)`
+  → `p.pos(xsStart, 0)` — второй panic-вектор → тот же хелпер для
+  Start ✓
+- Вектор C (пустые хвостовые строки): цикл обрезки уменьшает end <
+  len → старый путь корректен, не регрессирует ✓
 
-### Trace: `complete.NewCompleter(store)` / `Completer`
-
-1. **Input**: `store *kb.Store` (DI).
-2. `Completer{store: store}` — единственное поле; без горутин, без
-   кэшей (Store immutable). → checkpoint: ✓ conventions (constructor DI).
-
-### Trace: `Completer.RmsAt(file, pos)`
+### Trace: `rms.Parse` — путь №5 (closeScopes)
 
 #### Chain
 
-1. **Input**: `file rms.RmsFile` (свежий Parse), `pos common.Pos`.
-2. `file.ArgAt(pos)` → `(ArgSite, bool)`.
-   - **found=false** → `file.SectionAt(pos)`:
-     - found → `sectionCommands(sec.Name)` (гл. 4 ниже); "global" →
-       `store.Commands("")` (все); → checkpoint: ✓ `SectionAt`
-       возвращает синтетическую "global" только если материализована.
-     - не found → **return nil**.
-3. **ArgSite.Kind** (значения «arg»/«attr»/«none» — канонические
-   константы rms.KindArg/KindAttr/KindNone):
-   - `none` → `sectionCommands(...)` ∪ `ownerAttributes(site.Stmt)`.
-   - `arg` → `store.Constants("")` → candidates kind=constant.
-   - `attr` → поиск код-атрибута: среди `site.Stmt.Attributes` взять
-     последний с `Name == site.Name` и `Range.Contains(pos)` →
-     `attrCode`; тогда `attrCode.Value.Range.Contains(pos)` →
-     **value-позиция** → константы; иначе (имя/без значения) →
-     `ownerAttributes(site.Stmt)`.
-     → checkpoint: ✓ Value — экспортированное поле `rms.Attribute`,
-     `Expr.Range` экспортирован; атрибут без значения → zero-Range →
-     Contains всегда false → корректный дефолт «на имени».
-4. `sectionCommands(section)`: `store.Commands(section)` →
-   `Candidate{Label: cmd.Name, Kind: "command", Detail: cmd.Section,
-   Sort: "1"+cmd.Name}`.
-5. `ownerAttributes(stmt)`: `store.Command(stmt.Name)`; found → для
-   каждого `Command.Attributes[i]` → `Candidate{Label: a.Name, Kind:
-   "attribute", Detail: attrDetail(a), Sort: "0"+a.Name}`, где
-   `attrDetail`: Range непуста (Min≠"" && Max≠"") → «Kind Min..Max»;
-   иначе Kind≠"" → «Kind»; иначе "" (флаг).
-   → checkpoint: ✓ формат паритетен меткам hints (`lookups`:
-   «Name: Kind Min..Max»; здесь без Name — Label уже рядом).
-6. Константы: `Candidate{Label: c.Name, Kind: "constant", Detail:
-   c.Value, Sort: "2"+c.Name}`.
-7. **Output**: `[]Candidate` (порядок: атрибуты(Sort 0) → команды(1) →
-   константы(2); внутри группы — Label, т.к. Sort = группа+Label).
-   Дедупликация не требуется (источники не пересекаются по Label).
+1. **Input**: `start_random / if 1 / percent_chance 50 /
+   create_terrain GRASS / end_random`.
+2. Стек scopes при `end_random`: `[random, if]` (percent_chance уже
+   закрыт своим statement-переходом).
+3. `closeScopes(closer=end_random, stops=isRandomName)`:
+   итерация `slices.Backward` → i=1 (`if`): **дефект** — условие
+   `i < len(p.scopes)-1` всегда false (len уже усечён предыдущими
+   итерациями/первой проверкой), warning мёртв.
+4. **Output** (после фикса): warning ``"end_random" closes an
+   unterminated "if" block`` severity=warning code="syntax" ✓; сам
+   `random` закрывается без warning (легитимная цель stops) ✓.
 
 #### Checkpoint Summary
 
-- Все kb-вызовы сигнатурно совпадают (`Commands(string) []Command`,
-  `Command(string) (Command, bool)`, `Constants(string) []Constant`,
-  `CommandArg.Kind/Range`) — passed.
-- ArgAt/SectionAt — экспортированы, семантика в `rms-parsing` — passed.
-- Дефектов нет.
+- Мёртвое условие → замена на `!stops(open.name) && open.name !=
+  "percent_chance"` ✓
+- `percent_chance` — не предупреждать (документировано в комментарии
+  closeScopes) ✓
+- Парные if/endif, start_random/end_random — без warning (регресс-тест) ✓
 
-### Trace: `Completer.XsAt(file, pos, external)`
+### Trace: `xs.XsParse` — путь №3 (scanString)
 
 #### Chain
 
-1. **Input**: `file xs.XsFile`, `pos`, `external []xs.Decl`
-   (include-замыкание; для inline-блоков — ExternalDecls("")).
-2. `file.VisibleAt(pos)` → `(syms, ok)`; `!ok` → **return nil**.
-   → checkpoint: ✓ строка/комментарий отсечены здесь (единственный
-   in-string-гейт для XS-completion).
-3. **Пул source** (Sort "0"): map `seen[name]struct{}`:
-   - из `syms`: kind function/variable/param/local → как есть; kind
-     extern → kind "function"; kind rule/event → как есть (словарь
-     VisibleAt их возвращает; кандидатный kind — "function"? нет:
-     rule/event не вызываются по имени — **исключаются**, фиксируется
-     ниже); каждому — Sort "0"+Label.
-   - из `external`: Kind=function → "function"; Kind=variable →
-     "variable"; Kind=extern → "function"; rule/event/include — skip.
-   - имя в пуле → вытесняет kb (запись в `seen`).
-   - Detail: для function — мини-сигнатура (см. шаг 5); для прочих "".
-     → checkpoint: !! контракт говорит «visible-символы
-     (function/variable/param/local; extern → function)» — про
-     rule/event из VisibleAt не сказано. Решение дизайн-уровня:
-     **исключать** rule/event (не адресуемы по имени в выражениях).
-     Согласовано с контрактом (перечислен исчерпывающий словарь).
-4. **kb** (не в `seen`): `store.Functions()` → kind "function",
-   Sort "1"+Name; `store.Constants("")` → kind "constant",
-   Sort "2"+Name.
-5. **Мини-сигнатура** `functionDetail`: source → `Decl.Type` +
-   `Decl.Params` (типы через ", "); kb → `Function.ReturnType` +
-   `Function.Params`; рендер `«[ret ]name(t1, t2)»`; пустой Type →
-   без «ret ». → checkpoint: ✓ поля существуют (`Param.Type`,
-   `ReturnType`); паритет рендера с hints (Label-часть).
-6. **Output**: `[]Candidate`.
+1. **Input**: `string s = "abc\` + `\n` + `DEF";\nint z = 1;`.
+2. `next()` → `"` → `scanString()`: escape-ветка `s.pos += 2`
+   пропускает `\n` без `s.line++/s.lineStart` → **дефект**: все
+   последующие `posAt` дают Line на 1 меньше.
+3. **Output** (после фикса): при escape с `\n` → `s.line++;
+   s.lineStart = s.pos + 2`; декларация `z` получает Line=2 ✓;
+   `noncode`-диапазон литерала корректен (Contains для VisibleAt/CallAt) ✓.
 
 #### Checkpoint Summary
 
-- VisibleAt ↔ XsAt: `[]common.Symbol` ↔ потребление Name+Kind — passed.
-- external `[]Decl` ↔ `hints.XsAt`-паттерн — passed.
-- Открытка: rule/event из VisibleAt исключаются (дизайн-решение в
-  рамках контрактного словаря) — дефектом не является.
+- `skipSpace`-инвариант (line считается только на `\n`; `\r` — обычный
+  пробел) сохранён ✓
+- `\` + не-`\n` — поведение неизменно ✓; `\` в конце входа — pos += 2
+  безопасен (граница цикла) ✓
 
-### Trace: `server.Server.Completion(ctx, params)`
+### Trace: `xs.XsParse` — путь №4 (parseTypedDecl, мультидекларация)
 
 #### Chain
 
-1. **Input**: `params.TextDocument.URI`, `params.Position`;
-   `params.Context` игнорируется (stateless).
-2. `openDocument(uri)` → (text, name); не открыт → пустой
-   `CompletionList{Items: []}` (не nil).
-3. Роутинг (общий шаблон SignatureHelp):
-   - `.xs`: `XsParse(text)` + `closure.ExternalDecls(uri)` →
-     `completer.XsAt(file, pos, ext)`.
-   - `.rms`: `Parse(text)`; найти `XsBlock` с `Range.Contains(pos)` →
-     `unshiftPos(pos, block.Range.Start)` + `XsParse(block.Code)` +
-     `closure.ExternalDecls("")` → `XsAt`; иначе `RmsAt(file, pos)`.
-   → checkpoint: ✓ unshiftPos существует (server.go:746, паттерн
-   SignatureHelp task 8); Closure-доступ — как в существующих хендлерах.
-4. Рендер: для каждого `Candidate` → `protocol.CompletionItem{Label:
-   c.Label, Kind: kindMap[c.Kind], Detail: protocol.NewOptional(c.Detail)
-   при c.Detail != "", SortText: Optional(c.Sort)}`; `InsertText`
-   опускается; `InsertTextFormat` — plain (zero value).
-   kindMap: command→Function, attribute→Field, constant→Constant,
-   function→Function, variable→Variable, param→Variable, local→Variable.
-   → checkpoint: ✓ таблица = глобальная аннотация server; поведение
-   отличается от MVP (command был Keyword, Documentation заполнялся,
-   фильтрация была серверной) — задокументировано как замена MVP.
-5. **Output**: `&protocol.CompletionList{IsIncomplete: false, Items:
-   items}`; пустой items — `[]protocol.CompletionItem{}` (не nil).
+1. **Input**: `int a = 1, b = 2;` (top level).
+2. `parseTypedDecl()`: `typ = "int"`, `name = a`, `= 1` → `decl a`
+   сформирован; далее `expectSemi` встречает `,` → **дефект**: 2
+   синтаксические ошибки, декларация `b` теряется.
+3. **Output** (после фикса): цикл деклараторов по образцу
+   `parseLocalDecl`: `Decl{a, Range от start (type words)}`, затем
+   `Decl{b, Range от имени b, Type: "int", Body: [b = 2]}`; один
+   `expectSemi` на весь statement; diags пуст ✓.
+4. `p.record(name)` на каждое имя → occurrence-индекс содержит оба →
+   Definition/References/VisibleAt/completion работают для `b` ✓.
 
 #### Checkpoint Summary
 
-- Открытый документ/парсинг — существующие хелперы — passed.
-- Замена MVP: тесты `TestServe_CompletionAllXsFunctions`,
-  `TestServe_CompletionRmsScopedToSection` переписываются под новый
-  контракт (единственное изменение существующих тестов в задаче;
-  остальные фичи — SC8, не трогаются). Capability-тест (строка 615)
-  остаётся валидным.
+- Одиночная декларация — путь байт-идентичен текущему (Range от
+  type-word start, существующие тесты/outline не меняются) ✓
+- Форма функции (`int f() {}`) не затронута: ветка `(` до цикла
+  деклараторов ✓
 
-### Trace: `server.Serve` (дельта)
+### Trace: `xs.XsFile.VisibleAt` / `Definition` — путь №2
 
-1. `store := kb.NewStore()` (существ.)
-2. `+ completer := complete.NewCompleter(store)`
-3. `NewServer(store, analyzer, computer, completer)` — расширенный
-   конструктор; struct Server += поле `completer`.
-   → checkpoint: ✓ DI-конструктор по conventions; алиасинг пакетов
-   не нужен (hints.Computer / complete.Completer — разные имена).
+#### Chain
+
+1. **Input**: `void main() { for (int i = 0; i < 10; i++) { int j =
+   i + 1; } }`, pos в условии (или теле).
+2. `parseFor`: init-декларация парсится `parseLocalDecl()` →
+   `Stmt{Kind: StmtDecl, Exprs: [i = 0 binary], Range: "int i = 0"}` →
+   **дефект**: `stmt.Exprs = append(stmt.Exprs, init.Exprs...)`
+   разворачивает декларацию — маркер StmtDecl теряется.
+3. **Output** (после фикса): init сохраняется как `stmt.Body[0]`
+   (тело = [init, …statement(s)]); cond/step остаются в `stmt.Exprs`.
+4. `VisibleAt(pos)` → `appendLocals(out, decl.Body, decl.Range.End,
+   pos)`: рекурсия в for-тело использует `blockEnd = for.Range.End` →
+   `i` видима во всём операторе (init/cond/step/body), после — нет ✓.
+5. `Definition(pos_i)` → `bestDeclarer` → `collectLocals`:
+   `declCandidate{nameRange: i-токен, scopeEnd: for.Range.End,
+   depth: глубина}` → покрывает вхождения в заголовке и теле ✓.
+6. `analysis.AnalyzeXs`: `collectLocals(decl.Body)` собирает имена из
+   StmtDecl-ов рекурсивно → `i` в `declared` до проверок → ложных
+   `undefined-symbol` нет; `walkStmtsXs` обходит init как обычную
+   декларацию (`env.declareLocals`) — консервативно, без Push/Pop ✓.
+7. `complete.Completer.XsAt`: VisibleAt возвращает `i` (kind=local) →
+   кандидат `i` группы source ✓.
+
+#### Checkpoint Summary
+
+- Assign-форма `for (i = 0; …)` без type-word — путь `forPart`, не
+  создаёт фантомную локаль ✓
+- Мульти-init `for (int i = 0, j = 5; …)` — `parseLocalDecl` уже
+  поддерживает запятые → обе локали ✓
+- Тело без скобок `for (…) x = i;` — Body=[init, exprStmt] ✓
+- Вложенный for/shadowing — глубинная декларация побеждает по depth ✓
+- Гонка с существующими тестами: `parseFor.Exprs` больше НЕ содержит
+  init-выражения → тесты, ожидающие «Exprs = [init, cond, step]»,
+  легитимно обновляются (SC-правило; других потребителей Exprs-for нет) ✓
 
 ## Algorithm Design
 
-### `xs.XsFile.VisibleAt`
+### `rms: lineStartPos` (новый хелпер парсера, unexported)
 
-**Responsibility**: видимый в точке набор именованных символов для
-completion-провайдеров; scope-модель = `Definition` (covers-семантика).
-
-**Algorithm:**
-```
-1. IF pos ∈ noncode → return (nil, false)
-2. out := []
-3. FOR decl IN Decls WHERE Kind != include:
-     out += Symbol{Kind: decl.Kind, Name, Range: decl.Range,
-                   Selection: declNameRange(decl)}
-4. FOR decl IN Decls WHERE Kind == function AND decl.Range ∋ pos:
-     FOR p IN decl.Params (по списку):
-       r := paramNameRange(decl, p.Name); fallback r = decl.Range
-       out += Symbol{Kind: "param", Name: p.Name, Range: r, Selection: r}
-5. FOR decl IN Decls WHERE Kind == function AND decl.Range ∋ pos:
-     walk(decl.Body, blockEnd = decl.Range.End, depth = 1):
-       FOR stmt WHERE Kind == StmtDecl:
-         FOR item IN stmt.Exprs:
-           (name, r) := declaredLocalName(item)   // обобщение declaredLocal
-           IF r.Start <= pos < blockEnd:           // covers
-             out += Symbol{Kind: "local", Name: name, Range: r, Selection: r}
-       RECURSE stmt.Body (blockEnd = stmt.Range.End, depth+1)
-6. return (out, true)
-```
-
-**Errors**: не возвращаются (парсер не падает; навигация детерминирована).
-
-**Edge Cases**:
-- пустой файл → `(empty, true)` (found отличает «нет символов» от «не код»).
-- локаль объявлена после pos → не видима (covers-семантика = Definition).
-- параметр = имени функции → paramNameRange skip-логика возвращает токен
-  параметра, не имени функции.
-- одноимённые топ-левел и локаль → оба в выдаче (приоритизация — потребитель).
-
-### `complete.Completer.RmsAt`
-
-**Responsibility**: контекстная матрица RMS → кандидаты.
+**Responsibility**: позиция начала строки `i`, устойчивая к `i ==
+len(p.lines)` (EOF).
 
 **Algorithm:**
 ```
-1. site, ok := file.ArgAt(pos)
-2. IF !ok:
-     sec, ok2 := file.SectionAt(pos)
-     IF !ok2 → return nil
-     IF sec.Name == "global" → return sectionCommands("")
-     return sectionCommands(sec.Name)
-3. SWITCH site.Kind:
-   case none:  return append(sectionCommands(sectionOf(pos)),
-                             ownerAttributes(site.Stmt)...)
-   case arg:   return constants()
-   case attr:  attrCode := последний a IN site.Stmt.Attributes
-                          WHERE a.Name == site.Name AND a.Range ∋ pos
-               IF attrCode != nil AND attrCode.Value.Range ∋ pos:
-                 return constants()
-               return ownerAttributes(site.Stmt)
-4. sectionCommands(sec): Store.Commands(sec) →
-     Candidate{Label: c.Name, Kind: "command", Detail: c.Section,
-               Sort: "1" + c.Name}
-   ownerAttributes(stmt): (cmd, ok) := Store.Command(stmt.Name); !ok → nil
-     FOR a IN cmd.Attributes:
-       Candidate{Label: a.Name, Kind: "attribute", Detail: attrDetail(a),
-                 Sort: "0" + a.Name}
-   constants(): Store.Constants("") →
-     Candidate{Label: c.Name, Kind: "constant", Detail: c.Value,
-               Sort: "2" + c.Name}
-   attrDetail(a): Min!=""&&Max!="" → "Kind Min..Max";
-                   Kind!="" → "Kind"; else ""
+1. IF i < len(p.lines) → p.pos(i, 0)
+2. ELSE (EOF): last = len(p.lines) - 1 →
+   Pos{Line: last, Column: len(p.lines[last]),
+       Offset: p.starts[last] + len(p.lines[last])}
+   (совпадает с вычислением конца файла в closeAll)
 ```
 
-**Errors**: нет; пустой список = молчание.
+**Edge Cases:**
+- пустой source (lines = [""]): EOF-ветка → Pos{0,0,0} ✓
 
-**Edge Cases**:
-- владелец не в kb → только команды секции (без атрибутов).
-- атрибут без значения (`set_scaling_by_map ␣`) → zero Value.Range →
-  Contains=false → имена атрибутов (правильный дефолт).
-- секция "global" → все команды (`Commands("")`).
-- позиция на заголовке секции/директиве при ArgAt=false → SectionAt
-  fallback даёт команды секции (шум отфильтрует клиент; молчание здесь
-  хуже — пользователь начинает вводить команду).
-
-### `complete.Completer.XsAt`
-
-**Responsibility**: пул source (visible + external) + kb → кандидаты.
+### `rms.Parse` — правка `endXsBlock` (№1)
 
 **Algorithm:**
 ```
-1. syms, ok := file.VisibleAt(pos); !ok → return nil
-2. seen := set(); out := []
-3. FOR sym IN syms:                       // Sort "0"
-     kind := sym.Kind
-     SWITCH kind:
-       function, variable, param, local → как есть
-       extern   → "function"
-       rule, event, section → SKIP        // не адресуемы в выражениях
-     IF sym.Name ∉ seen: out += cand(sym.Name, kind, detailFor(kind), "0"+Name)
-     seen += sym.Name
-4. FOR d IN external:                     // Sort "0", тот же приоритет
-     kind := d.Kind == extern → "function"; function → "function";
-            variable → "variable"; else SKIP
-     IF d.Name ∉ seen: out += cand(d.Name, kind, fnDetail(d), "0"+d.Name)
-     seen += d.Name
-5. FOR fn IN Store.Functions() WHERE fn.Name ∉ seen:   // Sort "1"
-     out += Candidate{fn.Name, "function", fnDetail(fn), "1"+fn.Name}
-6. FOR c IN Store.Constants("") WHERE c.Name ∉ seen:   // Sort "2"
-     out += Candidate{c.Name, "constant", c.Value, "2"+c.Name}
+1. end = min(idx, len(p.lines))
+2. обрезка пустых строк (без изменений)
+3. Range = {Start: lineStartPos(p.xsStart), End: lineStartPos(end)}
+   — обе границы безопасны при xsStart/end == len(p.lines)
 ```
 
-`fnDetail`: source Decl → `[Type +] Name(T1, T2)`; kb Function →
-`[ReturnType +] Name(P1.Type, P2.Type)`; пустой тип — без префикса.
+**Edge Cases:**
+- bare `#includeXS` в EOF → Code "", Range нулевой ширины в EOF
+  (блок-мусор в outline — отдельная находка №7 ревью, вне задачи).
 
-**Errors**: нет.
-
-**Edge Cases**:
-- source-функция = имя kb-функции → только source (truth-модель).
-- function foo + variable foo в source → оба (разные kinds).
-- Detail у variable/param/local — "" (тип в Symbol недоступен; не
-  выдумывать) — клиент покажет просто имя.
-
-### `server.Server.Completion` (переписываемый)
-
-**Responsibility**: роутинг + рендер; stateless.
+### `rms.Parse` — правка `closeScopes` (№5)
 
 **Algorithm:**
 ```
-1. text, name, ok := openDocument(uri); !ok → пустой CompletionList
-2. pos := fromProtocolPos(params.Position)
-3. SWITCH расширение name:
-   ".xs":  file := XsParse(text); ext := Closure.ExternalDecls(uri)
-           cands := completer.XsAt(file, pos, ext)
-   ".rms": file := Parse(text)
-           IF ∃ block IN file.XsBlocks WHERE block.Range ∋ pos:
-             bp := unshiftPos(pos, block.Range.Start)
-             xsFile := XsParse(block.Code)
-             cands := completer.XsAt(xsFile, bp, Closure.ExternalDecls(""))
-           ELSE cands := completer.RmsAt(file, pos)
-4. items := render(cands)      // kindMap; Detail Optional при != "";
-                                // SortText=Sort; InsertText опущен
-5. return &CompletionList{IsIncomplete: false, Items: items}
+FOR open В slices.Backward(p.scopes):
+  IF !stops(open.name) AND open.name != "percent_chance":
+     reportf(closer.at, warning, "syntax",
+       `"%" closes an unterminated "%" block`, closer.text, open.name)
+  finalizeScope(open); truncate
+  IF stops(open.name): RETURN
+reportf(..., error, `"%" without a matching opening block`)
 ```
 
-**Errors**: err всегда nil (молчание = пустой список; «не открыт» и
-«нет кандидатов» — не ошибки протокола).
+**Edge Cases:**
+- percent_chance закрывается неявно без warning (комментарий
+  closeScopes); stops-цель без warning.
 
-**Edge Cases**:
-- неизвестное расширение/язык → пустой items (существующее поведение
-  switch без ветки).
-- Closure недоступен (C6) → ExternalDecls отдаёт что может; unknown
-  имена молча падают до kb.
+### `xs.XsParse` — правка `scanString` (№3)
+
+**Algorithm:**
+```
+WHILE pos < len(src):
+  IF src[pos]=='\\' AND pos+1 < len(src):
+     IF src[pos+1]=='\n': line++; lineStart = pos+2
+     pos += 2; CONTINUE
+  IF src[pos]=='"': pos++; RETURN
+  IF src[pos]=='\n': RETURN   // unterminated
+  pos++
+```
+
+### `xs.XsParse` — правка `parseTypedDecl` (№4)
+
+**Algorithm:**
+```
+1. typ = parseTypeWords(); первый name; ветка "(" → функция (без изменений)
+2. цикл деклараторов (по образцу parseLocalDecl):
+   a. name = next(); IF не ident → diag "expected a name in declaration"; BREAK
+   b. record(name)
+   c. IF atOp("="): parseExpr → Body=[initStmt], Range.End=value.End
+   d. append Decl{Kind: variable, Name, Type: typ,
+        Range: {Start: (первый декларатор ? start : name.at.Start),
+                End: name/value.End}}
+   e. IF atOp(","): next(); CONTINUE ELSE BREAK
+3. expectSemi(последний End)
+```
+
+### `xs.XsParse` — правка `parseFor` (№2)
+
+**Algorithm:**
+```
+1. init-ветка (type-word/const): init = parseLocalDecl()
+2. НЕ разворачивать: сохранить init в локальной переменной
+3. cond/step → stmt.Exprs (как сейчас)
+4. body = parseStmt()
+5. stmt.Body = [init] + body  (только когда init был декларацией)
+6. stmt.Range.End = body.End
+```
+
+**Constraints:** Exprs у StmtFor = только cond/step; init живёт в Body
+как StmtDecl — область видимости (scopeEnd = for.Range.End) и
+сбор локалей работают через существующие обходы без их правки.
+
+### `analysis.Analyzer.AnalyzeXs` — без правки кода
+
+`collectLocals`/`walkStmtsXs` уже рекурсивно обходят Body и StmtDecl →
+init-декларация for подхватывается автоматически. Консервативная
+семантика (использование после цикла не маркируется) — решение
+пользователя, зафиксировано в контракте.
+
+### `complete.Completer.XsAt` — без правки кода
+
+`i` приходит из `VisibleAt` как kind=local → рендер и группы
+существующие. Только регрессионный тест.
 
 ## Cross-cutting Concerns
 
-- **Error handling**: полином nil-error — ни один новый путь не
-  возвращает err (парсеры не падают; kb-lookup — `(T, bool)`; пустой
-  список = штатное молчание). Согласовано с контрактами (без `err` в
-  сигнатурах Completer/VisibleAt).
-- **Logging**: отсутствует (чистые вычисления; паритет с hints —
-  там тоже нет логов).
-- **Validation**: детерминированность всех методов (одинаковый вход →
-  одинаковый результат — Requirements контрактов); сортировка
-  стабильна через Sort = группа+Label.
-- **Caching**: нет новых кэшей. Parse выполняется на каждый запрос —
-  паритет с SignatureHelp/Hover (per-request parse); DocStore кэширует
-  только текст.
-- **Concurrency**: все структуры immutable после построения; Completer
-  разделяётся горутиной соединения безопасно (как Computer/Analyzer).
+- **Error handling**: без изменений — парсеры никогда не падают, все
+  проблемы как Diagnostic; новые warning-и (№5) в общем конвейере
+  сортировки/мерджа.
+- **Logging**: отсутствует (существующая архитектура парсеров —
+  чистые функции без IO).
+- **Validation**: `goga lint` (0 ошибок), `goga contract rms xs
+  analysis complete` (exit 0) после контрактных дельт — выполнено;
+  тесты строго под memory cap (CLAUDE.md, runaway-прецедент).
+- **Caching**: не затрагивается (DocStore/Resolver вне области).
+- **Concurrency**: правки в чистых функциях парсера; race-режим
+  существующих тестов (`go test -race`) остаётся зелёным.
 
 ## Usages Analysis
 
 ### `conventions`
-- **What**: обязательные правила Go-кода/тестов (DI, errors, table-driven).
-- **Where**: все три ячейки (глобальные аннотации).
-- **Why**: базовая практика проекта.
-- **How**: NewCompleter-конструктор; методы без err; testify-таблицы.
+- **What**: Go-правила проекта (формат, DI, тесты table-driven).
+- **Where**: все изменённые ячейки; тесты по `Test<Component>_<Scenario>`.
+- **Why**: базовая практика из `.goga/config.yml`.
+- **How**: `goimports`, testify require/assert, memory-cap запуск.
 
-### `lsp-protocol` (server)
-- **What**: go.lsp.dev-паттерны: result shapes, Completion Items.
-- **Where**: `Server.Completion` (рендер, empty-list), `Serve`.
-- **Why**: единый источник протокольных конвенций.
-- **How**: `*CompletionList` (не slice-арм), Optional-обёртки,
-  stateless-правило, клиентская фильтрация.
+### `rms_grammar` / `xs_grammar`
+- **What**: грамматики RMS/XS (директивы, statements, for, recovery).
+- **Where**: `Parse` (№1/№5 — inline-режим, end_*-блоки), `XsParse`
+  (№3 — строки с escape; №4 — переменные; №2 — for).
+- **Why**: единственный источник языковой семантики.
+- **How**: inline-XS до конца файла; `end_*`-парность; `\`-escape в
+  строках; for(init;cond;step) с typed-decl init.
 
 ### Imported Usages
-
-- `lookups` из `kb` — list-lookups API (`Functions`/`Constants`/
-  `Commands`/`Command`); путь `kb/.usages/lookups.md`. Использован
-  Completer'ом; регистрозависимость имён учтена (сервер не фильтрует).
-- `rms-parsing` из `rms` — `ArgAt`/`SectionAt`-семантика; путь
-  `rms/.usages/rms-parsing.md`. Использован RmsAt.
-- `xs-parsing` из `xs` — `VisibleAt` (+`CallAt`-семантика noncode);
-  путь `xs/.usages/xs-parsing.md`. Использован XsAt.
-- `positions-and-diagnostics`, `symbols` из `common` — Pos, Symbol
-  (Selection ⊆ Range); пути `common/.usages/*.md`.
-- `computing` из `hints` — unchanged (SignatureHelp).
-- `completing` из `complete` — consumer-контракт нового Completer;
-  путь `complete/.usages/completing.md`.
+- `xs-parsing` from `xs` — семантика VisibleAt/Definition для analysis
+  и complete; обновлена строкой о for-init локали.
+  Path: `xs/.usages/xs-parsing.md`.
+- `positions-and-diagnostics`, `symbols` from `common` — построение
+  Pos/Range/Diagnostic/Symbol; без изменений.
 
 ## `.usages/` Update
 
 ### Cell: `xs`
-- **xs-parsing.md** → статус current (секция Visible symbols добавлена
-  на материализации); дополнений не требуется.
 
-### Cell: `complete`
-- **completing.md** → создан на материализации; после реализации
-  проверяется соответствие примеров фактическому API (NewCompleter).
+#### Existing Files — Consistency
+- **`xs-parsing.md`** → `xs/.usages/xs-parsing.md`
+  - Status: updated (в этой задаче)
+  - Additions: precondition о for-init локали (раздел VisibleAt).
+  - Updates needed: нет.
 
-### Cell: `server`
-- **lifecycle.md** → not affected (Completion — не lifecycle);
-  изменений нет.
+### Cell: `rms`, `analysis`, `complete`
+
+- `rms-parsing.md`, `includes.md`, `checks.md`,
+  `value-and-type-checks.md`, `completing.md` — актуальны, правок не
+  требуется (диагностические коды не меняются; «Parse never fails»
+  становится ещё вернее).
 
 ## Test Stack Trace
 
 ### General Setup
 
-- `kb`: настоящий `NewStore()` (embedded JSON; lookups.md) — без моков.
-- `rms`/`xs`: Parse/XsParse реальных фикстур; позиции — байтовые offset
-  из фикстуры (patтерн navigation_test.go).
-- `complete`: table-driven на (фикстура, pos) → []Candidate; сравнение
-  полных срезов (Label, Kind, Detail, Sort) через require.Equal.
-- `server`: integration через dispatcher (паттерн serve_test.go:
-  harness h.disp.Completion); язык определяется URI (.rms/.xs).
+- Чистые модульные тесты в пакетах `rms`, `xs`, `analysis`,
+  `complete` (pattern проекта: table-driven, testify).
+- Позиции в тестах — 0-based `common.Pos{Line, Column}`.
+- Регрессионная база: репро из
+  `docs/reviews/2026-09-08-full-review.md`.
 
 ### Source File Registry
 
-- `xs/ast.go` (+`visible.go` при необходимости) — VisibleAt + хелперы.
-- `complete/completer.go`, `complete/candidate.go` (+ тесты).
-- `server/server.go` — Completion, render, DI; `server/serve.go` — сборка.
-- Тесты: `xs/navigation_test.go` (доп.), `complete/completer_test.go`,
-  `complete/candidate_test.go`, `server/serve_test.go` (замена
-  completion-тестов).
+- `rms/parse.go` (endXsBlock, closeScopes, +lineStartPos) →
+  `rms/parse_test.go`
+- `xs/parse.go` (scanString, parseTypedDecl, parseFor) →
+  `xs/parse_test.go`, `xs/navigation_test.go`
+- `analysis/analyzer.go` (без правки — тесты-регрессии) →
+  `analysis/analyzer_test.go`
+- `complete/completer.go` (без правки) → `complete/completer_test.go`
 
 ---
 
 ### Positive Tests
 
-#### `TestVisibleAt_TopLevelDecls`
+#### `TestParse_UnclosedXsBlockAtEOFWithoutNewline` (rms, №1)
 
-**Setup**: `XsParse("int g = 1;\nvoid f(float a) { a = 2; }\nextern int e();\ninclude \"x.xs\";", "t.xs")`
+**Setup**: исходник без финального `\n`.
 
-**Input**: pos на строке 2 (внутри `void f` заголовка), например offset
-начала `float a`.
-
-**Trace**:
-```
-VisibleAt(pos)
-  → noncode: пусто → ok
-  → топ-левел: g(variable), f(function), e(extern) → Symbol
-  → f.Volume ∋ pos? Range f покрывает → params: a → kind=param
-  → locals тела: нет до pos
-  → (out, true)
-```
-
-**Assertions**: names/подмножество kinds: g=variable, f=function,
-e=extern, a=param; `include` отсутствует; для каждого Selection ⊆ Range;
-found=true.
-
-**Sufficiency**: фиксирует словарь top-level + skip include — регрессия
-на «completion предлагает пути include».
-
-#### `TestVisibleAt_ParamAndLocalScopes`
-
-**Setup**: `void f(int p) { int a1 = 1; { int b1 = 2; } pos_mark int a2; }`
-(курсор — на `pos_mark`, перед декларацией a2)
+**Input**: `rms.Parse("#includeXS\nvoid main() { int x = 1; }", "t.rms")`
 
 **Trace**:
 ```
-VisibleAt(pos)
-  → top: f
-  → params: p
-  → locals: a1 (r.Start <= pos < blockEnd) ✓; b1 — inner block r.Start
-    <= pos? b1 объявлен до pos, его блок объемлет pos? блок { int b1 }
-    закрылся до pos → scopeEnd < pos → НЕ видима; a2 объявлена после
-    pos → не видима
-  → [f, p, a1]
+Parse → lines=[#includeXS, void main…] → directive(#includeXS): inXs, xsStart=1
+  → closeAll → endXsBlock(2) → lineStartPos(2)=EOF-ветка {1, 25, 37}
+  → XsBlock{Code:"void main() { int x = 1; }", Range:{1:0..1:25}}
 ```
 
-**Assertions**: contains f(function), p(param), a1(local); NOT contains
-b1, a2; порядок: f → p → a1.
-
-**Sufficiency**: covers-семантика (Declaration-before-use) — ядро
-scope-модели; синхронно с Definition.
-
-#### `TestRmsAt_CommandNamePosition`
-
-**Setup**: rms-фикстура `<land_generation>\ncreate_land\n</land_generation>`;
-kb.Store; pos на токене `create_land` (ArgAt → kind=none).
-
-**Trace**:
+**Assertions**:
 ```
-RmsAt(file, pos)
-  → ArgAt → {Stmt: create_land, Kind: none}
-  → sectionCommands("land_generation") → команды секции, Sort "1…"
-  → ownerAttributes(create_land) → Store.Command("create_land").Attributes,
-    Sort "0…"
+require.NotPanics; len(file.XsBlocks) == 1
+XsBlocks[0].Code == "void main() { int x = 1; }"
+XsBlocks[0].Range.Start == {Line:1, Column:0}
+XsBlocks[0].Range.End == {Line:1, Column:25}
+len(diags) == 0
 ```
 
-**Assertions**: содержит create_land (kind=command, Detail="land_generation",
-Sort="1create_land"); содержит атрибуты create_land с Sort="0"+имя;
-все Kind ∈ {command, attribute}; констант нет.
+**Sufficiency**: репро №1 — паника всего LSP-сервера на didOpen;
+контракт «не паниковать».
 
-**Sufficiency**: главная UX-ветка; атрибуты опережают команды в SortText.
+#### `TestXsParse_TopLevelMultiDecl` (xs, №4)
 
-#### `TestRmsAt_ArgValuePosition_Constants`
+**Input**: `xs.XsParse("int a = 1, b = 2;", "t.xs")`
 
-**Setup**: `set_up_lands 5`? — аргумент number: kb create_elevator;
-фикстура `create_elevator 7`; pos на `7` (kind=arg).
+**Trace**: `parseTypedDecl → цикл деклараторов → Decl a, Decl b →
+record обоих имён`.
 
-**Assertions**: только константы (kind=constant, Detail=c.Value,
-Sort="2"+Name); пусто от команд/атрибутов.
+**Assertions**:
+```
+len(file.Decls) == 2; Decls[0].Name=="a", Decls[1].Name=="b"
+оба Kind==variable, Type=="int"
+Decls[1].Range.Start == позиция токена "b" (Column 10)
+нет синтаксических diags
+```
 
-**Sufficiency**: value-контекст даёт константы — не команды.
+**Sufficiency**: репро №4 — потеря деклараций из навигации/completion.
 
-#### `TestRmsAt_AttrNameVsValue`
+#### `TestVisibleAt_ForInitVisible` (xs, №2)
 
-**Setup**: `create_elevator 7 { set_scaling_by_map 50 }`; pos1 — на
-`set_scaling_by_map` (имя), pos2 — на `50` (значение).
+**Input**: `void main() { for (int i = 0; i < 10; i++) { int j = i + 1; } }`;
+pos в теле цикла (внутри `{ int j`).
 
-**Assertions**: pos1 → атрибуты владельца (kind=attribute; Detail по
-Kind/Range флаг-атрибута set_scaling_by_map — без Kind → Detail="");
-pos2 → константы.
+**Trace**: `parseFor → Body=[StmtDecl i=0, block] → appendLocals →
+локали i, j с blockEnd=for.Range.End`.
 
-**Sufficiency**: дискриминация имя-vs-значение через Value.Range.
+**Assertions**:
+```
+visible содержит {Name:"i", Kind:"local"} и {Name:"j", Kind:"local"}
+found == true
+```
 
-#### `TestRmsAt_GlobalSection_AllCommands`
+**Sufficiency**: репро №2 — completion не предлагал переменную цикла.
 
-**Setup**: фиксtура с глобальным statement (вне секций), pos на хвосте.
+#### `TestAnalyzeXs_ForLoopVarNoUndefined` (analysis, №2)
 
-**Assertions**: кандидаты = Commands("") (все секции), kind=command.
+**Input**: репро ревью: `void main() { for (int i = 0; i < 10; i++)
+{ int j = i + 1; } }`, `AnalyzeXs(file, nil)`.
 
-**Sufficiency**: синтетическая global → все команды.
+**Trace**: `collectLocals(decl.Body) → StmtDecl(init) в for-Body →
+declared["i"]=true → checkIdent(i) в declared → нет diags`.
 
-#### `TestXsAt_SourceShadowsKb`
+**Assertions**:
+```
+0 диагностик с code="undefined-symbol" (фактически diags пуст)
+```
 
-**Setup**: XsParse с `int xsVectorSet() { return 1; }`? — имя kb-функции;
-проще: `void main() {}` + локальная `int trQuestVarGet = 1;`? — берём
-функцию с именем из kb (`trQuestVarGet`), external=nil.
+**Sufficiency**: репро №2 — 4 ложных `undefined symbol "i"` на каждый
+цикл; главный источник диагностического шума.
 
-**Assertions**: ровно один `trQuestVarGet` (kind=function, Detail из
-source-Decl.Type+Params, Sort="0…"); Detail НЕ из kb.
+#### `TestXsAt_ForInitCandidate` (complete, №2)
 
-**Sufficiency**: truth-модель source > kb.
+**Input**: XsAt(file, pos в теле for, nil).
 
-#### `TestXsAt_ExternalDeclsMerged`
+**Assertions**:
+```
+кандидат {Label:"i", Kind:"local"} присутствует; Sort.startsWith("0")
+```
 
-**Setup**: XsParse(`void main() {}`), external = []Decl{{Kind: function,
-Name: "helper"}, {Kind: include, Name: "z.xs"}}.
+**Sufficiency**: сквозная регрессия: parse → VisibleAt → Candidate.
 
-**Assertions**: helper присутствует (kind=function, Sort "0…");
-include-декларация отсутствует; kb-функции/константы присутствуют
-(Sort "1…"/"2…").
+#### `TestParse_EndRandomClosesUnterminatedIf` (rms, №5)
 
-**Sufficiency**: include-замыкание — единый пул source.
+**Input**: `start_random\nif 1\npercent_chance 50\ncreate_terrain
+GRASS\nend_random`.
 
-#### `TestCompletion_RmsIntegration` (server)
+**Assertions**:
+```
+ровно 1 warning: Message `"end_random" closes an unterminated "if"
+block"`, Severity=warning, Code="syntax"
+```
 
-**Setup**: harness serve_test; didOpen `t.rms` c секцией; запрос.
+**Sufficiency**: репро №5 — мёртвый warning, молчаливое закрытие.
 
-**Trace**: disp.Completion → Server.Completion → Parse → RmsAt → render.
+#### `TestXsParse_StringEscapeNewlineTracksLines` (xs, №3)
 
-**Assertions**: `*CompletionList`; items непусты; для command-кандидата:
-Kind=CompletionItemKindFunction (не Keyword — смена MVP), InsertText
-nil, SortText == Candidate.Sort; Documentation nil (concise-items).
+**Input**: `"string s = \"abc\\\nDEF\";\nint z = 1;"` (escape + `\n`
+внутри литерала).
 
-**Sufficiency**: полная стопка + kind-таблица + concise-items.
+**Assertions**:
+```
+Decl "z".Range.Start.Line == 2
+Decl "s".Range.Start.Line == 0
+```
 
-#### `TestCompletion_InlineXsBlock` (server)
+**Sufficiency**: репро №3 — сдвиг всех позиций после литерала.
 
-**Setup**: didOpen `t.rms` c `#includeXS\nvoid f() { |` (курсор в
-блоке); запрос на позицию внутри блока.
-
-**Assertions**: items содержат f (function, Sort "0…") и kb-функции;
-координаты корректны (unshiftPos) — например, main-функция из kb.
-
-**Sufficiency**: inline-роутинг повторяет SignatureHelp-паттерн.
+---
 
 ### Negative Tests
 
-#### `TestVisibleAt_InStringAndComment`
+#### `TestParse_EndRandomWithoutMatch` (rms, guard)
 
-**Setup**: `void f() { string s = "abc|def"; } // tail|` (две позиции).
+**Input**: `end_random` без открытия → существующий error
+`"end_random" without a matching opening block` сохраняется
+(severity=error); фикc не превращает его в warning.
 
-**Assertions**: обе → (nil/empty, false).
+#### `TestXsParse_ForAssignFormNoPhantomLocal` (xs, guard №2)
 
-**Sufficiency**: in-string completion — главный «мусорный» кейс.
+**Input**: `int i;\nvoid main() { for (i = 0; i < 10; i++) {} }`, pos
+в теле.
 
-#### `TestRmsAt_NoContext_Empty`
+**Assertions**: `i` НЕ kind=local (только топ-левел variable);
+assign-форма не декларирует.
 
-**Setup**: rms-текст только из директив/вне секций (`#include "a.rms"`);
-pos на директиве вне секций.
+**Sufficiency**: защита от ложных деклараций assign-формы — регресс
+различения decl/assign.
 
-**Assertions**: RmsAt → пустой слайс (len 0), не nil-ошибка.
-
-**Sufficiency**: молчание как пустой список.
-
-#### `TestXsAt_VisibleAtFalse_Empty`
-
-**Setup**: XsParse с pos в строке; external=nil.
-
-**Assertions**: пустой слайс.
-
-**Sufficiency**: единый in-string-гейт.
-
-#### `TestCompletion_UnknownLanguage_EmptyList`
-
-**Setup**: didOpen `t.txt`; запрос.
-
-**Assertions**: `*CompletionList`, Items len 0; err nil.
-
-**Sufficiency**: не-ошибка для неизвестного языка.
+---
 
 ### Edge Case Tests
 
-#### `TestRmsAt_UnknownOwner_NoAttributes`
+#### `TestParse_BareIncludeXSAtEOF` (rms, №1-вектор B)
 
-**Setup**: `not_a_command 1` (нет в kb), pos на имени (kind=none).
+**Input**: `rms.Parse("#includeXS", "t.rms")` → 1 XsBlock, Code "",
+Range нулевой ширины в EOF; NotPanics.
 
-**Assertions**: команды секции есть; атрибутов нет; паник нет.
+#### `TestParse_ClosedNestNoWarning` (rms, №5-guard)
 
-**Sufficiency**: деградация без краха.
+**Input**: полный `start_random … end_random` с парным `if/endif`
+внутри → 0 warning-ов о незакрытых блоках.
 
-#### `TestRmsAt_AttributeWithoutValue_DefaultsToName`
+#### `TestParse_PercentChanceImplicitNoWarn` (rms, №5-guard)
 
-**Setup**: `create_elevator 7 { set_scaling_by_map }` (без значения),
-pos на имени атрибута.
+**Input**: `start_random\npercent_chance 50\nend_random` →
+percent_chance закрывается неявно БЕЗ warning (документировано).
 
-**Assertions**: атрибуты владельца (не константы) — zero Value.Range.
+#### `TestXsParse_MultiVarForInit` (xs, №2-edge)
 
-**Sufficiency**: дефолт name-позиции.
+**Input**: `for (int i = 0, j = 5; …)` → обе локали в VisibleAt.
 
-#### `TestXsAt_SameNameDifferentKinds_BothKept`
+#### `TestVisibleAt_ForInitNotVisibleAfter` (xs, №2-edge)
 
-**Setup**: source `void foo() {}` + `int foo;`... — XS не допустит;
-берём top-level variable `int foo` + external function foo.
+**Input**: pos после цикла (в конце тела функции) → локаль `i`
+отсутствует; топ-левел символы остаются.
 
-**Assertions**: оба кандидата (function и variable, оба Sort "0").
+#### `TestDefinition_ForInit` (xs, №2)
 
-**Sufficiency**: словарь kinds не схлопывает одноимённые.
+**Input**: Definition(pos `i` в условии) → name-range `i` в init;
+Definition(pos `i` после цикла) → found=false (нет топ-левел `i`).
 
-#### `TestXsAt_KbFunctionNoReturnType_DetailWithoutRet`
+#### `TestAnalyzeXs_ForLoopVarUsedAfterNotFlagged` (analysis, консервативность)
 
-**Setup**: kb-функция с пустым ReturnType (есть в данных, напр. с void?
-— берём любую с "" при наличии, иначе фикструем через source Decl без
-Type: `foo() {}`).
+**Input**: `void main() { for (int i = 0; i < 3; i++) {} i = 5; }` →
+0 undefined-symbol (консервативная семантика, решение пользователя).
 
-**Assertions**: Detail == "foo()" (без «void »-подобного префикса).
+#### `TestXsParse_TopLevelSingleDeclUnchanged` (xs, guard №4)
 
-**Sufficiency**: не выдумываем типы.
+**Input**: `int a = 1;` → 1 Decl, Range от type-word start —
+байт-идентично текущему поведению (SC: не менять существующие
+ожидания).
 
-#### `TestCompletion_Stateless_SameAnswerTwice` (server)
+#### `TestXsParse_ForBodyWithoutBraces` (xs, №2-edge)
 
-**Setup**: два запроса с разными params.Context (TriggerCharacter
-различен, эмуляция ретриггера).
-
-**Assertions**: items идентичны (require.Equal).
-
-**Sufficiency**: контракт stateless (AC task.md).
-
-#### `TestCompletion_EmptyCandidates_EmptyListNotError` (server)
-
-**Setup**: `.rms` документ, позиция вне контекста (даёт пустых
-кандидатов), например директива вне секций.
-
-**Assertions**: result — *CompletionList; Items != nil (len 0); err nil.
-
-**Sufficiency**: AC «пустой список — не nil, не ошибка».
+**Input**: `for (int i = 0; i < 3; i++) x = i;` → Body=[init,
+exprStmt]; `i` видима.
 
 ## Additional Instructions for the Implementation Agent
 
-- Порядок: xs (VisibleAt) → complete (Candidate → Completer) → server
-  (DI → Completion → Serve) — совпадает с arch.md; каждая задача —
-  зелёные гейты (memory-cap `go test ./... -count=1`, goimports,
-  golangci-lint, `goga lint`, `goga contract <cell>`).
-- Существующие тесты не модифицируются, КРОМЕ completion-тестов server
-  (`TestServe_CompletionAllXsFunctions`, `TestServe_CompletionRmsScopedToSection`)
-  — они проверяют заменяемый MVP; переписать под новый контракт
-  (kind-таблица, concise-items, клиентская фильтрация).
-- Удалить ставшие мёртвыми: `completionsRms`, `completionsXs`,
-  `wordPrefix`, `matchesPrefix`, `commandSignature`, `functionSignature`
-  (перед удалением убедиться grep'ом, что hover их не использует).
-- `VisibleAt` реализуется в xs/ast.go рядом с Definition; переиспользовать
-  `declNameRange`, `paramNameRange`, обобщить `collectLocals` →
-  collect-без-фильтра-по-имени (не копировать логику covers).
-- В complete НЕ импортировать go.lsp.dev (протоколо-независимость,
-  проверяется goga contract + ревью).
-- Kind-словарь Candidate и kindMap server — точные таблицы из
-  контрактов; никаких новых значений без правки CODEMANIFEST.
-- `kb/data/rms-commands.json` не перегенерировать (by design, паритет
-  с signature help).
+- Подзадачи и порядок: (1) rms №1+№5; (2) xs №3+№4; (3) xs №2 +
+  регрессии analysis/complete. Каждая — отдельная ветка task/*, PR в
+  master; №2 последней (зависит от представления parseFor).
+- Существующие тесты, ожидающие `StmtFor.Exprs == [init, cond, step]`,
+  обновляются легитимно (repr-change зафиксирован дизайном); остальные
+  ожидания не трогать (SC-правило из task.md).
+- Тесты — только под memory cap:
+  `timeout 300 systemd-run --user --scope -p MemoryMax=1500M
+  -p MemorySwapMax=0 bash -c 'go test ./... -count=1'`; финально
+  `goimports -w .`, `golangci-lint run`, `goga lint`,
+  `goga contract rms xs analysis complete`.
+- Контракты уже материализованы и валидны (goga lint 0, contract OK) —
+  CODEMANIFEST в кодовых задачах не трогать.
+- Комментарии в коде — плотность и стиль окружения (короткие
+  пояснения неочевидных решений: второй panic-вектор, dead-condition
+  история closeScopes, repr-выбор parseFor).

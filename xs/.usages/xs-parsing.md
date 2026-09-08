@@ -112,5 +112,8 @@ Preconditions:
 - Shadowing is not resolved: an outer top-level `int x` and an inner
   `float x` both come back — deduplication policy belongs to the
   consumer.
+- For-loop init declarations (`for (int i = ...)`) are locals scoped to the
+  for statement: visible in the initializer, condition, step and body,
+  not after the statement.
 - `include` declarations are skipped (not name-bearing for completion).
 
