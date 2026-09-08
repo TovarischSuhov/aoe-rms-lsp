@@ -94,17 +94,23 @@ func (a *Analyzer) walkStmts(stmts []rms.Statement, diags []common.Diagnostic) [
 			// structural blocks carry no own semantics; nested commands
 			// are checked in place. percent_chance folds its chance into
 			// positional args of the block statement itself.
-			if stmt.Name != "" && stmt.Name[0] != '#' {
-				if cmd, known := a.store.Command(stmt.Name); known {
-					diags = a.checkArgValues(stmt.Args, cmd.Args, diags)
-				}
-			}
-
-			diags = a.walkStmts(stmt.Children, diags)
+			diags = a.checkBlockStmt(stmt, diags)
 		}
 	}
 
 	return diags
+}
+
+// checkBlockStmt checks a structural statement: known block commands keep
+// their positional args validated, then children are walked in place.
+func (a *Analyzer) checkBlockStmt(stmt *rms.Statement, diags []common.Diagnostic) []common.Diagnostic {
+	if stmt.Name != "" && stmt.Name[0] != '#' {
+		if cmd, known := a.store.Command(stmt.Name); known {
+			diags = a.checkArgValues(stmt.Args, cmd.Args, diags)
+		}
+	}
+
+	return a.walkStmts(stmt.Children, diags)
 }
 
 // checkCommand validates one command statement: name, arguments and
@@ -251,19 +257,25 @@ func collectLocals(stmts []xs.Stmt, declared map[string]bool) {
 		stmt := &stmts[i]
 
 		if stmt.Kind == xs.StmtDecl {
-			for _, e := range stmt.Exprs {
-				switch {
-				case e.Kind == xs.ExprIdent:
-					declared[e.Value] = true // bare declarator: int x;
-				case e.Kind == xs.ExprBinary && e.Value == "=" && len(e.Children) > 0:
-					if e.Children[0].Kind == xs.ExprIdent {
-						declared[e.Children[0].Value] = true
-					}
-				}
-			}
+			declareItems(stmt.Exprs, declared)
 		}
 
 		collectLocals(stmt.Body, declared)
+	}
+}
+
+// declareItems marks the names introduced by one declaration's expression
+// list: bare identifiers and assignment targets.
+func declareItems(exprs []xs.Expr, declared map[string]bool) {
+	for _, e := range exprs {
+		switch {
+		case e.Kind == xs.ExprIdent:
+			declared[e.Value] = true // bare declarator: int x;
+		case e.Kind == xs.ExprBinary && e.Value == "=" && len(e.Children) > 0:
+			if e.Children[0].Kind == xs.ExprIdent {
+				declared[e.Children[0].Value] = true
+			}
+		}
 	}
 }
 
