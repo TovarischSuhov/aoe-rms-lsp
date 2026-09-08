@@ -118,6 +118,39 @@ func (s *Server) Completion(ctx context.Context, params *protocol.CompletionPara
 }
 ```
 
+## Completion Items
+
+`Completion` returns the sealed interface `CompletionResult` — return
+`*protocol.CompletionList` (or `protocol.CompletionItemSlice{}`).
+Empty candidates → `&protocol.CompletionList{}` with empty items, never nil:
+completion is not an error case, editors handle an empty list gracefully.
+
+```go
+func (s *Server) Completion(ctx context.Context, params *protocol.CompletionParams) (protocol.CompletionResult, error) {
+	items := s.computer.Items(doc, params.Position)
+
+	return &protocol.CompletionList{IsIncomplete: false, Items: items}, nil
+}
+```
+
+Item rules:
+- **`Label`** is the candidate text; omit `InsertText` when insertion equals the
+  label (the common case).
+- **`InsertTextFormat`**: plain text only — no snippet syntax (`$0`, `${...}`);
+  snippet infrastructure is out of scope.
+- **`Kind`** maps the candidate's nature to `protocol.CompletionItemKind`
+  constants (`Function`, `Constant`, `Variable`, `Field`, `Keyword`, `Value`).
+- **`Detail`** is one short line (arg range "0..100", param summary); extended
+  prose stays out of completion — concise-items rule, mirroring concise-hints.
+- **`SortText`** defines stable server-side ordering when alphabetical is not
+  desired (context-appropriate candidates first); clients ignoring it fall
+  back to label sorting.
+- The provider is **stateless**: items depend only on (document, position),
+  never on `params.Context` trigger info or previous responses — same rule as
+  `SignatureHelp`.
+- Filtering by prefix is the client's job; the server returns the full
+  context-appropriate candidate set (bounded by context, not by typed prefix).
+
 ## Signature Help
 
 Advertise in `Initialize`: `SignatureHelpProvider: &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}}`.
