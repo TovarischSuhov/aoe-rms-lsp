@@ -16,6 +16,10 @@ import (
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
+
+	"aoe2-lsp/analysis"
+	"aoe2-lsp/hints"
+	"aoe2-lsp/kb"
 )
 
 // testTimeout bounds every wait for an asynchronous server reaction.
@@ -557,4 +561,87 @@ func TestServerNavigation_IntegrationStdio(t *testing.T) {
 	require.Equal(t, protocol.SymbolKindModule, tree[0].Kind)
 	require.Len(t, tree[0].Children, 1)
 	require.Equal(t, "create_player_lands", tree[0].Children[0].Name)
+}
+
+// TestServe_SignatureHelpAPIShape pins the handler contract surface: the
+// three-argument NewServer wiring and the SignatureHelp method shape.
+func TestServe_SignatureHelpAPIShape(t *testing.T) {
+	store, err := kb.NewStore()
+	require.NoError(t, err)
+
+	srv := NewServer(store, analysis.NewAnalyzer(store), hints.NewComputer(store))
+
+	require.NotNil(t, srv)
+
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err = h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	docURI := uri.URI("file:///work/blank.rms")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{URI: docURI, LanguageID: "aoe2rms", Version: 1, Text: "\n\n"},
+	}))
+	h.waitDiagnostics(docURI)
+
+	help, err := h.disp.SignatureHelp(ctx, &protocol.SignatureHelpParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Nil(t, help, "blank document: silence is a nil result")
+}
+
+// TestServe_InitializeAdvertisesSignatureHelp covers the capability
+// contract: triggers "(" and "," only — disjoint from completion's
+// " " and "<"; existing capabilities unchanged.
+func TestServe_InitializeAdvertisesSignatureHelp(t *testing.T) {
+	h := startHarness(t)
+
+	res, err := h.disp.Initialize(context.Background(), &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	caps := res.Capabilities
+	require.NotNil(t, caps.SignatureHelpProvider)
+	require.Equal(t, []string{"(", ","}, caps.SignatureHelpProvider.TriggerCharacters)
+
+	require.NotNil(t, caps.HoverProvider, "existing capabilities stay intact")
+	require.NotNil(t, caps.CompletionProvider)
+	require.NotNil(t, caps.DefinitionProvider)
+	require.NotNil(t, caps.ReferencesProvider)
+	require.NotNil(t, caps.DocumentSymbolProvider)
+	require.NotNil(t, caps.TextDocumentSync)
+}
+
+// TestServe_SignatureHelpSilence covers the nil,nil silence convention
+// through the protocol layer: a nullable result, not an error and not an
+// empty SignatureHelp.
+func TestServe_SignatureHelpSilence(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	docURI := uri.URI("file:///work/empty.rms")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{URI: docURI, LanguageID: "aoe2rms", Version: 1, Text: "\n\n"},
+	}))
+	h.waitDiagnostics(docURI)
+
+	help, err := h.disp.SignatureHelp(ctx, &protocol.SignatureHelpParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Nil(t, help)
 }
