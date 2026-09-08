@@ -43,6 +43,7 @@ type sect struct {
 	name  string
 	nodes []*node
 	start common.Pos
+	end   common.Pos
 }
 
 // parser holds the incremental state of one Parse run.
@@ -52,12 +53,14 @@ type parser struct {
 	lines  []string
 	starts []int // byte offset of each line start
 
-	cur         *sect    // section being filled
-	scopes      []*node  // open if/elseif/else/start_random/percent_chance blocks
-	braceScopes []string // structural nesting inside an attribute block
-	owner       *node    // command owning attributes of an open { } block
-	lastCmd     *node    // last command statement started (for "{" on the next line)
-	openPos     common.Pos
+	cur           *sect    // section being filled
+	sects         []*sect  // closed sections, materialized at EOF
+	scopes        []*node  // open if/elseif/else/start_random/percent_chance blocks
+	braceScopes   []string // structural nesting inside an attribute block
+	owner         *node    // command owning attributes of an open { } block
+	lastCmd       *node    // last command statement started (for "{" on the next line)
+	lastCmdParent any      // scope (node or sect) the last command was attached to
+	openPos       common.Pos
 
 	inXs    bool
 	xsStart int
@@ -152,7 +155,10 @@ func isExcludedDirective(trimmed string) bool {
 	return word == "#include" || word == "#includeXS"
 }
 
-// closeAll finalizes the trailing section, XS block and open constructs.
+// closeAll finalizes the trailing section, XS block and open constructs,
+// then materializes every closed section — deferred to EOF because
+// conditional scopes may span section headers and their ranges are only
+// final once the last child lands.
 func (p *parser) closeAll() {
 	if p.inXs {
 		p.endXsBlock(len(p.lines))
@@ -163,7 +169,26 @@ func (p *parser) closeAll() {
 	last := len(p.lines) - 1
 	end := common.Pos{Line: uint32(last), Column: uint32(len(p.lines[last])), Offset: p.starts[last] + len(p.lines[last])}
 
-	p.closeSection(end)
+	p.cur.end = end
+	p.sects = append(p.sects, p.cur)
+
+	for _, s := range p.sects {
+		if s.name == "global" && len(s.nodes) == 0 {
+			continue
+		}
+
+		out := Section{
+			Name:       s.name,
+			Statements: make([]Statement, 0, len(s.nodes)),
+			Range:      common.Range{Start: s.start, End: s.end},
+		}
+
+		for _, n := range s.nodes {
+			out.Statements = append(out.Statements, materialize(n))
+		}
+
+		p.file.Sections = append(p.file.Sections, out)
+	}
 }
 
 // statementLine parses one statement, attribute or block-punctuation line.
@@ -203,7 +228,49 @@ func (p *parser) statementLine(line string, idx int) {
 		return
 	}
 
+	// Brace-less attribute context: create_* commands accept attributes
+	// on the following lines until the next command, a structural line or
+	// a section boundary — published maps omit the braces.
+	if p.implicitAttrTarget() != nil && !isCreateCommand(first.text) {
+		p.attributeLine(p.lastCmd, first, rest)
+
+		return
+	}
+
 	p.commandLine(first, rest)
+}
+
+// implicitAttrTarget reports the command owning a brace-less attribute
+// context, if one is open: the create_* command must live in the current
+// scope chain — attributes inside nested conditionals still attach to it
+// (published maps switch attribute values by branch), but once the chain
+// moved to a sibling branch the context is over. An explicit "{" line is
+// exempt (openBrace): published maps open the attribute block after a
+// closed conditional chain.
+func (p *parser) implicitAttrTarget() *node {
+	if p.lastCmd == nil || !isCreateCommand(p.lastCmd.name) {
+		return nil
+	}
+
+	switch parent := p.lastCmdParent.(type) {
+	case *sect:
+		if parent != p.cur {
+			return nil
+		}
+	case *node:
+		if !slices.Contains(p.scopes, parent) {
+			return nil
+		}
+	}
+
+	return p.lastCmd
+}
+
+// isCreateCommand reports whether a statement name belongs to the
+// create_* family — the commands whose attribute blocks are written
+// without braces in published maps.
+func isCreateCommand(name string) bool {
+	return strings.HasPrefix(name, "create_")
 }
 
 // commandLine builds a command statement. A trailing "{" opens its
@@ -439,6 +506,18 @@ func (p *parser) openBrace(brace token) {
 // closeBrace ends the attribute block of the owning command.
 func (p *parser) closeBrace(brace token) {
 	if p.owner == nil {
+		// A "}" closing a brace-less create_* attribute context is valid:
+		// the braces around attribute blocks are optional.
+		if target := p.implicitAttrTarget(); target != nil {
+			if brace.at.End.After(target.end) {
+				target.end = brace.at.End
+			}
+
+			p.lastCmd = nil
+
+			return
+		}
+
 		p.reportf(brace.at, common.SeverityError, "syntax", `unexpected "}"`)
 
 		return
@@ -542,14 +621,19 @@ func (p *parser) endXsBlock(idx int) {
 
 // add attaches a statement to the innermost collecting scope.
 func (p *parser) add(stmt *node) {
+	var parent any
+
 	if len(p.scopes) > 0 {
+		parent = p.scopes[len(p.scopes)-1]
 		p.scopes[len(p.scopes)-1].children = append(p.scopes[len(p.scopes)-1].children, stmt)
 	} else {
+		parent = p.cur
 		p.cur.nodes = append(p.cur.nodes, stmt)
 	}
 
 	if stmt.kind == KindCommand {
 		p.lastCmd = stmt
+		p.lastCmdParent = parent
 	}
 }
 
@@ -562,8 +646,9 @@ func (p *parser) finalizeScope(open *node) {
 	}
 }
 
-// syncConstructs reports constructs left open at a section header or EOF.
-func (p *parser) syncConstructs(context string) {
+// syncOwner closes an open { } attribute block (a section boundary or
+// EOF) with a warning; brace nesting state resets with it.
+func (p *parser) syncOwner(context string) {
 	if p.owner != nil {
 		p.diags = append(p.diags, common.Diagnostic{
 			Range:    common.Range{Start: p.openPos, End: p.openPos},
@@ -575,6 +660,13 @@ func (p *parser) syncConstructs(context string) {
 	}
 
 	p.braceScopes = nil
+}
+
+// syncConstructs reports constructs left open at EOF: the { } owner via
+// syncOwner, the conditional/random scopes as one unterminated-blocks
+// diagnostic.
+func (p *parser) syncConstructs(context string) {
+	p.syncOwner(context)
 
 	for _, open := range p.scopes {
 		p.finalizeScope(open)
@@ -599,24 +691,14 @@ func (p *parser) syncConstructs(context string) {
 
 // closeSection materializes the current section into the file.
 func (p *parser) closeSection(end common.Pos) {
-	p.syncConstructs("section change")
+	// A section boundary closes an open { } block — attributes cannot
+	// leave their command — but conditional and random scopes stay open:
+	// published maps run if/elseif chains across section headers.
+	p.syncOwner("section change")
 	p.lastCmd = nil
 
-	if p.cur.name == "global" && len(p.cur.nodes) == 0 {
-		return
-	}
-
-	out := Section{
-		Name:       p.cur.name,
-		Statements: make([]Statement, 0, len(p.cur.nodes)),
-		Range:      common.Range{Start: p.cur.start, End: end},
-	}
-
-	for _, n := range p.cur.nodes {
-		out.Statements = append(out.Statements, materialize(n))
-	}
-
-	p.file.Sections = append(p.file.Sections, out)
+	p.cur.end = end
+	p.sects = append(p.sects, p.cur)
 }
 
 // materialize converts the internal node tree into contract Statement
@@ -763,9 +845,9 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 				if line[j] == '"' {
 					inString = false
 				}
-			case line[j] == '"':
-				inString = true
 			case inBlock:
+				// Quotes inside a block comment are comment bytes, not
+				// string delimiters — they blank like any other char.
 				if line[j] == '*' && j+1 < len(line) && line[j+1] == '/' {
 					line = line[:j] + "  " + line[j+2:]
 					comments = append(comments, common.Range{Start: blockStart, End: at(i, j+2)})
@@ -783,6 +865,8 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 				line = line[:j] + strings.Repeat(" ", len(line)-j)
 				comments = append(comments, common.Range{Start: at(i, j), End: at(i, len(line))})
 				j = len(line)
+			case line[j] == '"':
+				inString = true
 			}
 		}
 
@@ -858,15 +942,18 @@ func (l *lexer) next() token {
 	start := l.pos
 	ch := l.line[l.pos]
 
-	isWord := ch == '_' || ch == '#' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+	isWord := ch == '_' || ch == '#' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch >= 0x80
 
 	switch {
 	case isWord:
 		// '#' starts a word (directives like #const) and also continues one,
-		// so the scan always advances past the first character.
+		// so the scan always advances past the first character. Dots and
+		// non-ASCII bytes continue a word: file arguments like
+		// random_map.def and 8-bit text are one token, not token soup.
 		for l.pos < len(l.line) {
 			c := l.line[l.pos]
-			if c == '_' || c == '#' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
+			if c == '_' || c == '#' || c == '.' || (c >= 'a' && c <= 'z') ||
+				(c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c >= 0x80 {
 				l.pos++
 				continue
 			}

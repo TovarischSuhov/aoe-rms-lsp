@@ -1,0 +1,237 @@
+# pool: raw-url (repo/sha/path) <TAB> display-name; pinned by corpus-fetch.sh --update
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/AM%40OddworldPrison_v2.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/AM@OddworldPrison_v2.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/AM%40RandomSomethingExtreme%20v5.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/AM@RandomSomethingExtreme v5.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/CannonBoar.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/CannonBoar.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ComGames_Arabia.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ComGames_Arabia.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/DavesFunHouse.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/DavesFunHouse.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/DavesFunHouse_Light.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/DavesFunHouse_Light.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/Harambe%27s%20Jungle.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/Harambe's Jungle.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/KingOfTheMangroves_v3.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/KingOfTheMangroves_v3.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/MrMokkaBoarChaos.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/MrMokkaBoarChaos.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/REDv1.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/REDv1.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/REDv2.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/REDv2.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/R_Everything_Extreme_v3.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/R_Everything_Extreme_v3.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/R_Everything_v3.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/R_Everything_v3.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/SNIPP%40EcoArabiaV2.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/SNIPP@EcoArabiaV2.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/SNIPP%40WildlifeMayhemV2.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/SNIPP@WildlifeMayhemV2.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/Tiger_Woods_1.0.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/Tiger_Woods_1.0.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Bird%27s%20Nest%20CTR%20v3.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Bird's Nest CTR v3.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Bird%27s%20Nest%20Regicide%20v5.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Bird's Nest Regicide v5.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Bird%27s%20Nest%20SD%20v3.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Bird's Nest SD v3.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Bird%27s%20Nest%20v3.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Bird's Nest v3.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Colloseum_KOTH_FIXED.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Colloseum_KOTH_FIXED.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Colloseum_KOTH_Regicide.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Colloseum_KOTH_Regicide.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40EverythingNothing.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@EverythingNothing.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40HonysRumbleV7.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@HonysRumbleV7.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40HonysRumbleV8WK.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@HonysRumbleV8WK.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40King_of_Kings_.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@King_of_Kings_.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Monopoly%20v5.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Monopoly v5.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Mouldy_PizzaR.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Mouldy_PizzaR.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40SNIPP_Planets.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@SNIPP_Planets.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Shallow%20trap.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Shallow trap.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40Spiraling.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@Spiraling.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/ZR%40SpiralingRegicide1.rms	HSZemi/rms/FREE_FOR_ALL_MAPS/ZR@SpiralingRegicide1.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/AM%40Islabia%20v5.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/AM@Islabia v5.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/King%20Deer_v3.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/King Deer_v3.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Arabia.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Arabia.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Beachfight_V1.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Beachfight_V1.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Colloseum.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Colloseum.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Donut.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Donut.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Dust.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Dust.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_MapPack_v4.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_MapPack_v4.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_NotSocotra_V1.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_NotSocotra_V1.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Steppe.rms	HSZemi/rms/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_Steppe.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/AM%40TreelicNothing%20v2.rms	HSZemi/rms/NOTHING_MAPS/AM@TreelicNothing v2.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/AMBoarNothing_v2.rms	HSZemi/rms/NOTHING_MAPS/AMBoarNothing_v2.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/Boar_Nothing.rms	HSZemi/rms/NOTHING_MAPS/Boar_Nothing.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/GOLD_NOTHING_LIGHT.rms	HSZemi/rms/NOTHING_MAPS/GOLD_NOTHING_LIGHT.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/GOLD_NOTHING_T90_SPECIAL.rms	HSZemi/rms/NOTHING_MAPS/GOLD_NOTHING_T90_SPECIAL.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/Gold_Nothing.rms	HSZemi/rms/NOTHING_MAPS/Gold_Nothing.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/MrMokkaGoldNothing.rms	HSZemi/rms/NOTHING_MAPS/MrMokkaGoldNothing.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/MrMokkaHoursOfNothing.rms	HSZemi/rms/NOTHING_MAPS/MrMokkaHoursOfNothing.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/SNIPP%40RelicNothingV2.rms	HSZemi/rms/NOTHING_MAPS/SNIPP@RelicNothingV2.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/Stone_Nothing.rms	HSZemi/rms/NOTHING_MAPS/Stone_Nothing.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/Stone_Nothing_v1.2_DUX.rms	HSZemi/rms/NOTHING_MAPS/Stone_Nothing_v1.2_DUX.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NOTHING_MAPS/mangrove_nothing.rms	HSZemi/rms/NOTHING_MAPS/mangrove_nothing.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Acropolis.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Acropolis.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Arena.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Arena.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Atacama.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Atacama.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Baltic.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Baltic.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Black%20Forest.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Black Forest.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Chaos%20Pit.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Chaos Pit.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Continental.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Continental.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Crater%20Lake_v2.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Crater Lake_v2.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Desert.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Desert.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Dry%20Arabia.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Dry Arabia.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Duopoly.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Duopoly.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_El%20Dorado.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_El Dorado.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Ghost%20Lake.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Ghost Lake.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Gold%20Rush.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Gold Rush.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Hamburger.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Hamburger.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Hills.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Hills.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Hippo%27s%20Belly.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Hippo's Belly.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Homeland.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Homeland.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Islands.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Islands.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_MFO%40Double%20Arabia.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_MFO@Double Arabia.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Meatballs_v2.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Meatballs_v2.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Mediterranean.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Mediterranean.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Migration.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Migration.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Nomad.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Nomad.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Oasis.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Oasis.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Plains.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Plains.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Pond_Arena.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Pond_Arena.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Raft.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Raft.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Regicide_Fortress.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Regicide_Fortress.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Rooster.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Rooster.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Sand_Maze.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Sand_Maze.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Team%20Islands.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_Team Islands.rms
+HSZemi/rms/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_nC%40Decentring.rms	HSZemi/rms/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG Single Maps v2/KHR_WSVG_nC@Decentring.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40canals_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@canals_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40capricious_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@capricious_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40dingos_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@dingos_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40graveyards_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@graveyards_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40metropolis_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@metropolis_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40moats_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@moats_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40paradiseisland_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@paradiseisland_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40pilgrims_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@pilgrims_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40prairie_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@prairie_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40seasons_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@seasons_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40sherwood_forest_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@sherwood_forest_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40sherwood_heroes_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@sherwood_heroes_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40shipwreck_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@shipwreck_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40team_glaciers_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@team_glaciers_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40the_unknown_v2.rms	Naramsim/AoE2-random-map-scripts/Others/es@the_unknown_v2.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Arabia.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Arabia.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Archipelago.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Archipelago.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Arena.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Arena.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Baltic.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Baltic.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Black_Forest.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Black_Forest.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Blind_Random.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Blind_Random.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Coastal.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Coastal.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Continental.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Continental.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Crater_Lake.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Crater_Lake.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Fortress.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Fortress.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Ghost_Lake.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Ghost_Lake.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Gold_Rush.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Gold_Rush.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Highland.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Highland.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Islands.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Islands.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Mediterranean.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Mediterranean.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Migration.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Migration.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Mongolia.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Mongolia.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Oasis.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Oasis.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Rivers.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Rivers.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Salt_Marsh.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Salt_Marsh.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Scandanavia.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Scandanavia.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Team_Islands.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Team_Islands.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/Yucatan.rms	Naramsim/AoE2-random-map-scripts/The conquerors/Yucatan.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/nomad.rms	Naramsim/AoE2-random-map-scripts/The conquerors/nomad.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_britain.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_britain.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_byzantium.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_byzantium.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_caribbean.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_caribbean.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_france.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_france.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_italy.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_italy.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_jutland.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_jutland.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_mideast.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_mideast.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_nippon.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_nippon.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_spain.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_spain.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20conquerors/real_world_texas.rms	Naramsim/AoE2-random-map-scripts/The conquerors/real_world_texas.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Arabia.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Arabia.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Archipelago.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Archipelago.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Arena.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Arena.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Baltic.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Baltic.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Black_Forest.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Black_Forest.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Blind_Random.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Blind_Random.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Coastal.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Coastal.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Continental.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Continental.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Crater_Lake.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Crater_Lake.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Fortress.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Fortress.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Ghost_Lake.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Ghost_Lake.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Gold_Rush.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Gold_Rush.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Highland.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Highland.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Islands.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Islands.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Kilimanjaro.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Kilimanjaro.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Mediterranean.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Mediterranean.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Migration.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Migration.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Mongolia.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Mongolia.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Mountain%20Pass.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Mountain Pass.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Nile%20Delta.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Nile Delta.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Oasis.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Oasis.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Rivers.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Rivers.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Salt_Marsh.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Salt_Marsh.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Scandanavia.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Scandanavia.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Serengeti.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Serengeti.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Socotra.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Socotra.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Team_Islands.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Team_Islands.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Yucatan.rms	Naramsim/AoE2-random-map-scripts/The forgotten/Yucatan.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/nomad.rms	Naramsim/AoE2-random-map-scripts/The forgotten/nomad.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_amazon.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_amazon.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_bohemia.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_bohemia.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_britain.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_britain.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_byzantium.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_byzantium.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_caribbean.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_caribbean.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_china.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_china.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_eastafrica.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_eastafrica.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_france.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_france.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_india.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_india.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_italy.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_italy.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_jutland.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_jutland.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_madagascar.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_madagascar.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_mideast.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_mideast.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_nippon.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_nippon.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_spain.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_spain.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_texas.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_texas.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_westafrica.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_westafrica.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_world.rms	Naramsim/AoE2-random-map-scripts/The forgotten/real_world_world.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_canyons.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_canyons.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_enemyarchipelago.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_enemyarchipelago.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_enemyislands.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_enemyislands.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_farout.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_farout.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_frontline.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_frontline.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_innercircle.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_innercircle.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_motherland.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_motherland.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_openplains.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_openplains.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_ringofwater.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_ringofwater.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_snakepit.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_snakepit.rms
+Naramsim/AoE2-random-map-scripts/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/special_map_theeye.rms	Naramsim/AoE2-random-map-scripts/The forgotten/special_map_theeye.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/%21Infinite%20Forest%21%200.4%20AI%20Friendly%20by%20vjaz.rms	dundass/rms-playground/!Infinite Forest! 0.4 AI Friendly by vjaz.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/bambootrap.rms	dundass/rms-playground/bambootrap.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/bristol.rms	dundass/rms-playground/bristol.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/encased.rms	dundass/rms-playground/encased.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40canals_v2.rms	dundass/rms-playground/es@canals_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40capricious_v2.rms	dundass/rms-playground/es@capricious_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40dingos_v2.rms	dundass/rms-playground/es@dingos_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40graveyards_v2.rms	dundass/rms-playground/es@graveyards_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40metropolis_v2.rms	dundass/rms-playground/es@metropolis_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40moats_v2.rms	dundass/rms-playground/es@moats_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40paradiseisland_v2.rms	dundass/rms-playground/es@paradiseisland_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40pilgrims_v2.rms	dundass/rms-playground/es@pilgrims_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40prairie_v2.rms	dundass/rms-playground/es@prairie_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40seasons_v2.rms	dundass/rms-playground/es@seasons_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40sherwood_forest_v2.rms	dundass/rms-playground/es@sherwood_forest_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40sherwood_heroes_v2.rms	dundass/rms-playground/es@sherwood_heroes_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40shipwreck_v2.rms	dundass/rms-playground/es@shipwreck_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40team_glaciers_v2.rms	dundass/rms-playground/es@team_glaciers_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/es%40the_unknown_v2.rms	dundass/rms-playground/es@the_unknown_v2.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/landsnakes.rms	dundass/rms-playground/landsnakes.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/landsnakess.rms	dundass/rms-playground/landsnakess.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/meganomad.rms	dundass/rms-playground/meganomad.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/membranes.rms	dundass/rms-playground/membranes.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/wut.rms	dundass/rms-playground/wut.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/wutu.rms	dundass/rms-playground/wutu.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/wutut.rms	dundass/rms-playground/wutut.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/wututu.rms	dundass/rms-playground/wututu.rms
+dundass/rms-playground/74471f709f52338918d2cae5a7a7ef1694fd0e5a/wututut.rms	dundass/rms-playground/wututut.rms
+Gatsuca/AOE2_RMS/9f2f358a288720927002d3a4ba17baa68cda120e/Bay%20Battle.rms	Gatsuca/AOE2_RMS/Bay Battle.rms
+Gatsuca/AOE2_RMS/9f2f358a288720927002d3a4ba17baa68cda120e/FOREST%20NOTHING%20AI.rms	Gatsuca/AOE2_RMS/FOREST NOTHING AI.rms
+Gatsuca/AOE2_RMS/9f2f358a288720927002d3a4ba17baa68cda120e/Forest%20Michi.rms	Gatsuca/AOE2_RMS/Forest Michi.rms
+Gatsuca/AOE2_RMS/9f2f358a288720927002d3a4ba17baa68cda120e/Forest%20River.rms	Gatsuca/AOE2_RMS/Forest River.rms
+Gatsuca/AOE2_RMS/9f2f358a288720927002d3a4ba17baa68cda120e/Great%20Plains.rms	Gatsuca/AOE2_RMS/Great Plains.rms
+Gatsuca/AOE2_RMS/9f2f358a288720927002d3a4ba17baa68cda120e/Nomad%20Ruins.rms	Gatsuca/AOE2_RMS/Nomad Ruins.rms
+Gatsuca/AOE2_RMS/9f2f358a288720927002d3a4ba17baa68cda120e/Ruin%20Rumble.rms	Gatsuca/AOE2_RMS/Ruin Rumble.rms
+Gatsuca/AOE2_RMS/9f2f358a288720927002d3a4ba17baa68cda120e/Siege%20Breakout.rms	Gatsuca/AOE2_RMS/Siege Breakout.rms
+Gatsuca/AOE2_RMS/9f2f358a288720927002d3a4ba17baa68cda120e/misc_scripts/customseasonal.rms	Gatsuca/AOE2_RMS/misc_scripts/customseasonal.rms
+asuky/aoe2_rms/cf4e5cddacbbad198a3106a7d387aa164b04a2e5/Land%20Nomad%202017RJ%2002.rms	asuky/aoe2_rms/Land Nomad 2017RJ 02.rms
+rohanport/aoe2rms/7f7c28207553ddac2e34108752c046e23a675078/maps/Relic_Arabia.rms	rohanport/aoe2rms/maps/Relic_Arabia.rms
+Maboey/aoe2_rms/3f064dbeedbdd4a490d974ae1c0cf7b5bc44353b/first_map.rms	Maboey/aoe2_rms/first_map.rms
+matsaraiva/AOE2-RMS/c6950ed65b41cc786b1bcbc96a24dc4faff3a35a/Mtr_Forest.rms	matsaraiva/AOE2-RMS/Mtr_Forest.rms
+matsaraiva/AOE2-RMS/c6950ed65b41cc786b1bcbc96a24dc4faff3a35a/Mtr_Sand_Lake.rms	matsaraiva/AOE2-RMS/Mtr_Sand_Lake.rms

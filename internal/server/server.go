@@ -125,7 +125,9 @@ func negotiateEncoding(
 func (s *Server) DidOpen(
 	ctx context.Context,
 	params *protocol.DidOpenTextDocumentParams,
-) error {
+) (err error) {
+	defer recoverNotification(ctx, "DidOpen", &err)
+
 	doc := params.TextDocument
 	s.docs.Put(string(doc.URI), doc.Text, int(doc.Version))
 	s.publishDiagnostics(ctx, doc.URI)
@@ -138,7 +140,9 @@ func (s *Server) DidOpen(
 func (s *Server) DidChange(
 	ctx context.Context,
 	params *protocol.DidChangeTextDocumentParams,
-) error {
+) (err error) {
+	defer recoverNotification(ctx, "DidChange", &err)
+
 	docURI := params.TextDocument.URI
 	text, _, _ := s.docs.Get(string(docURI))
 
@@ -158,12 +162,29 @@ func (s *Server) DidChange(
 func (s *Server) DidClose(
 	ctx context.Context,
 	params *protocol.DidCloseTextDocumentParams,
-) error {
+) (err error) {
+	defer recoverNotification(ctx, "DidClose", &err)
+
 	docURI := params.TextDocument.URI
 	s.docs.Remove(string(docURI))
 	s.publish(ctx, docURI, nil)
 
 	return nil
+}
+
+// recoverNotification turns a notification-handler panic into a logged,
+// degraded success: the editor session survives without the dropped
+// notification, the panic lands in stderr (ERROR) where the corpus
+// harness and operators find it. Request handlers stay unwrapped — the
+// jsonrpc2 layer already answers those with an error response the caller
+// sees.
+func recoverNotification(ctx context.Context, method string, err *error) {
+	if r := recover(); r != nil {
+		slog.ErrorContext(ctx, "notification panic recovered",
+			"method", method, "panic", r)
+
+		*err = nil
+	}
 }
 
 // Hover answers with the kb entry under the cursor: the RMS command owning
