@@ -323,8 +323,9 @@ type commandWire struct {
 
 // argWire is the JSON shape of one command argument or attribute.
 type argWire struct {
-	Name     string `json:"name"`
-	Kind     string `json:"kind"`
-	Required bool   `json:"required"`
-	Desc     string `json:"desc"`
+	Name     string     `json:"name"`
+	Kind     string     `json:"kind"`
+	Range    ValueRange `json:"range"`
+	Required bool       `json:"required"`
+	Desc     string     `json:"desc"`
 }
