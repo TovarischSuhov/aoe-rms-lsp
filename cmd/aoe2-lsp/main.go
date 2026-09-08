@@ -5,7 +5,9 @@ package main
 import (
 	"aoe2-lsp/internal/server"
 	"context"
+	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 )
@@ -21,11 +23,26 @@ func main() {
 		return
 	}
 
+	debug := flag.Bool("debug", false, "enable debug logging to stderr")
+	flag.Parse()
+
 	// stdout carries the protocol; logs must go to stderr only.
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	slog.SetDefault(newLogger(os.Stderr, *debug))
 
 	if err := server.Serve(context.Background()); err != nil {
 		slog.Error("server exited", "err", err)
 		os.Exit(1)
 	}
+}
+
+// newLogger builds the stderr logger; debug flips the level from Info to
+// Debug so editors opt into verbose tracing with `aoe2-lsp -debug`.
+func newLogger(w io.Writer, debug bool) *slog.Logger {
+	level := slog.LevelInfo
+
+	if debug {
+		level = slog.LevelDebug
+	}
+
+	return slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: level}))
 }
