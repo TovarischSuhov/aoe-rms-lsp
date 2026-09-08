@@ -3,13 +3,12 @@
 package analysis
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
-
 	"aoe2-lsp/common"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
+	"fmt"
+	"strconv"
+	"strings"
 )
 
 // CheckRmsValue checks a single RMS argument/attribute value against its

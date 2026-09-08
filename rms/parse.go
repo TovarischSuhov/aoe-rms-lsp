@@ -1,11 +1,10 @@
 package rms
 
 import (
+	"aoe2-lsp/common"
 	"fmt"
 	"slices"
 	"strings"
-
-	"aoe2-lsp/common"
 )
 
 // Parse parses an RMS source into an AST with error recovery: every

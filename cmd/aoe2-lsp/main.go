@@ -3,12 +3,11 @@
 package main
 
 import (
+	"aoe2-lsp/server"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
-
-	"aoe2-lsp/server"
 )
 
 // version is injected at release builds via ldflags "-X main.version=<tag>";

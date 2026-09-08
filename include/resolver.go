@@ -1,6 +1,9 @@
 package include
 
 import (
+	"aoe2-lsp/common"
+	"aoe2-lsp/rms"
+	"aoe2-lsp/xs"
 	"context"
 	"os"
 	"path/filepath"
@@ -10,10 +13,6 @@ import (
 	"time"
 
 	"go.lsp.dev/uri"
-
-	"aoe2-lsp/common"
-	"aoe2-lsp/rms"
-	"aoe2-lsp/xs"
 )
 
 // Depth and file-count limits guard against include bombs; reaching a

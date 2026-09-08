@@ -4,13 +4,12 @@
 package analysis
 
 import (
-	"fmt"
-	"slices"
-
 	"aoe2-lsp/common"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
 	"aoe2-lsp/xs"
+	"fmt"
+	"slices"
 )
 
 // Diagnostic codes emitted by the analyzer.

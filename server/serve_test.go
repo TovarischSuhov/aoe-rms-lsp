@@ -1,6 +1,10 @@
 package server
 
 import (
+	"aoe2-lsp/analysis"
+	"aoe2-lsp/complete"
+	"aoe2-lsp/hints"
+	"aoe2-lsp/kb"
 	"context"
 	"errors"
 	"fmt"
@@ -17,11 +21,6 @@ import (
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
-
-	"aoe2-lsp/analysis"
-	"aoe2-lsp/complete"
-	"aoe2-lsp/hints"
-	"aoe2-lsp/kb"
 )
 
 // testTimeout bounds every wait for an asynchronous server reaction.
@@ -937,10 +936,14 @@ func TestCompletionKinds_FullDictionary(t *testing.T) {
 
 func TestToCompletionItems_Render(t *testing.T) {
 	items := toCompletionItems([]complete.Candidate{
-		{Label: "create_land", Kind: complete.KindCommand,
-			Detail: "land_generation", Sort: "1create_land"},
-		{Label: "set_circular_base", Kind: complete.KindAttribute,
-			Detail: "", Sort: "0set_circular_base"},
+		{
+			Label: "create_land", Kind: complete.KindCommand,
+			Detail: "land_generation", Sort: "1create_land",
+		},
+		{
+			Label: "set_circular_base", Kind: complete.KindAttribute,
+			Detail: "", Sort: "0set_circular_base",
+		},
 	})
 
 	require.Len(t, items, 2)

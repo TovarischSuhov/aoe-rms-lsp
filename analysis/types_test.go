@@ -1,12 +1,11 @@
 package analysis
 
 import (
+	"aoe2-lsp/kb"
+	"aoe2-lsp/xs"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"aoe2-lsp/kb"
-	"aoe2-lsp/xs"
 )
 
 // Compile-time contract checks: the exported surface must match

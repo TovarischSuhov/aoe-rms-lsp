@@ -5,6 +5,7 @@
 package main
 
 import (
+	"aoe2-lsp/kb"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,8 +16,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"aoe2-lsp/kb"
 )
 
 // updateHeadingRe matches changelog update headings.

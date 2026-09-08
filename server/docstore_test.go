@@ -1,12 +1,11 @@
 package server
 
 import (
+	"aoe2-lsp/include"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"aoe2-lsp/include"
 )
 
 func TestDocStore_GetNotOpen(t *testing.T) {

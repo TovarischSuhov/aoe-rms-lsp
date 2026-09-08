@@ -1,15 +1,14 @@
 package complete
 
 import (
-	"strings"
-	"testing"
-
-	"github.com/stretchr/testify/require"
-
 	"aoe2-lsp/common"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
 	"aoe2-lsp/xs"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // at returns the position offset bytes after the first occurrence of
@@ -220,8 +219,10 @@ func TestXsAt_ExternalDeclsMerged(t *testing.T) {
 	file, _ := xs.XsParse(src, "t.xs")
 
 	external := []xs.Decl{
-		{Kind: xs.DeclFunction, Name: "helper", Type: "void",
-			Params: []xs.Param{{Name: "b", Type: "bool"}}},
+		{
+			Kind: xs.DeclFunction, Name: "helper", Type: "void",
+			Params: []xs.Param{{Name: "b", Type: "bool"}},
+		},
 		{Kind: xs.DeclInclude, Name: "z.xs"},
 	}
 
@@ -279,8 +280,10 @@ func TestXsAt_ExternalNoReturnType_DetailWithoutRet(t *testing.T) {
 	src := "void main() { }"
 	file, _ := xs.XsParse(src, "t.xs")
 
-	external := []xs.Decl{{Kind: xs.DeclFunction, Name: "foo",
-		Params: []xs.Param{{Name: "a", Type: "int"}}}}
+	external := []xs.Decl{{
+		Kind: xs.DeclFunction, Name: "foo",
+		Params: []xs.Param{{Name: "a", Type: "int"}},
+	}}
 
 	cands := newTestCompleter(t).XsAt(file, at(src, "main", 2), external)
 

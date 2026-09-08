@@ -1,13 +1,12 @@
 package include
 
 import (
+	"aoe2-lsp/rms"
+	"aoe2-lsp/xs"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"aoe2-lsp/rms"
-	"aoe2-lsp/xs"
 )
 
 // TestClosure_TypesConstruct checks the contract shape: every closure data

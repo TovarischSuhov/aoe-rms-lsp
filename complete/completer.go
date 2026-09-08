@@ -1,12 +1,11 @@
 package complete
 
 import (
-	"strings"
-
 	"aoe2-lsp/common"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
 	"aoe2-lsp/xs"
+	"strings"
 )
 
 // Candidate kinds — the complete cell's protocol-agnostic dictionary.
