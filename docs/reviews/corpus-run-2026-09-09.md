@@ -96,8 +96,9 @@ syntax-диагностик на бинарный мусор, ни одной п
   работающих картах — `border_fuzziness`/`other_zone_avoidance_distance`
   на create_terrain, `clumping_factor` на create_elevation,
   `set_scale_by_size/groups` на create_object (гайд прямо говорит: для
-  объектов — `set_scaling_to_map_size`). Нужна кураторская правка kb/data
-  по источникам — см. план задачи.
+  объектов — `set_scaling_to_map_size`). Полный разбор с примерами карт и
+  вердиктами — [docs/ref/real-map-nuances.md](../ref/real-map-nuances.md);
+  кураторская правка kb/data — см. план задачи.
 - **Опечатки авторов** (~20): `group_varience`, `clumbing_factor`,
   `min_length_cliff`/`min_distance_cliff` (правильно
   `min_length_of_cliff`/`min_distance_cliffs`), французский текст вне

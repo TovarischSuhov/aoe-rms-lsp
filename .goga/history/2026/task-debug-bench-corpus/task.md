@@ -174,9 +174,10 @@ JSON-RPC 0; найдено и исправлено 6 дефектов парсе
    `left/right/top/bottom_border` + `base_size` на `create_terrain`;
    `clumping_factor` + `spacing_to_other_terrain_types` на
    `create_elevation`; `set_avoid_player_start_areas` +
-   `set_scale_by_size/groups` на `create_object`. Решение требует
-   отдельного источника (тесты движка/форум) — иначе флаги «неизвестный
-   атрибут» останутся.
+   `set_scale_by_size/groups` на `create_object`. Полный список с
+   вердиктами и ссылками на карты —
+   `docs/ref/real-map-nuances.md`. Решение требует отдельного источника
+   (тесты движка/форум) — иначе флаги «неизвестный атрибут» останутся.
 2. **`create_land` с аргументом** (`create_land 3`, 8 флагов): проверка
    арности опирается на kb; уточнить по гайду, действительно ли create_land
    без аргументов (гайд-скелет показывает `create_land {}`).
