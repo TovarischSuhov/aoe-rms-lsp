@@ -385,3 +385,14 @@ func TestAnalyzeXs_ExternalsSuppressUndefinedAndLocalsWin(t *testing.T) {
 	e, _ := xs.XsParse("void q() { ghost(); }", "t.xs")
 	assert.Equal(t, []string{"undefined-symbol"}, codes(a.AnalyzeXs(e, empty)))
 }
+
+func TestAnalyzeXs_MultiDeclNoUndefined(t *testing.T) {
+	// int a = 1, b = 2; — both declarators of a top-level list are
+	// declared names: no undefined-symbol on their use
+	src := "int a = 1, b = 2;\nvoid main() { int s = a + b; }"
+
+	file, _ := xs.XsParse(src, "multi.xs")
+	a := newAnalyzer(t)
+
+	assert.Equal(t, []string{}, codes(a.AnalyzeXs(file, nil)))
+}
