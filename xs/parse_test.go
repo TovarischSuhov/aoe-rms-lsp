@@ -406,6 +406,8 @@ func TestXsParse_MultiDeclNavigation(t *testing.T) {
 	r, found := file.Definition(common.Pos{Line: 0, Column: 11})
 	require.True(t, found)
 	assert.Equal(t, common.Pos{Line: 0, Column: 11, Offset: 11}, r.Start)
+}
+
 // TestXsParse_StringEscapeNewlineTracksLines checks that a backslash
 // escape followed by a newline inside a string literal advances the
 // scanner line counter: positions after the literal stay on their
