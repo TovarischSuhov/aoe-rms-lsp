@@ -3,37 +3,25 @@ package include
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.lsp.dev/uri"
 )
 
-// benchSource is an in-memory Source: a chain of N documents each
-// including the next.
-type benchSource struct {
-	texts map[string]string
-}
+// benchNoSource mirrors the common case: no open documents, every
+// include target loads from disk through the stat-keyed cache.
+type benchNoSource struct{}
 
-func (s benchSource) Text(uri string) (string, bool) {
-	text, ok := s.texts[uri]
+func (benchNoSource) Text(uri string) (string, bool) { return "", false }
 
-	return text, ok
-}
+func (benchNoSource) URIs() []string { return nil }
 
-func (s benchSource) URIs() []string {
-	uris := make([]string, 0, len(s.texts))
-
-	for uri := range s.texts {
-		uris = append(uris, uri)
-	}
-
-	return uris
-}
-
-// benchChain builds N documents: doc_i includes doc_{i+1} plus a shared
-// library — the include shape of real map packs.
-func benchChain(docs int) benchSource {
-	texts := map[string]string{}
-
+// benchChainOnDisk writes N documents into dir: doc_i includes doc_{i+1}
+// plus a shared library — the include shape of real map packs.
+func benchChainOnDisk(b *testing.B, dir string, docs int) string {
 	var lib strings.Builder
 
 	fmt.Fprintln(&lib, "#const SHARED_CONST 7")
@@ -44,7 +32,9 @@ func benchChain(docs int) benchSource {
 		fmt.Fprintf(&lib, "create_object LIB_OBJ_%d {\n  number_of_objects %d\n}\n", i, i)
 	}
 
-	texts["file:///bench/lib.rms"] = lib.String()
+	if err := os.WriteFile(filepath.Join(dir, "lib.rms"), []byte(lib.String()), 0o644); err != nil {
+		b.Fatal(err)
+	}
 
 	for i := range docs {
 		var doc strings.Builder
@@ -62,14 +52,19 @@ func benchChain(docs int) benchSource {
 			fmt.Fprintf(&doc, "create_object OBJ_%d {\n  number_of_objects %d\n}\n", j, j)
 		}
 
-		texts[fmt.Sprintf("file:///bench/doc_%d.rms", i)] = doc.String()
+		name := filepath.Join(dir, fmt.Sprintf("doc_%d.rms", i))
+
+		if err := os.WriteFile(name, []byte(doc.String()), 0o644); err != nil {
+			b.Fatal(err)
+		}
 	}
 
-	return benchSource{texts: texts}
+	return string(uri.File(filepath.Join(dir, "doc_0.rms")))
 }
 
 // BenchmarkClosure measures the include-closure computation behind
-// diagnostics and cross-file navigation.
+// diagnostics and cross-file navigation: the steady-state (warm disk
+// cache) path the server takes on every request.
 func BenchmarkClosure(b *testing.B) {
 	for _, size := range []struct {
 		name string
@@ -78,14 +73,19 @@ func BenchmarkClosure(b *testing.B) {
 		{"chain_5", 5},
 		{"chain_20", 20},
 	} {
-		resolver := NewResolver(benchChain(size.docs))
+		root := benchChainOnDisk(b, b.TempDir(), size.docs)
+		resolver := NewResolver(benchNoSource{})
 		ctx := context.Background()
+
+		// warm the stat-keyed disk cache once — the server keeps one
+		// resolver for the whole session
+		_ = resolver.Closure(ctx, root)
 
 		b.Run(size.name, func(b *testing.B) {
 			b.ReportAllocs()
 
 			for b.Loop() {
-				_ = resolver.Closure(ctx, "file:///bench/doc_0.rms")
+				_ = resolver.Closure(ctx, root)
 			}
 		})
 	}
