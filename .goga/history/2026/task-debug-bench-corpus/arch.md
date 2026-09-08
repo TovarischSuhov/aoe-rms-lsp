@@ -66,7 +66,7 @@ Annotations: |
 
       Algorithm:
       1. Рекурсивно обойти `dir`, собрать .rms/.xs, отсортировать пути
-      2. На каждый файл — LSP-сессия: спавн `bin` (stderr процесса —
+      2. На каждый файл — LSP-сессия: спавн процесса сервера (stderr —
          в ограниченный буфер), initialize (utf-8 positionEncoding,
          rootUri=`dir`), didOpen, дождаться publishDiagnostics,
          hover/completion/signatureHelp/documentSymbol в
