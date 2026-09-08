@@ -39,10 +39,14 @@ var wordRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
 // shape described by the kbdata annotation.
 //
 // It is a one-shot data-build utility; the server never calls it at runtime.
-// Ambiguous fragments are skipped with a WARN log instead of aborting the
-// whole pass. path points at the guide; the changelog used for
-// since_update enrichment is looked up next to it.
-func ExtractRmsCommands(path string) ([]Command, error) {
+// Ambiguous fragments are skipped with a WARN to log instead of aborting the
+// whole pass; a nil log selects slog.Default(). path points at the guide;
+// the changelog used for since_update enrichment is looked up next to it.
+func ExtractRmsCommands(path string, log *slog.Logger) ([]Command, error) {
+	if log == nil {
+		log = slog.Default()
+	}
+
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read zetnus guide: %w", err)
@@ -50,7 +54,7 @@ func ExtractRmsCommands(path string) ([]Command, error) {
 
 	lines := strings.Split(string(raw), "\n")
 
-	skeleton, err := parseSkeleton(lines)
+	skeleton, err := parseSkeleton(lines, log)
 	if err != nil {
 		return nil, fmt.Errorf("parse syntax skeleton: %w", err)
 	}
@@ -61,7 +65,7 @@ func ExtractRmsCommands(path string) ([]Command, error) {
 	}
 
 	docs := parseReferenceDocs(lines, names)
-	since := parseChangelogSince(readChangelog(path), names)
+	since := parseChangelogSince(readChangelog(path, log), names)
 
 	commands := make([]Command, 0, len(skeleton))
 	seen := make(map[string]bool, len(skeleton))
@@ -72,7 +76,7 @@ func ExtractRmsCommands(path string) ([]Command, error) {
 		}
 
 		seen[sk.name] = true
-		commands = append(commands, buildCommand(sk, docs[sk.name], since[sk.name]))
+		commands = append(commands, buildCommand(sk, docs[sk.name], since[sk.name], log))
 	}
 
 	return commands, nil
@@ -93,10 +97,10 @@ type skelCmd struct {
 
 // parseSkeleton walks the Syntax Skeleton section of the guide and returns
 // one skelCmd per command alternative, in file order.
-func parseSkeleton(lines []string) ([]skelCmd, error) {
+func parseSkeleton(lines []string, log *slog.Logger) ([]skelCmd, error) {
 	start := skeletonStart(lines)
 	if start < 0 {
-		return nil, fmt.Errorf("heading not found")
+		return nil, fmt.Errorf("syntax skeleton heading not found")
 	}
 
 	var commands []skelCmd
@@ -160,7 +164,7 @@ func parseSkeleton(lines []string) ([]skelCmd, error) {
 		pending = pending[:0]
 
 		for _, tokens := range splitAlternatives(strings.Fields(trimmed)) {
-			cmd, ok := newSkelCmd(tokens, section)
+			cmd, ok := newSkelCmd(tokens, section, log)
 			if !ok {
 				continue
 			}
@@ -179,11 +183,11 @@ func parseSkeleton(lines []string) ([]skelCmd, error) {
 
 // newSkelCmd builds one command from its skeleton tokens, handling the
 // rnd(N,N) functional form. ok=false marks an unparsable fragment.
-func newSkelCmd(tokens []string, section string) (skelCmd, bool) {
+func newSkelCmd(tokens []string, section string, log *slog.Logger) (skelCmd, bool) {
 	if len(tokens) == 1 && strings.Contains(tokens[0], "(") {
 		parts := strings.SplitN(strings.ReplaceAll(tokens[0], ")", ""), "(", 2)
 		if parts[0] == "" || parts[1] == "" {
-			slog.Warn("skip ambiguous skeleton line", "line", tokens[0])
+			log.Warn("skip ambiguous skeleton line", "line", tokens[0])
 
 			return skelCmd{}, false
 		}
@@ -455,7 +459,7 @@ func parseArgBullets(lines []string, start int) ([]refArg, int) {
 
 // buildCommand assembles the final Command from skeleton structure,
 // reference documentation and changelog enrichment.
-func buildCommand(sk skelCmd, doc refDoc, since string) Command {
+func buildCommand(sk skelCmd, doc refDoc, since string, log *slog.Logger) Command {
 	cmd := Command{
 		Name:         sk.name,
 		Section:      sk.section,
@@ -467,7 +471,7 @@ func buildCommand(sk skelCmd, doc refDoc, since string) Command {
 	for i, tok := range sk.args {
 		arg := CommandArg{
 			Name:     fmt.Sprintf("arg%d", i+1),
-			Kind:     kindOf(tok, sk.name),
+			Kind:     kindOf(tok, sk.name, log),
 			Required: true,
 		}
 
@@ -488,7 +492,7 @@ func buildCommand(sk skelCmd, doc refDoc, since string) Command {
 	for _, attr := range sk.attrs {
 		arg := CommandArg{
 			Name:     attr.tokens[0],
-			Kind:     kindOf(firstOr(attr.tokens, 1, ""), sk.name),
+			Kind:     kindOf(firstOr(attr.tokens, 1, ""), sk.name, log),
 			Required: false,
 		}
 
@@ -501,7 +505,7 @@ func buildCommand(sk skelCmd, doc refDoc, since string) Command {
 }
 
 // kindOf maps a skeleton placeholder token to the CommandArg kind.
-func kindOf(tok string, owner string) string {
+func kindOf(tok string, owner string, log *slog.Logger) string {
 	switch tok {
 	case "N":
 		return "number"
@@ -518,7 +522,7 @@ func kindOf(tok string, owner string) string {
 	case "":
 		return ""
 	default:
-		slog.Warn("unknown argument placeholder", "placeholder", tok, "command", owner)
+		log.Warn("unknown argument placeholder", "placeholder", tok, "command", owner)
 
 		return strings.ToLower(tok)
 	}
@@ -526,12 +530,12 @@ func kindOf(tok string, owner string) string {
 
 // readChangelog reads the changelog sibling of the guide; an empty string
 // is returned (with a WARN) when the file is missing.
-func readChangelog(guidePath string) string {
+func readChangelog(guidePath string, log *slog.Logger) string {
 	path := filepath.Join(filepath.Dir(guidePath), changelogFile)
 
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		slog.Warn("changelog not found, since_update stays empty", "path", path)
+		log.Warn("changelog not found, since_update stays empty", "path", path)
 
 		return ""
 	}

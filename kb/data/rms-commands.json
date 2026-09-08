@@ -51,6 +51,10 @@
       {
         "name": "VersionNumber",
         "kind": "number",
+        "range": {
+          "min": "0",
+          "max": "2"
+        },
         "required": false,
         "desc": "number (0-2) (default: 0)"
       }
@@ -67,6 +71,10 @@
       {
         "name": "SideLength",
         "kind": "number",
+        "range": {
+          "min": "36",
+          "max": "480"
+        },
         "required": false,
         "desc": "number (36-480) (default: use size set in lobby) (see: Map Sizes)"
       }
@@ -83,6 +91,10 @@
       {
         "name": "CivNumber",
         "kind": "number",
+        "range": {
+          "min": "0",
+          "max": "53"
+        },
         "required": false,
         "desc": "number (0-53) (default: 0 - gaia) (see: Civilizations)"
       }
@@ -99,24 +111,40 @@
       {
         "name": "MapType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "map type constant (see: Map Types) (default: CUSTOM)"
       },
       {
         "name": "IsNomad",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "boolean (1 or 0) (default: 0)"
       },
       {
         "name": "IsMichi",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "boolean (1 or 0) (default: 0)"
       },
       {
         "name": "ShowType",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "boolean (1 or 0) (default: 0)"
       }
@@ -133,24 +161,40 @@
       {
         "name": "EffectType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "effect constant (see: Effect Constants)"
       },
       {
         "name": "Type",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "object/resource/technology/effect constant (see: Objects, Resource Constants, Technology Constants, Miscellaneous Constants, Class Constants, Advanced Genie Editor)"
       },
       {
         "name": "AttributeType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "attribute constant (see: Attribute Constants)"
       },
       {
         "name": "Amount",
         "kind": "float",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "number"
       }
@@ -167,24 +211,40 @@
       {
         "name": "EffectType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "effect constant (see: Effect Constants)"
       },
       {
         "name": "Type",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "object/resource/technology/effect constant (see: Objects, Resource Constants, Technology Constants, Class Constants, Miscellaneous Constants, Advanced Genie Editor)"
       },
       {
         "name": "AttributeType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "attribute constant (see: Attribute Constants)"
       },
       {
         "name": "%",
         "kind": "float",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "number"
       }
@@ -201,24 +261,40 @@
       {
         "name": "ObjectType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "object constant or class constant (see: Objects, Class Constants)"
       },
       {
         "name": "ResourceType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "resource amount constant (see: Resource Constants)"
       },
       {
         "name": "ResourceDelta",
         "kind": "float",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (default: 0)"
       },
       {
         "name": "Flags",
         "kind": "number",
+        "range": {
+          "min": "0",
+          "max": "7"
+        },
         "required": false,
         "desc": "number (0-7) (default: 0)"
       }
@@ -235,24 +311,40 @@
       {
         "name": "Mode",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (0) (default: 0)"
       },
       {
         "name": "Parameter1",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (0) (default: 0)"
       },
       {
         "name": "Parameter1",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (0) (default: 0)"
       },
       {
         "name": "Flags",
         "kind": "number",
+        "range": {
+          "min": "0",
+          "max": "7"
+        },
         "required": false,
         "desc": "number (0-7) (default: 0)"
       }
@@ -269,24 +361,40 @@
       {
         "name": "PrecipitationStyle",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (-4 to 4) (default: 0)"
       },
       {
         "name": "LiveColor",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (0 to 255) (default: 0)"
       },
       {
         "name": "FogColor",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (0 to 255) (default: 0)"
       },
       {
         "name": "WaterDirection",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (-1 to 1) (default 0)"
       }
@@ -303,6 +411,10 @@
       {
         "name": "WaterType",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "water color correction constant (see: Water Definitions) (default: 0 (sunny daytime))"
       }
@@ -319,6 +431,10 @@
       {
         "name": "TerrainType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "terrain constant (see: Terrains) (default: GRASS)"
       }
@@ -335,6 +451,10 @@
       {
         "name": "TerrainType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "terrain constant (see: Terrains) (default: none)"
       }
@@ -351,6 +471,10 @@
       {
         "name": "ShowWaves",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "boolean (1 or 0) (default: 1)"
       }
@@ -368,144 +492,240 @@
       {
         "name": "terrain_type",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "land_percent",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "number_of_tiles",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "base_size",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_circular_base",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "generate_mode",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "land_position",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "circle_radius",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "left_border",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "right_border",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "top_border",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "bottom_border",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "border_fuzziness",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "clumping_factor",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "land_conformity",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "base_elevation",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "assign_to_player",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "assign_to",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "zone",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_zone_by_team",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_zone_randomly",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "other_zone_avoidance_distance",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "min_placement_distance",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "land_id",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -522,144 +742,240 @@
       {
         "name": "terrain_type",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "land_percent",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "number_of_tiles",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "base_size",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_circular_base",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "generate_mode",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "land_position",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "circle_radius",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "left_border",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "right_border",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "top_border",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "bottom_border",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "border_fuzziness",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "clumping_factor",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "land_conformity",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "base_elevation",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "assign_to_player",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "assign_to",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "zone",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_zone_by_team",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_zone_randomly",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "other_zone_avoidance_distance",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "min_placement_distance",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "land_id",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -675,6 +991,10 @@
       {
         "name": "MaxHeight",
         "kind": "number",
+        "range": {
+          "min": "1",
+          "max": "16"
+        },
         "required": false,
         "desc": "number (1-16) (default: 0 - not elevated)"
       }
@@ -683,48 +1003,80 @@
       {
         "name": "base_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "base_layer",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "number_of_tiles",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "number_of_clumps",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_scale_by_size",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_scale_by_groups",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "spacing",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "enable_balanced_elevation",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -740,6 +1092,10 @@
       {
         "name": "CliffType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "cliff type constant (see: Cliff Types) (default: gray granite cliffs)"
       }
@@ -756,6 +1112,10 @@
       {
         "name": "Amount",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (default: min 3, max 8)"
       }
@@ -772,6 +1132,10 @@
       {
         "name": "Amount",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (default: min 3, max 8)"
       }
@@ -788,6 +1152,10 @@
       {
         "name": "Length",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (3+) (default: min 5, max 9)"
       }
@@ -804,6 +1172,10 @@
       {
         "name": "Length",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (3+) (default: min 5, max 9)"
       }
@@ -820,6 +1192,10 @@
       {
         "name": "%",
         "kind": "percent",
+        "range": {
+          "min": "0",
+          "max": "100"
+        },
         "required": false,
         "desc": "number (0-100) (default: 36)"
       }
@@ -836,6 +1212,10 @@
       {
         "name": "Distance",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (default: 2)"
       }
@@ -852,6 +1232,10 @@
       {
         "name": "Distance",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "number (default: 2)"
       }
@@ -868,6 +1252,10 @@
       {
         "name": "ColorCorrectionType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "color correction constant (see: Season Types) (default: no color correction)"
       }
@@ -884,6 +1272,10 @@
       {
         "name": "TerrainType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": "terrain constant (see: Terrains) (default: GRASS)"
       }
@@ -892,90 +1284,150 @@
       {
         "name": "base_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "base_layer",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "beach_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_mask",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "spacing_to_other_terrain_types",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "spacing_to_specific_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_flat_terrain_only",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "land_percent",
         "kind": "percent",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "number_of_tiles",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "number_of_clumps",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "clumping_factor",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_scale_by_size",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_scale_by_groups",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_avoid_player_start_areas",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "height_limits",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -1001,24 +1453,40 @@
       {
         "name": "default_terrain_replacement",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "replace_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_cost",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_size",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -1035,24 +1503,40 @@
       {
         "name": "default_terrain_replacement",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "replace_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_cost",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_size",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -1069,24 +1553,40 @@
       {
         "name": "default_terrain_replacement",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "replace_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_cost",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_size",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -1103,24 +1603,40 @@
       {
         "name": "default_terrain_replacement",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "replace_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_cost",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_size",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -1136,12 +1652,20 @@
       {
         "name": "ZoneNumber1",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "numeric zone ID (maximum 245)"
       },
       {
         "name": "ZoneNumber2",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "numeric zone ID (maximum 245)"
       }
@@ -1150,24 +1674,40 @@
       {
         "name": "default_terrain_replacement",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "replace_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_cost",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_size",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -1184,24 +1724,40 @@
       {
         "name": "default_terrain_replacement",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "replace_terrain",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_cost",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_size",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -1217,24 +1773,40 @@
       {
         "name": "X",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "number (x-coordinate in tiles; see Map Sizes)"
       },
       {
         "name": "Y",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "number (y-coordinate in tiles; see Map Sizes)"
       },
       {
         "name": "Identifier",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "number"
       },
       {
         "name": "Radius",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "number (square radius in tiles)"
       }
@@ -1251,6 +1823,10 @@
       {
         "name": "GroupName",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "text"
       }
@@ -1259,6 +1835,10 @@
       {
         "name": "add_object",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -1274,6 +1854,10 @@
       {
         "name": "ObjectType",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "object constant (see: Objects)"
       }
@@ -1282,276 +1866,460 @@
       {
         "name": "number_of_objects",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "number_of_groups",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "group_variance",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "group_placement_radius",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_tight_grouping",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_loose_grouping",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "min_connected_tiles",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "resource_delta",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "second_object",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_scaling_to_map_size",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_scaling_to_player_number",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_place_for_every_player",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "place_on_specific_land_id",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "avoid_other_land_zones",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "generate_for_first_land_only",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_gaia_object_only",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_gaia_unconvertible",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_building_capturable",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "make_indestructible",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "min_distance_to_players",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "max_distance_to_players",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_circular_placement",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "terrain_to_place_on",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "layer_to_place_on",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "ignore_terrain_restrictions",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "max_distance_to_other_zones",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "place_on_forest_zone",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "avoid_forest_zone",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "avoid_cliff_zone",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "min_distance_to_map_edge",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "min_distance_group_placement",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "temp_min_distance_group_placement",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "find_closest",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "find_closest_to_map_center",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "find_closest_to_map_edge",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "enable_tile_shuffling",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "require_path",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "force_placement",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "actor_area",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "actor_area_radius",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "override_actor_radius_if_required",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "actor_area_to_place_in",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "avoid_actor_area",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "avoid_all_actor_areas",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "set_facet",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       },
       {
         "name": "match_player_civ",
         "kind": "",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": false,
         "desc": ""
       }
@@ -1567,6 +2335,10 @@
       {
         "name": "Filename",
         "kind": "filename",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "name (or path and name)"
       }
@@ -1583,6 +2355,10 @@
       {
         "name": "Filename",
         "kind": "filename",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "name (or path and name)"
       }
@@ -1608,6 +2384,10 @@
       {
         "name": "%",
         "kind": "percent",
+        "range": {
+          "min": "0",
+          "max": "99"
+        },
         "required": true,
         "desc": "number (0-99)"
       }
@@ -1633,12 +2413,20 @@
       {
         "name": "arg1",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": ""
       },
       {
         "name": "arg2",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": ""
       }
@@ -1655,6 +2443,10 @@
       {
         "name": "ConditionLabel",
         "kind": "condition",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "either a predefined condition or a custom condition"
       }
@@ -1671,6 +2463,10 @@
       {
         "name": "ConditionLabel",
         "kind": "condition",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "either a predefined condition or a custom condition"
       }
@@ -1705,6 +2501,10 @@
       {
         "name": "ConditionLabel",
         "kind": "condition",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "text"
       }
@@ -1721,12 +2521,20 @@
       {
         "name": "Constant",
         "kind": "const",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "text"
       },
       {
         "name": "Identifier",
         "kind": "number",
+        "range": {
+          "min": "",
+          "max": ""
+        },
         "required": true,
         "desc": "number (see: Constant Reference)"
       }
