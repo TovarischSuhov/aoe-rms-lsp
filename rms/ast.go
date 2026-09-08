@@ -4,6 +4,7 @@ package rms
 
 import (
 	"slices"
+	"strings"
 
 	"aoe2-lsp/common"
 )
@@ -16,6 +17,17 @@ const (
 	KindRandom = "random"
 	// KindConditional is an if/elseif/else branch.
 	KindConditional = "conditional"
+)
+
+// Argument-context kinds of ArgSite.
+const (
+	// KindArg marks the cursor on a positional argument.
+	KindArg = "arg"
+	// KindAttr marks the cursor on an attribute (its name or value).
+	KindAttr = "attr"
+	// KindNone marks an unambiguous non-argument position (command name,
+	// braces, gaps, tail).
+	KindNone = "none"
 )
 
 // Expression kinds.
@@ -54,12 +66,37 @@ type RmsFile struct {
 	// attribute names, identifier/constant values) recorded at parse
 	// time; ReferencesAt answers from here.
 	words []wordOcc
+	// strings are the string-token spans of statement lines (attribute
+	// values); ArgAt answers silence from here.
+	strings []common.Range
+	// comments are the exact /* */ and // comment extents; ArgAt answers
+	// silence from here.
+	comments []common.Range
+	// excluded are the line spans that never own a statement — section
+	// headers, #include/#includeXS directive lines (path arguments
+	// included) and plain #-comment lines.
+	excluded []common.Range
 }
 
 // wordOcc is one word-token occurrence.
 type wordOcc struct {
 	name string
 	at   common.Range
+}
+
+// ArgSite is the argument context under the cursor — data for signature
+// help. Construct-and-use data: no mutation; the kind discriminator
+// follows the Statement.Kind/Expr.Kind style.
+type ArgSite struct {
+	// Stmt is the owning command (positional semantics: attributes belong
+	// to the preceding command; nested blocks to their own statement).
+	Stmt Statement
+	// Kind is one of arg / attr / none.
+	Kind string
+	// Index is the 0-based positional-argument ordinal (Kind=arg).
+	Index int
+	// Name is the attribute name (Kind=attr).
+	Name string
 }
 
 // SectionAt returns the section containing pos (for the completion
@@ -117,6 +154,100 @@ func deepestAt(stmt *Statement, pos common.Pos) *Statement {
 // pos; used to track the preceding statement.
 func endsBefore(stmt *Statement, pos common.Pos) bool {
 	return stmt.Range.End.Line < pos.Line
+}
+
+// ArgAt discriminates the argument context under the cursor (signature
+// help): the owning command plus the active element. Strings, comments,
+// section-header lines, #include/#includeXS lines and plain #-comment
+// lines answer found=false before any owner lookup; directive-styled
+// statements (#const, #define, #include_drs) are filtered by name.
+// Ambiguous positions (braces, gaps, command tail) answer KindNone —
+// never a guessed label.
+func (f RmsFile) ArgAt(pos common.Pos) (ArgSite, bool) {
+	for _, r := range f.strings {
+		if r.Contains(pos) {
+			return ArgSite{}, false
+		}
+	}
+
+	for _, r := range f.comments {
+		if r.Contains(pos) {
+			return ArgSite{}, false
+		}
+	}
+
+	for _, r := range f.excluded {
+		if r.Contains(pos) {
+			return ArgSite{}, false
+		}
+	}
+
+	stmt, ok := f.ownerAt(pos)
+	if !ok {
+		return ArgSite{}, false
+	}
+
+	if strings.HasPrefix(stmt.Name, "#") {
+		return ArgSite{}, false
+	}
+
+	for i := range stmt.Args {
+		if stmt.Args[i].Range.Contains(pos) {
+			return ArgSite{Stmt: stmt, Kind: KindArg, Index: i}, true
+		}
+	}
+
+	for _, attr := range stmt.Attributes {
+		if attr.nameAt.Contains(pos) || attr.Value.Range.Contains(pos) {
+			return ArgSite{Stmt: stmt, Kind: KindAttr, Name: attr.Name}, true
+		}
+	}
+
+	return ArgSite{Stmt: stmt, Kind: KindNone}, true
+}
+
+// ownerAt resolves the statement owning pos with band semantics: within
+// each statement list (sections top-down, then nested children) the last
+// statement whose start is at or before pos wins, and the walk recurses
+// into its children — the innermost statement reached owns the position.
+// Unlike StatementAt's containing-match, same-line trailing positions
+// (the cursor past the last argument — the key signature-help moment)
+// are owned by their own statement, not an earlier one; positions in
+// gaps fall to the preceding statement.
+func (f RmsFile) ownerAt(pos common.Pos) (Statement, bool) {
+	var best Statement
+
+	found := false
+
+	for i := range f.Sections {
+		if owner, ok := ownerIn(f.Sections[i].Statements, pos); ok {
+			best, found = owner, true
+		}
+	}
+
+	return best, found
+}
+
+// ownerIn picks the last statement of stmts starting at or before pos
+// and descends into its children.
+func ownerIn(stmts []Statement, pos common.Pos) (Statement, bool) {
+	candidate := -1
+
+	for j := range stmts {
+		if !pos.Before(stmts[j].Range.Start) {
+			candidate = j
+		}
+	}
+
+	if candidate < 0 {
+		return Statement{}, false
+	}
+
+	if owner, ok := ownerIn(stmts[candidate].Children, pos); ok {
+		return owner, true
+	}
+
+	return stmts[candidate], true
 }
 
 // Symbols returns the outline tree of the file (LSP
@@ -347,6 +478,11 @@ type Attribute struct {
 	Value Expr
 	// Range is the span of the attribute line.
 	Range common.Range
+
+	// nameAt is the name-token span recorded at parse time; ArgAt uses it
+	// for precise name-or-value discrimination (flag attributes match on
+	// the name alone — their zero Value range contains no position).
+	nameAt common.Range
 }
 
 // Expr is a DE math expression tree. Kind=binary: Value is the operator

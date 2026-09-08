@@ -83,12 +83,45 @@ type XsFile struct {
 	// symbols are all identifier occurrences (declaration names, callees,
 	// plain identifiers) with their ranges; SymbolAt answers from here.
 	symbols []symbol
+	// calls are the call contexts recorded by the parser (one per
+	// Kind=call expression); CallAt answers from here.
+	calls []*callRec
+	// noncode are the string and comment spans; positions inside them
+	// resolve to no symbol and no call.
+	noncode []common.Range
 }
 
 // symbol is one identifier occurrence.
 type symbol struct {
 	name string
 	at   common.Range
+}
+
+// callRec is one call context recorded by the parser. The span
+// [calleeAt, argEnd) deliberately ignores Expr.Range (which stops at the
+// last parsed argument): for an unterminated list argEnd is the eofPos
+// recovery frontier, so in-progress calls own the cursor positions an
+// editor asks about right after the trigger keystroke.
+type callRec struct {
+	callee   string
+	calleeAt common.Pos
+	lparen   common.Pos
+	argEnd   common.Pos
+	commas   []common.Pos
+}
+
+// CallSite is the call context under the cursor — data for signature
+// help. Construct-and-use data: no mutation.
+type CallSite struct {
+	// Callee is the callee name of the innermost enclosing call.
+	Callee string
+	// ArgIndex is the 0-based ordinal of the argument under the cursor
+	// (valid when OnArg: right after "(" it is 0; after k top-level
+	// commas it is k).
+	ArgIndex int
+	// OnArg reports whether the cursor is inside the argument list
+	// (false — on the callee name).
+	OnArg bool
 }
 
 // SymbolAt returns the identifier under pos (for hover and the completion
@@ -114,6 +147,62 @@ func (f XsFile) ReferencesAt(pos common.Pos) []common.Range {
 	}
 
 	return f.References(name)
+}
+
+// CallAt returns the innermost call enclosing pos (signature help):
+// among the recorded call contexts whose span contains the position,
+// the one with the latest "(" wins — the inner call of a nesting opens
+// later, and a postfix chain resolves to its suffix call. In-progress
+// (unterminated) calls answer too: their span stretches to the eofPos
+// recovery frontier. ArgIndex is never clamped: exceeding any declared
+// parameter count is a consumer decision, not navigation's.
+func (f XsFile) CallAt(pos common.Pos) (CallSite, bool) {
+	// Step 1: positions inside strings and comments resolve to no call —
+	// checked before any call lookup.
+	for _, r := range f.noncode {
+		if r.Contains(pos) {
+			return CallSite{}, false
+		}
+	}
+
+	best := -1
+
+	for i := range f.calls {
+		if f.calls[i].contains(pos) && (best < 0 || f.calls[i].lparen.After(f.calls[best].lparen)) {
+			best = i
+		}
+	}
+
+	if best < 0 {
+		return CallSite{}, false
+	}
+
+	rec := f.calls[best]
+
+	// On the callee name or between the name and "(": callee-side, no
+	// active argument.
+	if !pos.After(rec.lparen) {
+		return CallSite{Callee: rec.callee, ArgIndex: 0, OnArg: false}, true
+	}
+
+	// Count this call's top-level commas with end <= pos. A cursor on a
+	// comma character still reports the previous argument (the comma's
+	// end is one column further).
+	k := 0
+
+	for _, end := range rec.commas {
+		if !end.After(pos) {
+			k++
+		}
+	}
+
+	return CallSite{Callee: rec.callee, ArgIndex: k, OnArg: true}, true
+}
+
+// contains reports whether pos lies within the record span
+// [calleeAt, argEnd).
+func (r *callRec) contains(pos common.Pos) bool {
+	return !pos.Before(r.calleeAt) && pos.Before(r.argEnd)
 }
 
 // References returns every occurrence of the name — the declaration

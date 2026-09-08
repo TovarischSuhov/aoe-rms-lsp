@@ -102,6 +102,207 @@ func TestXsDefinition_APIShape(t *testing.T) {
 	require.IsType(t, common.Range{}, r)
 }
 
+// TestXsCallAt_APIShape pins the call-context contract surface: the
+// CallAt method on XsFile returning the exported CallSite.
+func TestXsCallAt_APIShape(t *testing.T) {
+	file, _ := XsParse("void f() { g(a, b); }", "shape.xs")
+
+	site, found := file.CallAt(common.Pos{Line: 0, Column: uint32(strings.Index("void f() { g(a, b); }", "a"))})
+
+	require.True(t, found)
+	require.IsType(t, CallSite{}, site)
+	require.IsType(t, "", site.Callee)
+	require.IsType(t, 0, site.ArgIndex)
+	require.IsType(t, false, site.OnArg)
+	require.Equal(t, "g", site.Callee)
+}
+
+// col builds a line-0 position at the given column.
+func col(c int) common.Pos {
+	return common.Pos{Line: 0, Column: uint32(c)}
+}
+
+// posOf builds the position of needle's first occurrence in src
+// (single-line fixtures).
+func posOf(src string, needle string, offset int) common.Pos {
+	return common.Pos{Line: 0, Column: uint32(strings.Index(src, needle) + offset)}
+}
+
+// TestCallAt_ClosedCallArgIndex covers baseline comma counting on a
+// closed call.
+func TestCallAt_ClosedCallArgIndex(t *testing.T) {
+	src := "void f() { g(a, b); }"
+	file, _ := XsParse(src, "t.xs")
+
+	site, found := file.CallAt(posOf(src, "a", 0))
+	require.True(t, found)
+	assert.Equal(t, CallSite{Callee: "g", ArgIndex: 0, OnArg: true}, site)
+
+	site, found = file.CallAt(posOf(src, "b", 0))
+	require.True(t, found)
+	assert.Equal(t, CallSite{Callee: "g", ArgIndex: 1, OnArg: true}, site)
+}
+
+// TestCallAt_JustAfterOpenParen covers SC1 — the first character after
+// "(" is the feature's key moment: the exact state an editor sends after
+// the trigger keystroke, on an unterminated list.
+func TestCallAt_JustAfterOpenParen(t *testing.T) {
+	src := "void f() { g("
+	file, _ := XsParse(src, "t.xs")
+
+	site, found := file.CallAt(posOf(src, "g(", 2))
+
+	require.True(t, found)
+	assert.Equal(t, CallSite{Callee: "g", ArgIndex: 0, OnArg: true}, site)
+}
+
+// TestCallAt_OnCalleeName covers the cursor on the callee token:
+// signature renders with no active argument.
+func TestCallAt_OnCalleeName(t *testing.T) {
+	src := "void f() { g(a); }"
+	file, _ := XsParse(src, "t.xs")
+
+	site, found := file.CallAt(posOf(src, "g(", 0))
+
+	require.True(t, found)
+	assert.Equal(t, CallSite{Callee: "g", ArgIndex: 0, OnArg: false}, site)
+}
+
+// TestCallAt_NestedInnerWins covers innermost-call selection:
+// f(g(x| → g, аргумент 0.
+func TestCallAt_NestedInnerWins(t *testing.T) {
+	src := "void f() { h(g(x)); }"
+	file, _ := XsParse(src, "t.xs")
+
+	site, found := file.CallAt(posOf(src, "x", 0))
+
+	require.True(t, found)
+	assert.Equal(t, CallSite{Callee: "g", ArgIndex: 0, OnArg: true}, site)
+}
+
+// TestCallAt_UnclosedToEOF covers doubly-nested in-progress calls at the
+// exact end of input — the eofPos recovery frontier contains the cursor.
+func TestCallAt_UnclosedToEOF(t *testing.T) {
+	src := "void f() { g(h("
+	file, _ := XsParse(src, "t.xs")
+
+	require.Equal(t, len(src), 15)
+
+	site, found := file.CallAt(col(len(src)))
+
+	require.True(t, found)
+	assert.Equal(t, CallSite{Callee: "h", ArgIndex: 0, OnArg: true}, site)
+}
+
+// TestCallAt_PositionOnOpenParenChar covers the exact boundary between
+// the callee-side and argument-side steps: the "(" character itself is
+// callee-side; one column later flips to onArg=true.
+func TestCallAt_PositionOnOpenParenChar(t *testing.T) {
+	src := "void f() { g(a); }"
+	file, _ := XsParse(src, "t.xs")
+
+	site, found := file.CallAt(posOf(src, "g(", 1))
+
+	require.True(t, found)
+	assert.Equal(t, CallSite{Callee: "g", ArgIndex: 0, OnArg: false}, site)
+}
+
+// TestCallAt_PositionOnCommaChar covers comma-character ownership: the
+// previous-argument region (the comma's end is one column further).
+func TestCallAt_PositionOnCommaChar(t *testing.T) {
+	src := "void f() { g(a, b); }"
+	file, _ := XsParse(src, "t.xs")
+
+	site, found := file.CallAt(posOf(src, ",", 0))
+
+	require.True(t, found)
+	assert.Equal(t, CallSite{Callee: "g", ArgIndex: 0, OnArg: true}, site)
+}
+
+// TestCallAt_ArgIndexNeverClamped covers the never-clamp constraint:
+// navigation reports the true ordinal even beyond any declared
+// parameter count.
+func TestCallAt_ArgIndexNeverClamped(t *testing.T) {
+	src := "void f() { g(a, b, c "
+	file, _ := XsParse(src, "t.xs")
+
+	site, found := file.CallAt(posOf(src, "c", 0))
+
+	require.True(t, found)
+	assert.Equal(t, 2, site.ArgIndex)
+	assert.True(t, site.OnArg)
+}
+
+// TestCallAt_Deterministic covers the determinism requirement: pure
+// index lookup, same question — same answer.
+func TestCallAt_Deterministic(t *testing.T) {
+	src := "void f() { g(a, b); }"
+	file, _ := XsParse(src, "t.xs")
+
+	pos := posOf(src, "b", 0)
+
+	first, found1 := file.CallAt(pos)
+	second, found2 := file.CallAt(pos)
+
+	require.True(t, found1)
+	require.True(t, found2)
+	assert.Equal(t, first, second)
+}
+
+// TestCallAt_InString covers string exclusion: positions inside a string
+// token never resolve to a call, even inside a call's argument span.
+func TestCallAt_InString(t *testing.T) {
+	src := `void f() { g("abc"); }`
+	file, _ := XsParse(src, "t.xs")
+
+	_, found := file.CallAt(posOf(src, "c", 0))
+
+	assert.False(t, found)
+}
+
+// TestCallAt_InComment covers line-comment exclusion.
+func TestCallAt_InComment(t *testing.T) {
+	src := "// g(a, b)\nvoid f() { g(a, b); }"
+	file, _ := XsParse(src, "t.xs")
+
+	_, found := file.CallAt(common.Pos{Line: 0, Column: 4})
+
+	assert.False(t, found)
+}
+
+// TestCallAt_InBlockComment covers multi-line block-comment spans — the
+// only comment form whose span crosses lines (from "/*" past "*/").
+func TestCallAt_InBlockComment(t *testing.T) {
+	src := "void f() { /* open\nstill comment */ g(a); }"
+	file, _ := XsParse(src, "t.xs")
+
+	_, found := file.CallAt(common.Pos{Line: 1, Column: uint32(strings.Index("still comment */ g(a); }", "still"))})
+
+	assert.False(t, found)
+}
+
+// TestCallAt_VectorLiteralNotCall covers the Kind=call rule: vector
+// literals are not call contexts.
+func TestCallAt_VectorLiteralNotCall(t *testing.T) {
+	src := "void f() { vector v = (1, 2, 3); }"
+	file, _ := XsParse(src, "t.xs")
+
+	_, found := file.CallAt(posOf(src, "3", 0))
+
+	assert.False(t, found)
+}
+
+// TestCallAt_ParamListNotCall covers the Kind=call rule: declaration
+// parameter lists are not call contexts.
+func TestCallAt_ParamListNotCall(t *testing.T) {
+	src := "int f(int a, int b) { return 0; }"
+	file, _ := XsParse(src, "t.xs")
+
+	_, found := file.CallAt(posOf(src, "b)", 0))
+
+	assert.False(t, found)
+}
+
 func TestXsDefinition_ParamShadowsTopLevel(t *testing.T) {
 	line := "void f(float x) { x = 2; }"
 

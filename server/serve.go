@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"aoe2-lsp/analysis"
+	"aoe2-lsp/hints"
 	"aoe2-lsp/kb"
 
 	"go.lsp.dev/jsonrpc2"
@@ -28,7 +29,7 @@ func serve(ctx context.Context, rwc io.ReadWriteCloser) error {
 		return fmt.Errorf("load knowledge base: %w", err)
 	}
 
-	srv := NewServer(store, analysis.NewAnalyzer(store))
+	srv := NewServer(store, analysis.NewAnalyzer(store), hints.NewComputer(store))
 
 	// The client dispatcher reaches handlers via the request context
 	// (protocol.ClientFromContext), so nothing races the serving start.

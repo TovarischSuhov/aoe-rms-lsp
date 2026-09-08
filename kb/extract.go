@@ -477,6 +477,11 @@ func buildCommand(sk skelCmd, doc refDoc, since string) Command {
 			arg.Required = doc.args[i].required
 		}
 
+		// Mining pass (Algorithm step 3): fill the empty Range from the
+		// Desc prose; the structured skeleton kind wins over the mined
+		// word. Same helper as the load path — idempotent by construction.
+		mineCommandArg(&arg)
+
 		cmd.Args = append(cmd.Args, arg)
 	}
 
@@ -486,6 +491,8 @@ func buildCommand(sk skelCmd, doc refDoc, since string) Command {
 			Kind:     kindOf(firstOr(attr.tokens, 1, ""), sk.name),
 			Required: false,
 		}
+
+		mineCommandArg(&arg)
 
 		cmd.Attributes = append(cmd.Attributes, arg)
 	}

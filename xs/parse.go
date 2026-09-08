@@ -29,17 +29,21 @@ func XsParse(source string, name string) (XsFile, []common.Diagnostic) {
 	})
 
 	p.file.symbols = p.syms
+	p.file.calls = p.calls
+	p.file.noncode = p.noncode
 
 	return p.file, p.diags
 }
 
 // xparser holds the incremental state of one XsParse run.
 type xparser struct {
-	file  XsFile
-	diags []common.Diagnostic
-	toks  []xtoken
-	pos   int
-	syms  []symbol
+	file    XsFile
+	diags   []common.Diagnostic
+	toks    []xtoken
+	pos     int
+	syms    []symbol
+	calls   []*callRec
+	noncode []common.Range
 }
 
 // parseDecl parses one top-level declaration, recovering to the next
@@ -245,7 +249,7 @@ func (p *xparser) parseEvent() {
 	decl := Decl{Kind: DeclEvent, Range: common.Range{Start: start, End: start}}
 
 	if p.atOp("(") {
-		if args, ok := p.parseArgs(); ok {
+		if args, ok := p.parseArgs(nil); ok {
 			for _, arg := range args {
 				if arg.Kind == ExprIdent {
 					decl.Name = arg.Value
@@ -819,7 +823,11 @@ func (p *xparser) parsePostfix() (Expr, bool) {
 
 		switch op.text {
 		case "(":
-			args, _ := p.parseArgs()
+			// Only this path creates call contexts (the contract's
+			// Kind=call rule): vector literals, param lists and grouping
+			// parens never record.
+			rec := p.openCall(operand, op.at.Start)
+			args, _ := p.parseArgs(rec)
 			end := operand.Range.End
 			if len(args) > 0 && args[len(args)-1].Range.End.After(end) {
 				end = args[len(args)-1].Range.End
@@ -928,8 +936,12 @@ func (p *xparser) parseParenExpr(open xtoken) (Expr, bool) {
 	return first, true
 }
 
-// parseArgs parses a call argument list: ( expr, ... ).
-func (p *xparser) parseArgs() ([]Expr, bool) {
+// parseArgs parses a call argument list: ( expr, ... ). When rec is
+// non-nil, every top-level comma consumed by this invocation appends its
+// token end to the record and termination pins argEnd (the ) end, or the
+// eofPos frontier for an unterminated list); nested calls record into
+// their own records via recursion.
+func (p *xparser) parseArgs(rec *callRec) ([]Expr, bool) {
 	if !p.at(xOp) || p.peek().text != "(" {
 		return nil, false
 	}
@@ -940,13 +952,21 @@ func (p *xparser) parseArgs() ([]Expr, bool) {
 
 	for {
 		if p.atOp(")") {
-			p.next()
+			closer := p.next()
+
+			if rec != nil {
+				rec.argEnd = closer.at.End
+			}
 
 			return out, true
 		}
 
 		if p.at(xEOF) {
 			p.reportf(p.peek().at, common.SeverityError, "syntax", "unterminated argument list")
+
+			if rec != nil {
+				rec.argEnd = eofPos
+			}
 
 			return out, false
 		}
@@ -960,7 +980,11 @@ func (p *xparser) parseArgs() ([]Expr, bool) {
 		}
 
 		if p.atOp(",") {
-			p.next()
+			comma := p.next()
+
+			if rec != nil {
+				rec.commas = append(rec.commas, comma.at.End)
+			}
 		} else if !p.atOp(")") {
 			p.reportf(p.peek().at, common.SeverityError, "syntax", "expected , or ) in argument list")
 			p.next()
@@ -968,6 +992,19 @@ func (p *xparser) parseArgs() ([]Expr, bool) {
 			continue
 		}
 	}
+}
+
+// openCall starts one call-context record for a postfix call on operand
+// (lparen is the "(" token start); parseArgs fills in the rest.
+func (p *xparser) openCall(operand Expr, lparen common.Pos) *callRec {
+	rec := &callRec{
+		callee:   identName(operand),
+		calleeAt: operand.Range.Start,
+		lparen:   lparen,
+	}
+	p.calls = append(p.calls, rec)
+
+	return rec
 }
 
 // skipBlock consumes a { ... } region (used for permissive recovery).
@@ -1229,7 +1266,8 @@ var multiCharOps = []string{
 // singleOps are the one-character operators and punctuation.
 const singleOps = "+-*/%=<>!&|^~?:;,(){}[]."
 
-// scan tokenizes the whole source into p.toks with an EOF sentinel.
+// scan tokenizes the whole source into p.toks with an EOF sentinel and
+// collects the non-code spans (strings, comments) into p.noncode.
 func (p *xparser) scan(source string) {
 	s := &xscanner{src: []byte(source)}
 
@@ -1237,6 +1275,8 @@ func (p *xparser) scan(source string) {
 		tok := s.next()
 		p.toks = append(p.toks, tok)
 		if tok.kind == xEOF {
+			p.noncode = s.noncode
+
 			return
 		}
 	}
@@ -1248,6 +1288,7 @@ type xscanner struct {
 	pos       int
 	line      uint32
 	lineStart int
+	noncode   []common.Range
 }
 
 // posAt builds the position of byte offset i.
@@ -1281,11 +1322,15 @@ func (s *xscanner) next() xtoken {
 		if c == '/' && s.pos+1 < len(s.src) {
 			if s.src[s.pos+1] == '/' {
 				s.skipLineComment()
+				s.noncode = append(s.noncode, s.span(start))
+
 				continue
 			}
 
 			if s.src[s.pos+1] == '*' {
 				s.skipBlockComment()
+				s.noncode = append(s.noncode, s.span(start))
+
 				continue
 			}
 		}
@@ -1303,8 +1348,10 @@ func (s *xscanner) next() xtoken {
 			return s.token(xNumber, start)
 		case c == '"':
 			s.scanString()
+			tok := s.token(xString, start)
+			s.noncode = append(s.noncode, tok.at)
 
-			return s.token(xString, start)
+			return tok
 		default:
 			if tok, ok := s.scanOp(); ok {
 				return tok

@@ -72,9 +72,23 @@ type CommandArg struct {
 	// Name is the argument or attribute name.
 	Name string
 	// Kind is the expected value shape: number / percent / const / ... .
+	// Empty after load only when the prose does not parse (flag attributes).
 	Kind string
+	// Range is the mined value bounds; empty — not mined.
+	Range ValueRange
 	// Required reports whether the argument must be present.
 	Required bool
 	// Desc is the human-readable description.
 	Desc string
+}
+
+// ValueRange is the mined value bounds of a command argument, extracted
+// from its Desc prose. Construct-and-use data: no mutation.
+type ValueRange struct {
+	// Min is the lower bound exactly as written in the prose
+	// ("" — not mined).
+	Min string `json:"min"`
+	// Max is the upper bound exactly as written in the prose
+	// ("" — not mined).
+	Max string `json:"max"`
 }

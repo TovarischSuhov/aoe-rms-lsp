@@ -240,13 +240,18 @@ func (s *Store) indexCommands(raw []byte) error {
 		}
 
 		for _, wa := range wcmd.Args {
-			cmd.Args = append(cmd.Args, CommandArg(wa))
+			arg := CommandArg(wa)
+			mineCommandArg(&arg)
+			cmd.Args = append(cmd.Args, arg)
 		}
 
 		for _, wa := range wcmd.Attributes {
-			cmd.Attributes = append(cmd.Attributes, CommandArg(wa))
+			attr := CommandArg(wa)
+			mineCommandArg(&attr)
+			cmd.Attributes = append(cmd.Attributes, attr)
 		}
 
+		// Mining happens before indexing so lookups serve mined data.
 		s.commands = append(s.commands, cmd)
 		s.commandByName[cmd.Name] = cmd
 		s.commandsBySect[cmd.Section] = append(s.commandsBySect[cmd.Section], cmd)
@@ -266,6 +271,29 @@ func validateName(name string) error {
 	}
 
 	return nil
+}
+
+// mineCommandArg fills the empty Range and Kind of arg from its Desc
+// prose. Structured values win (provenance rule): only empty fields are
+// filled, so the helper never overwrites values from extraction and is
+// idempotent across the load and extraction pipelines. Shared by
+// indexCommands here and buildCommand in extract.go — the identical
+// semantics at both call sites are what makes load idempotent with
+// extraction.
+func mineCommandArg(arg *CommandArg) {
+	zero := ValueRange{}
+
+	if arg.Range == zero || arg.Kind == "" {
+		kind, r := MineKindRange(arg.Desc)
+
+		if arg.Range == zero {
+			arg.Range = r
+		}
+
+		if arg.Kind == "" {
+			arg.Kind = kind
+		}
+	}
 }
 
 // decodeData decodes one embedded JSON payload with unknown-key rejection.
@@ -323,8 +351,9 @@ type commandWire struct {
 
 // argWire is the JSON shape of one command argument or attribute.
 type argWire struct {
-	Name     string `json:"name"`
-	Kind     string `json:"kind"`
-	Required bool   `json:"required"`
-	Desc     string `json:"desc"`
+	Name     string     `json:"name"`
+	Kind     string     `json:"kind"`
+	Range    ValueRange `json:"range"`
+	Required bool       `json:"required"`
+	Desc     string     `json:"desc"`
 }

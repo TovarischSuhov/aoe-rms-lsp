@@ -78,7 +78,8 @@ func (p *parser) run(source string) {
 		p.starts[i] = p.starts[i-1] + len(p.lines[i-1]) + 1
 	}
 
-	visible := blankComments(p.lines)
+	visible, comments := blankComments(p.lines, p.starts)
+	p.file.comments = comments
 	p.cur = &sect{name: "global", start: common.Pos{}}
 
 	for i := range p.lines {
@@ -100,6 +101,7 @@ func (p *parser) run(source string) {
 		if name, ok := sectionHeader(trimmed); ok {
 			p.closeSection(p.pos(i, 0))
 			p.recordSectionWord(name, line, i)
+			p.recordExcluded(i)
 
 			if strings.HasPrefix(trimmed, "</") {
 				// a closing tag ends the section: following statements
@@ -113,18 +115,41 @@ func (p *parser) run(source string) {
 		}
 
 		if isDirectiveLine(trimmed) {
+			if isExcludedDirective(trimmed) {
+				// the whole #include/#includeXS line — path argument
+				// included — never owns a statement
+				p.recordExcluded(i)
+			}
+
 			p.directive(line, i)
 			continue
 		}
 
 		if strings.HasPrefix(trimmed, "#") {
-			continue // plain #-comment line
+			p.recordExcluded(i) // plain #-comment line
+
+			continue
 		}
 
 		p.statementLine(line, i)
 	}
 
 	p.closeAll()
+}
+
+// recordExcluded adds the whole physical line to the excluded index.
+func (p *parser) recordExcluded(idx int) {
+	p.file.excluded = append(p.file.excluded,
+		common.Range{Start: p.pos(idx, 0), End: p.pos(idx, len(p.lines[idx]))})
+}
+
+// isExcludedDirective reports whether the trimmed line is an
+// #include/#includeXS directive (the line classes that materialize no
+// statement; #const/#define/#include_drs do and stay owned).
+func isExcludedDirective(trimmed string) bool {
+	word := strings.Fields(trimmed)[0]
+
+	return word == "#include" || word == "#includeXS"
 }
 
 // closeAll finalizes the trailing section, XS block and open constructs.
@@ -159,6 +184,12 @@ func (p *parser) statementLine(line string, idx int) {
 	}
 
 	rest := lex.rest()
+
+	for _, tok := range rest {
+		if tok.kind == tokString {
+			p.file.strings = append(p.file.strings, tok.at)
+		}
+	}
 
 	if structuralWords[first.text] {
 		p.structural(first, rest)
@@ -283,8 +314,9 @@ func (p *parser) buildAttribute(first token, rest []token) Attribute {
 	p.recordWord(first.text, first.at)
 
 	attr := Attribute{
-		Name:  first.text,
-		Range: common.Range{Start: first.at.Start, End: first.at.End},
+		Name:   first.text,
+		Range:  common.Range{Start: first.at.Start, End: first.at.End},
+		nameAt: first.at,
 	}
 
 	values := p.expressions(rest)
@@ -677,12 +709,21 @@ func xsTerminator(trimmed string) bool {
 }
 
 // blankComments returns a copy of lines with /* */ and // comments
-// replaced by spaces, preserving all offsets.
-func blankComments(lines []string) []string {
+// replaced by spaces (preserving all offsets) together with the exact
+// comment extents: multi-line block comments span from "/*" past "*/"
+// across the recorded lines; line comments span to the end of their line.
+func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 	out := make([]string, len(lines))
 	copy(out, lines)
 
+	var comments []common.Range
+
 	inBlock := false
+	var blockStart common.Pos
+
+	at := func(i int, col int) common.Pos {
+		return common.Pos{Line: uint32(i), Column: uint32(col), Offset: starts[i] + col}
+	}
 
 	for i := range out {
 		line := out[i]
@@ -692,6 +733,7 @@ func blankComments(lines []string) []string {
 			case inBlock:
 				if line[j] == '*' && j+1 < len(line) && line[j+1] == '/' {
 					line = line[:j] + "  " + line[j+2:]
+					comments = append(comments, common.Range{Start: blockStart, End: at(i, j+2)})
 					inBlock = false
 					j++
 				} else if line[j] != '\n' {
@@ -699,10 +741,12 @@ func blankComments(lines []string) []string {
 				}
 			case line[j] == '/' && j+1 < len(line) && line[j+1] == '*':
 				line = line[:j] + "  " + line[j+2:]
+				blockStart = at(i, j)
 				inBlock = true
 				j++
 			case line[j] == '/' && j+1 < len(line) && line[j+1] == '/':
 				line = line[:j] + strings.Repeat(" ", len(line)-j)
+				comments = append(comments, common.Range{Start: at(i, j), End: at(i, len(line))})
 				j = len(line)
 			}
 		}
@@ -710,7 +754,12 @@ func blankComments(lines []string) []string {
 		out[i] = line
 	}
 
-	return out
+	if inBlock {
+		last := len(out) - 1
+		comments = append(comments, common.Range{Start: blockStart, End: at(last, len(out[last]))})
+	}
+
+	return out, comments
 }
 
 // tokenKind enumerates the lexer token kinds.

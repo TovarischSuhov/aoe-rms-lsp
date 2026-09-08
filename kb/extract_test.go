@@ -1,6 +1,7 @@
 package kb
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -63,4 +64,104 @@ func TestExtractRmsCommands_MissingFile(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "zetnus"))
+}
+
+// TestExtractRmsCommands_APIShape pins the mining contract of the
+// extraction pipeline: create_elevation's MaxHeight arg carries the
+// mined range from the real guide.
+func TestExtractRmsCommands_APIShape(t *testing.T) {
+	commands, err := ExtractRmsCommands(zetnusGuide)
+	require.NoError(t, err)
+
+	byName := make(map[string]Command, len(commands))
+	for _, cmd := range commands {
+		byName[cmd.Name] = cmd
+	}
+
+	elev, found := byName["create_elevation"]
+	require.True(t, found)
+	require.NotEmpty(t, elev.Args)
+
+	assert.Equal(t, "MaxHeight", elev.Args[0].Name)
+	assert.Equal(t, ValueRange{Min: "1", Max: "16"}, elev.Args[0].Range)
+}
+
+// TestExtractRmsCommands_MinesRange covers the mining pass over the real
+// guide: skeleton kind wins, mined range fills the empty field.
+func TestExtractRmsCommands_MinesRange(t *testing.T) {
+	commands, err := ExtractRmsCommands(zetnusGuide)
+	require.NoError(t, err)
+
+	byName := make(map[string]Command, len(commands))
+	for _, cmd := range commands {
+		byName[cmd.Name] = cmd
+	}
+
+	elev, found := byName["create_elevation"]
+	require.True(t, found)
+	assert.Equal(t, ValueRange{Min: "1", Max: "16"}, elev.Args[0].Range)
+	assert.Equal(t, "number", elev.Args[0].Kind)
+
+	// Structured percent kind + mined bounds compose in one arg.
+	cliff, found := byName["cliff_curliness"]
+	require.True(t, found)
+	require.NotEmpty(t, cliff.Args)
+
+	assert.Equal(t, "percent", cliff.Args[0].Kind)
+	assert.Equal(t, ValueRange{Min: "0", Max: "100"}, cliff.Args[0].Range)
+}
+
+// TestStore_MiningIdempotentWithExtraction proves the data-pipeline
+// idempotency rule: extraction output marshaled to the wire shape
+// (range included) re-decodes through indexCommands with no drift —
+// regeneration and load-time mining agree.
+func TestStore_MiningIdempotentWithExtraction(t *testing.T) {
+	commands, err := ExtractRmsCommands(zetnusGuide)
+	require.NoError(t, err)
+
+	wire := make([]commandWire, 0, len(commands))
+	for _, cmd := range commands {
+		wire = append(wire, commandWire{
+			Name:         cmd.Name,
+			Section:      cmd.Section,
+			Args:         argsToWire(cmd.Args),
+			Attributes:   argsToWire(cmd.Attributes),
+			Desc:         cmd.Desc,
+			GameVersions: cmd.GameVersions,
+			SinceUpdate:  cmd.SinceUpdate,
+		})
+	}
+
+	raw, err := json.Marshal(wire)
+	require.NoError(t, err)
+
+	s := newStore()
+	require.NoError(t, s.indexCommands(raw))
+
+	for _, cmd := range commands {
+		loaded, found := s.Command(cmd.Name)
+		require.True(t, found, cmd.Name)
+
+		require.Len(t, loaded.Args, len(cmd.Args), cmd.Name)
+		for i := range cmd.Args {
+			assert.Equal(t, cmd.Args[i].Kind, loaded.Args[i].Kind, "%s args[%d]", cmd.Name, i)
+			assert.Equal(t, cmd.Args[i].Range, loaded.Args[i].Range, "%s args[%d]", cmd.Name, i)
+		}
+
+		require.Len(t, loaded.Attributes, len(cmd.Attributes), cmd.Name)
+		for i := range cmd.Attributes {
+			assert.Equal(t, cmd.Attributes[i].Kind, loaded.Attributes[i].Kind, "%s attrs[%d]", cmd.Name, i)
+			assert.Equal(t, cmd.Attributes[i].Range, loaded.Attributes[i].Range, "%s attrs[%d]", cmd.Name, i)
+		}
+	}
+}
+
+// argsToWire converts command argument specifications to the wire shape.
+func argsToWire(args []CommandArg) []argWire {
+	out := make([]argWire, 0, len(args))
+	for _, a := range args {
+		out = append(out, argWire(a))
+	}
+
+	return out
 }

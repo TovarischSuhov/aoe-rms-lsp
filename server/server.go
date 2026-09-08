@@ -9,6 +9,7 @@ import (
 
 	"aoe2-lsp/analysis"
 	"aoe2-lsp/common"
+	"aoe2-lsp/hints"
 	"aoe2-lsp/include"
 	"aoe2-lsp/kb"
 	"aoe2-lsp/rms"
@@ -21,28 +22,34 @@ import (
 // serverName identifies the server in Initialize responses and diagnostics.
 const serverName = "aoe2-lsp"
 
-// Server is the LSP server: the protocol surface over the kb, rms, xs and
-// analysis cells.
+// Server is the LSP server: the protocol surface over the kb, rms, xs,
+// analysis and hints cells.
 type Server struct {
 	protocol.UnimplementedServer
 
 	store    *kb.Store
 	analyzer *analysis.Analyzer
+	computer *hints.Computer
 	docs     *DocStore
 	resolver *include.Resolver
 	exit     chan struct{}
 	exitOnce sync.Once
 }
 
-// NewServer builds the server from its knowledge base and analyzer (DI);
-// the document cache and the include resolver over it are created
-// internally (DocStore structurally satisfies include.Source).
-func NewServer(store *kb.Store, analyzer *analysis.Analyzer) *Server {
+// NewServer builds the server from its knowledge base, analyzer and hint
+// computer (DI); the document cache and the include resolver over it are
+// created internally (DocStore structurally satisfies include.Source).
+func NewServer(
+	store *kb.Store,
+	analyzer *analysis.Analyzer,
+	computer *hints.Computer,
+) *Server {
 	docs := NewDocStore()
 
 	return &Server{
 		store:    store,
 		analyzer: analyzer,
+		computer: computer,
 		docs:     docs,
 		resolver: include.NewResolver(docs),
 		exit:     make(chan struct{}),
@@ -67,6 +74,7 @@ func (s *Server) Initialize(
 		DefinitionProvider:     protocol.Boolean(true),
 		ReferencesProvider:     protocol.Boolean(true),
 		DocumentSymbolProvider: protocol.Boolean(true),
+		SignatureHelpProvider:  &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}},
 	}
 
 	if enc, ok := negotiateEncoding(params); ok {
@@ -209,6 +217,119 @@ func (s *Server) hoverXs(text string, name string, pos common.Pos) string {
 	}
 
 	return functionMarkdown(fn)
+}
+
+// SignatureHelp answers textDocument/signatureHelp with the parameter
+// hints for the position: .xs documents and inline XS blocks route to the
+// XS path (with the include closure), plain .rms positions to the RMS
+// path. The handler is stateless and read-only: the answer depends only
+// on (document, position) — the trigger context is ignored. Silence —
+// nil, nil — when no hint resolves (trust rule, the Hover convention).
+func (s *Server) SignatureHelp(
+	ctx context.Context,
+	params *protocol.SignatureHelpParams,
+) (*protocol.SignatureHelp, error) {
+	text, name, ok := s.openDocument(params.TextDocument.URI)
+	if !ok {
+		return nil, nil
+	}
+
+	docURI := string(params.TextDocument.URI)
+	pos := fromProtocolPos(params.Position)
+
+	var hint hints.Hint
+
+	found := false
+
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		hint, found = s.signatureHelpRms(ctx, text, name, pos, docURI)
+	case strings.HasSuffix(name, ".xs"):
+		hint, found = s.signatureHelpXs(ctx, text, name, pos, docURI)
+	}
+
+	if !found {
+		return nil, nil
+	}
+
+	return toSignatureHelp(hint), nil
+}
+
+// signatureHelpXs parses the .xs document and computes the hint with the
+// closure's external declarations (the analyzed file is excluded from its
+// own externals — the analyzeXs pattern).
+func (s *Server) signatureHelpXs(
+	ctx context.Context,
+	text string,
+	name string,
+	pos common.Pos,
+	docURI string,
+) (hints.Hint, bool) {
+	file, _ := xs.XsParse(text, name)
+	closure := s.resolver.Closure(ctx, docURI)
+
+	return s.computer.XsAt(file, pos, closure.ExternalDecls(docURI))
+}
+
+// signatureHelpRms parses the .rms document: a position inside an inline
+// XS block routes to the XS path in block-local coordinates (the
+// include-Definition template; inline blocks are not closure members, so
+// the whole closure serves as externals); any other position takes the
+// RMS command path.
+func (s *Server) signatureHelpRms(
+	ctx context.Context,
+	text string,
+	name string,
+	pos common.Pos,
+	docURI string,
+) (hints.Hint, bool) {
+	file, _ := rms.Parse(text, name)
+
+	for _, block := range file.XsBlocks {
+		if !block.Range.Contains(pos) {
+			continue
+		}
+
+		xsFile, _ := xs.XsParse(block.Code, "inline:"+name)
+		closure := s.resolver.Closure(ctx, docURI)
+
+		return s.computer.XsAt(
+			xsFile,
+			unshiftPos(pos, block.Range.Start),
+			closure.ExternalDecls(""),
+		)
+	}
+
+	return s.computer.RmsAt(file, pos)
+}
+
+// toSignatureHelp maps one rendered hint to the protocol shape per
+// lsp-protocol: exactly one signature, ActiveSignature 0, plain-string
+// parameter labels, documentation omitted (concise-hints rule);
+// ActiveParameter is unset when no argument is active — never clamped to
+// the last parameter. It is set on both the result and the signature
+// (the per-signature field takes precedence since 3.16).
+func toSignatureHelp(hint hints.Hint) *protocol.SignatureHelp {
+	sig := protocol.SignatureInformation{Label: hint.Label}
+
+	for _, label := range hint.Params {
+		sig.Parameters = append(sig.Parameters, protocol.ParameterInformation{
+			Label: protocol.String(label),
+		})
+	}
+
+	var active protocol.Nullable[uint32]
+
+	if hint.Active >= 0 {
+		active = protocol.NewNullable(uint32(hint.Active))
+		sig.ActiveParameter = active
+	}
+
+	return &protocol.SignatureHelp{
+		Signatures:      []protocol.SignatureInformation{sig},
+		ActiveSignature: &[]uint32{0}[0],
+		ActiveParameter: active,
+	}
 }
 
 // Completion answers with the kb entries in scope: for .rms the commands of
@@ -616,6 +737,24 @@ func shiftPos(p common.Pos, base common.Pos) common.Pos {
 	}
 
 	return shifted
+}
+
+// unshiftPos maps a document position into block-relative coordinates by
+// subtracting the block start — the exact inverse of shiftPos; only the
+// first block line also loses the start column. Lookup coordinates become
+// block-local; the document-coordinate answer needs no re-shifting.
+func unshiftPos(p common.Pos, base common.Pos) common.Pos {
+	unshifted := common.Pos{
+		Line:   p.Line - base.Line,
+		Column: p.Column,
+		Offset: p.Offset - base.Offset,
+	}
+
+	if p.Line == base.Line {
+		unshifted.Column -= base.Column
+	}
+
+	return unshifted
 }
 
 // sortDiags orders diagnostics by start position, then message, so every
