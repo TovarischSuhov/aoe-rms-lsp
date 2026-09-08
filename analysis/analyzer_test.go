@@ -385,3 +385,25 @@ func TestAnalyzeXs_ExternalsSuppressUndefinedAndLocalsWin(t *testing.T) {
 	e, _ := xs.XsParse("void q() { ghost(); }", "t.xs")
 	assert.Equal(t, []string{"undefined-symbol"}, codes(a.AnalyzeXs(e, empty)))
 }
+
+func TestAnalyzeXs_ForLoopVarNoUndefined(t *testing.T) {
+	// the review repro: the loop variable used in init/cond/step/body
+	// must not fire undefined-symbol (previously 4 false errors)
+	src := "void main() { for (int i = 0; i < 10; i++) { int j = i + 1; } }"
+
+	file, _ := xs.XsParse(src, "for.xs")
+	a := newAnalyzer(t)
+
+	assert.Equal(t, []string{}, codes(a.AnalyzeXs(file, nil)))
+}
+
+func TestAnalyzeXs_ForLoopVarUsedAfterNotFlagged(t *testing.T) {
+	// conservative semantics: a use after the loop is not marked —
+	// same treatment as locals of nested blocks
+	src := "void main() { for (int i = 0; i < 3; i++) { } i = 5; }"
+
+	file, _ := xs.XsParse(src, "after.xs")
+	a := newAnalyzer(t)
+
+	assert.Equal(t, []string{}, codes(a.AnalyzeXs(file, nil)))
+}

@@ -329,3 +329,28 @@ func TestXsAt_ParamAndLocalEmptyDetail(t *testing.T) {
 	require.Equal(t, KindLocal, byLabel["loc"].Kind)
 	require.Empty(t, byLabel["loc"].Detail)
 }
+
+func TestXsAt_ForInitCandidate(t *testing.T) {
+	src := "void main() {\n" +
+		"  for (int i = 0; i < 10; i++) {\n" +
+		"    i = i + 1;\n" +
+		"  }\n" +
+		"}"
+	file, _ := xs.XsParse(src, "for.xs")
+
+	// cursor on the i assignment inside the loop body
+	cands := newTestCompleter(t).XsAt(file, at(src, "i = i", 4), nil)
+
+	var got []Candidate
+
+	for _, cand := range cands {
+		if cand.Label == "i" {
+			got = append(got, cand)
+		}
+	}
+
+	require.Len(t, got, 1, "the loop variable comes from the source pool")
+
+	require.Equal(t, KindLocal, got[0].Kind)
+	require.Equal(t, "0i", got[0].Sort, "source group sorts first")
+}
