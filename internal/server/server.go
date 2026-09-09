@@ -315,6 +315,7 @@ func (s *Server) Initialize(
 		ReferencesProvider:        protocol.Boolean(true),
 		DocumentSymbolProvider:    protocol.Boolean(true),
 		DocumentHighlightProvider: protocol.Boolean(true),
+		WorkspaceSymbolProvider:   protocol.Boolean(true),
 		FoldingRangeProvider:      protocol.Boolean(true),
 		SignatureHelpProvider:     &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}},
 		CodeActionProvider: &protocol.CodeActionOptions{
@@ -1173,6 +1174,138 @@ func (s *Server) DocumentSymbol(
 	slog.DebugContext(ctx, "document_symbol", "uri", params.TextDocument.URI, "symbols", len(out))
 
 	return out, nil
+}
+
+// workspaceCandidate is one fuzzy-matched symbol awaiting ordering.
+type workspaceCandidate struct {
+	score int
+	sym   common.Symbol
+	uri   string
+}
+
+// Symbols answers workspace/symbol: a fuzzy query over the universe of
+// every open document plus its include closure (the closure root is the
+// open document itself, parsed from editor state). RMS files contribute
+// sections only — command statements are noise; XS files contribute all
+// top-level declarations. Results carry SymbolInformation (flat arm);
+// locations may point into files that are not open. Empty results are
+// empty slices, not nil.
+func (s *Server) Symbols(
+	ctx context.Context,
+	params *protocol.WorkspaceSymbolParams,
+) (protocol.WorkspaceSymbolResult, error) {
+	query := params.Query
+
+	seen := make(map[string]bool)
+
+	var candidates []workspaceCandidate
+
+	for _, u := range s.docs.URIs() {
+		closure := s.resolver.Closure(ctx, u)
+
+		for _, entry := range closure.Rms {
+			if seen[entry.URI] {
+				continue
+			}
+
+			seen[entry.URI] = true
+
+			candidates = s.collectSymbols(candidates, query, entry.URI, sectionsOnly(entry.File.Symbols()))
+		}
+
+		for _, entry := range closure.Xs {
+			if seen[entry.URI] {
+				continue
+			}
+
+			seen[entry.URI] = true
+
+			candidates = s.collectSymbols(candidates, query, entry.URI, entry.File.Symbols())
+		}
+	}
+
+	slices.SortStableFunc(candidates, compareCandidates)
+
+	out := make(protocol.SymbolInformationSlice, 0, len(candidates))
+
+	for _, c := range candidates {
+		kind, ok := symbolKindTable[c.sym.Kind]
+		if !ok {
+			kind = protocol.SymbolKindField
+		}
+
+		out = append(out, protocol.SymbolInformation{
+			BaseSymbolInformation: protocol.BaseSymbolInformation{
+				Name: c.sym.Name,
+				Kind: kind,
+			},
+			Location: protocol.Location{
+				URI:   uri.URI(c.uri),
+				Range: s.targetRange(c.uri, c.sym.Selection),
+			},
+		})
+	}
+
+	slog.DebugContext(ctx, "workspace_symbol", "query", query, "count", len(out))
+
+	return out, nil
+}
+
+// collectSymbols filters one file's symbols through the fuzzy matcher.
+func (s *Server) collectSymbols(
+	out []workspaceCandidate,
+	query string,
+	uriArg string,
+	syms []common.Symbol,
+) []workspaceCandidate {
+	for _, sym := range syms {
+		score, matched := fuzzyMatch(query, sym.Name)
+		if !matched {
+			continue
+		}
+
+		out = append(out, workspaceCandidate{score: score, sym: sym, uri: uriArg})
+	}
+
+	return out
+}
+
+// compareCandidates orders the workspace result: score descending, then
+// URI, then position — a total order, so the answer is deterministic.
+func compareCandidates(a, b workspaceCandidate) int {
+	if a.score != b.score {
+		return b.score - a.score
+	}
+
+	if a.uri != b.uri {
+		return strings.Compare(a.uri, b.uri)
+	}
+
+	if a.sym.Selection.Start.Line != b.sym.Selection.Start.Line {
+		return int(a.sym.Selection.Start.Line) - int(b.sym.Selection.Start.Line)
+	}
+
+	return int(a.sym.Selection.Start.Column) - int(b.sym.Selection.Start.Column)
+}
+
+// sectionsOnly keeps the section nodes of an RMS outline tree — nested
+// sections included, command and inline-XS nodes dropped.
+func sectionsOnly(syms []common.Symbol) []common.Symbol {
+	out := make([]common.Symbol, 0, len(syms))
+
+	for _, sym := range syms {
+		if sym.Kind != "section" {
+			continue
+		}
+
+		if len(sym.Children) > 0 {
+			sym.Children = sectionsOnly(sym.Children)
+		}
+
+		out = append(out, sym)
+	}
+
+	return out
 }
 
 // symbolKindTable maps the producer kind vocabularies to protocol

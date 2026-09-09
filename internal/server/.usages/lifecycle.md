@@ -26,9 +26,9 @@ Preconditions:
 
 Initialize advertises: diagnostics (Full sync + OpenClose), hover,
 completion, navigation — definition, references, documentSymbol,
-documentHighlight — folding ranges, quick fixes (did-you-mean renames,
-effect_percent replacement, missing-include file creation), and
-signature help (TriggerCharacters "(" and ","). Editor configs need no
+documentHighlight, workspace symbol search — folding ranges, quick
+fixes (did-you-mean renames, effect_percent replacement, missing-include
+file creation), and signature help (TriggerCharacters "(" and ","). Editor configs need no
 extra flags; positionEncoding is negotiated (prefer utf-8 when the
 client offers it). Signature-help widgets refresh on client re-requests
 while open; the manual signature-help binding is the guaranteed path.
@@ -85,6 +85,20 @@ Preconditions:
   events force-reload the changed files (even with an unchanged
   size/mtime fingerprint) and republish the diagnostics of every open
   document.
+
+## Workspace symbol search
+
+workspace/symbol answers a fuzzy query over the union of every open
+document and its include closure (disk-backed files included — same
+universe as cross-file navigation). RMS files contribute sections only
+(commands are noise and stay out); XS files contribute all top-level
+declarations. An empty query returns the whole universe.
+
+Preconditions:
+- Results are ordered by match score (contiguous and word-start matches
+  score higher), ties broken by URI then position — the order is stable
+  across identical requests.
+- Locations may point into files that are not open in the editor.
 
 ## In-file highlights
 
