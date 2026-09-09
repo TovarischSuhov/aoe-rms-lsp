@@ -2,6 +2,7 @@ Imports:
   - Types:
       - Diagnostic
       - Range
+      - Token
     From: internal/common
   - Types:
       - Store
@@ -136,6 +137,44 @@ Annotations: |
 
       Constraints:
       - не изменять входной AST и externals
+
+    "TokensRms(file: RmsFile) -> tokens: []Token": |
+      Классификация идентификаторов RMS-файла для semantic tokens.
+
+      `file`: AST из rms.Parse; `tokens`: классифицированные диапазоны
+
+      Algorithm:
+      1. Обойти все statement (вкл. Children блоков) в порядке документа
+      2. Имя команды: lookup `Store` по `lookups` — есть → known, нет →
+         unknown; effect_percent → deprecated (перекрывает known)
+      3. Имя секции → section; имена атрибутов — known/unknown по
+         `Store`; идент-значения аргументов (константы RMS) —
+         known/unknown по `Store`
+      4. Отсортировать по позиции; перекрытия диапазонов не допускаются
+
+      Requirements:
+      - детерминированный порядок (позиция)
+      - входной AST не изменяется
+      - пороги did-you-mean из AnalyzeRms НЕ применяются
+
+    "TokensXs(file: XsFile, externals: []Decl) -> tokens: []Token": |
+      Классификация идентификаторов XS-файла для semantic tokens.
+
+      `file`: AST из XsParse; `externals`: декларации замыкания
+      (как AnalyzeXs); `tokens`: классифицированные диапазоны
+
+      Algorithm:
+      1. Собрать объявленные имена (файл + externals) — шаблон
+         AnalyzeXs шаги 1–2
+      2. Каждое ident-вхождение: объявлен или в kb (`Store.Function`,
+         `Store.Constant`) → known, иначе → unknown
+      3. Имя каждой декларации (function/variable/rule/event) → kind
+         (перекрывает known на этом диапазоне)
+      4. Отсортировать по позиции; перекрытий нет
+
+      Requirements:
+      - детерминированный порядок (позиция)
+      - входной AST не изменяется
 
 "CheckRmsValue(spec: CommandArg, kind: string, value: string, r: Range) -> diag: Diagnostic, reported: bool":
   location: values.go

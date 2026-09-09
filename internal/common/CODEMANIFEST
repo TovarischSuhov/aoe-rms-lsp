@@ -96,6 +96,24 @@ Annotations: |
     "Children -> []Symbol": |
       Вложенные узлы (пусто для листа).
 
+"Token(range: Range, typ: string)":
+  location: token.go
+  annotations: |
+    Классифицированный диапазон семантического токена: общий словарь
+    producer (analysis) и consumer (server) — прецедент `Symbol`.
+
+    `range`: диапазон токена в координатах файла
+    `typ`: класс токена; словарь фиксирован легендой сервера —
+    known/unknown/deprecated/section/kind
+
+    Constraints:
+    - чистый тип данных: construct-and-use, без методов
+  properties:
+    "Range -> Range": |
+      Диапазон токена в координатах файла.
+    "Type -> string": |
+      Класс токена из словаря легенды.
+
 ---
 
 Author: Goga

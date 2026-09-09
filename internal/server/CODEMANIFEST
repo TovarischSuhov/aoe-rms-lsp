@@ -37,6 +37,7 @@ Imports:
     From: internal/complete
   - Types:
       - Symbol
+      - Token
     Usages:
       - symbols
     From: internal/common
@@ -108,6 +109,9 @@ Annotations: |
   WorkspaceSymbol следует секции Workspace Symbols `lsp-protocol`:
   вселенная — открытые доки + их замыкания, fuzzy score desc с
   тай-брейком (URI, позиция), пустой результат — пустой slice, не nil.
+  SemanticTokens: легенда known/unknown/deprecated/section/kind держится
+  на сервере целиком (не настраиваемая — клиентские легенды
+  различаются); полный файл, range-запросы и инкремент не поддерживаются.
 
 ---
 
@@ -131,7 +135,9 @@ Annotations: |
       DocumentHighlightProvider, FoldingRangeProvider — Boolean(true);
       SignatureHelpProvider с триггерами «(» и «,»; CodeActionProvider
       с CodeActionKinds=[QuickFix]; WorkspaceSymbolProvider —
-      Boolean(true);
+      Boolean(true); SemanticTokensProvider — SemanticTokensOptions{
+      Legend: TokenTypes=[known, unknown, deprecated, section, kind],
+      TokenModifiers=[]};
       согласовать positionEncoding (utf-8 при поддержке клиентом);
       запомнить клиентские capability workspace.configuration и
       workspace.didChangeWatchedFiles.dynamicRegistration.
@@ -369,6 +375,31 @@ Annotations: |
       - без скана ФС воркспейса (только DocStore + Closure)
       - RMS-команды и inline-XS в выдачу не входят;
         workspaceSymbol/resolve не заявляем
+    "SemanticTokensFull(ctx: Context, params: SemanticTokensParams) -> tokens: SemanticTokens, err: error": |
+      Семантические токены полного файла (stateless, read-only).
+
+      `params`: документ запроса; `tokens`: delta-закодированные токены
+
+      Algorithm:
+      1. Язык по расширению URI (общий шаблон Hover); неизвестный —
+         Data:[] (не nil, не ошибка)
+      2. .rms: `Parse` → `Analyzer.TokensRms`; каждый inline `XsBlock`:
+         XsParse → `Analyzer.TokensXs` (externals — пустые), сдвиг
+         диапазонов в координаты файла (шаблон DocumentHighlight)
+      3. .xs: `XsParse` → внешние декларации `Closure` uri →
+         `Analyzer.TokensXs`
+      4. Каждый Token → (line, start, length) с конвертацией
+         positionEncoding; type → индекс в легенде
+      5. Delta-кодировка [Δline, Δstart, length, typeIdx] в документном
+         порядке; результат Data (пустой — пустой slice, не nil)
+
+      Requirements:
+      - детерминированность: одинаковый вход → одинаковая Data
+      - токены отсортированы по (line, start), перекрытий нет
+
+      Constraints:
+      - без range-запросов и инкремента (Full only)
+      - легенда фиксирована на сервере
     "Shutdown(ctx: Context) -> err: error": |
       Вернуть nil (default Unimplemented возвращает not-implemented).
     "Exit(ctx: Context) -> err: error": |
