@@ -173,3 +173,61 @@ func TestServerSymbols_UnknownExtensionSkipped(t *testing.T) {
 	require.True(t, ok)
 	require.Empty(t, list)
 }
+
+// TestServerWorkspaceSymbol_IntegrationStdio runs the slot's acceptance
+// scenarios over the real stdio entrypoint: a disk-backed closure
+// declaration and a non-included open document are both found by a
+// fuzzy query.
+func TestServerWorkspaceSymbol_IntegrationStdio(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	libPath := dir + "/lib.xs"
+
+	require.NoError(t, os.WriteFile(libPath,
+		[]byte("void sharedFn(int n) { }\n"), 0o644))
+
+	mainURI := uri.File(dir + "/main.rms")
+	standaloneURI := uri.File(dir + "/standalone.xs")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI: mainURI, LanguageID: "aoe2rms", Version: 1,
+			Text: "#includeXS lib.xs\n<LAND_GENERATION>\nbase_terrain GRASS\n</LAND_GENERATION>\n",
+		},
+	}))
+	h.waitDiagnostics(mainURI)
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI: standaloneURI, LanguageID: "aoe2xs", Version: 1,
+			Text: "void isolatedHelper() { }\n",
+		},
+	}))
+	h.waitDiagnostics(standaloneURI)
+
+	// A disk-backed closure declaration: lib.xs is not open anywhere.
+	res, err := h.disp.Symbols(ctx, &protocol.WorkspaceSymbolParams{Query: "shfn"})
+	require.NoError(t, err)
+
+	list, ok := res.(protocol.SymbolInformationSlice)
+	require.True(t, ok, "SymbolInformationSlice arm over stdio")
+	require.Len(t, list, 1, "exactly sharedFn from the disk-backed lib.xs")
+	require.Equal(t, "sharedFn", list[0].Name)
+	require.Equal(t, uri.File(libPath), list[0].Location.URI)
+
+	// The slot's headline criterion: a symbol of an open document that
+	// no other open document includes.
+	res, err = h.disp.Symbols(ctx, &protocol.WorkspaceSymbolParams{Query: "isolated"})
+	require.NoError(t, err)
+
+	list, ok = res.(protocol.SymbolInformationSlice)
+	require.True(t, ok)
+	require.Len(t, list, 1, "exactly isolatedHelper from the standalone open doc")
+	require.Equal(t, "isolatedHelper", list[0].Name)
+	require.Equal(t, standaloneURI, list[0].Location.URI)
+}
