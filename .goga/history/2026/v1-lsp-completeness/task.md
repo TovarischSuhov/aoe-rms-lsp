@@ -45,7 +45,16 @@ Formatting), опубликовать VS Code-расширение (Marketplace 
 - release v1.0.0: changelog, тег, релизные заметки
 
 **Out of scope (кандидаты 1.x):**
-- InlayHint, автозагрузка бинарника расширением
+- InlayHint
+- автозагрузка бинарника расширением — сформулирована 2026-09-09:
+  `2026/task-vscode-autodownload/task.md`
+- автодетект установленной игры в расширении VS Code: при установке /
+  активации найти инсталляцию AoE2 DE (Steam — стандартные пути +
+  `libraryfolders.vdf`, MS Store / XboxGames) и автоматически пробросить
+  корень системных include (напр. `<game>/resources/_common/ai-rms`) в
+  `aoe2lsp.includeRoots` — стоковые `#include` резолвятся без ручной
+  настройки; перекликается с vscode-autodownload (та же точка входа
+  `activate`, но не зависит от неё)
 - CallHierarchy, CodeLens, incremental sync, semantic tokens range/delta
 - доп. проверки анализа (duplicate declarations, unused)
 - scoop, AUR

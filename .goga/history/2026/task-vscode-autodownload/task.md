@@ -99,6 +99,9 @@ export async function installFromRelease(
 - linux/arm64 в релизной матрице (если понадобится — отдельно)
 - публикация расширения (подзадача #7 эпика v1.0.0)
 - пин конкретной версии сервера (кроме PATH/serverPath override)
+- автодетект установленной игры (AoE2 DE) и проброс её include-корня
+  (`ai-rms`) в `aoe2lsp.includeRoots` — отдельный кандидат 1.x,
+  см. «Out of scope» в `v1-lsp-completeness/task.md`
 
 ## Acceptance Criteria
 
