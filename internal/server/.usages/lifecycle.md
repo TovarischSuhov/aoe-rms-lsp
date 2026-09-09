@@ -76,10 +76,15 @@ Missing #include / #includeXS targets surface as "missing-include"
 diagnostics on the directive's path range.
 
 Preconditions:
-- Include paths resolve relative to the including file's directory; the
-  game's installation root is not searched.
-- Files changed outside the editor without a size/mtime change are not
-  reloaded (no file watcher).
+- Include paths resolve relative to the including file's directory;
+  additionally the configured `includeRoots` settings are searched in
+  order.
+- Disk files are cached by size and modtime. When the client supports
+  dynamic registration, the server registers watchers for `**/*.rms`
+  and `**/*.xs` on `initialized`: `workspace/didChangeWatchedFiles`
+  events force-reload the changed files (even with an unchanged
+  size/mtime fingerprint) and republish the diagnostics of every open
+  document.
 
 ## In-file highlights
 

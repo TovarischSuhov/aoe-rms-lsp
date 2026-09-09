@@ -21,6 +21,8 @@ import (
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
+
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // serverName identifies the server in Initialize responses and diagnostics.
@@ -43,6 +45,7 @@ type Server struct {
 	utf16 atomic.Bool // protocol default: translate byte columns unless utf-8 is negotiated
 
 	clientConfigCap atomic.Bool // the client answers workspace/configuration
+	clientWatchCap  atomic.Bool // the client accepts watcher registration
 	settings        atomic.Pointer[settingsState]
 }
 
@@ -144,22 +147,34 @@ func severityByName(name string) (protocol.DiagnosticSeverity, bool) {
 	return 0, false
 }
 
-// Initialized pulls the initial configuration: when the client
-// supports workspace/configuration, ask for the "aoe2lsp" section and
-// run it through the same application path as pushes.
+// Initialized runs the post-initialize pulls: the configuration
+// section (when the client answers workspace/configuration) and the
+// file-watcher registration (when the client accepts dynamic
+// registration for didChangeWatchedFiles).
 func (s *Server) Initialized(
 	ctx context.Context,
 	params *protocol.InitializedParams,
 ) error {
-	if !s.clientConfigCap.Load() {
-		return nil
+	client, hasClient := protocol.ClientFromContext(ctx)
+
+	if s.clientConfigCap.Load() && hasClient {
+		s.pullSettings(ctx, client)
 	}
 
-	client, ok := protocol.ClientFromContext(ctx)
-	if !ok {
-		return nil
+	if s.clientWatchCap.Load() && hasClient {
+		s.registerWatchers(ctx, client)
 	}
 
+	if s.clientConfigCap.Load() {
+		s.republishAll(ctx)
+	}
+
+	return nil
+}
+
+// pullSettings asks the client for the "aoe2lsp" section and applies
+// it through the shared settings path.
+func (s *Server) pullSettings(ctx context.Context, client protocol.Client) {
 	section := "aoe2lsp"
 
 	items, err := client.Configuration(ctx, &protocol.ConfigurationParams{
@@ -168,13 +183,66 @@ func (s *Server) Initialized(
 	if err != nil {
 		slog.WarnContext(ctx, "configuration pull failed", "err", err)
 
-		return nil
+		return
 	}
 
 	if len(items) > 0 {
 		s.applySettings(ctx, items[0])
 	}
+}
 
+// registerWatchers asks the client to watch the RMS/XS sources and
+// forward change events.
+func (s *Server) registerWatchers(ctx context.Context, client protocol.Client) {
+	watchAll := protocol.WatchKindCreate | protocol.WatchKindChange | protocol.WatchKindDelete
+
+	options, err := json.Marshal(protocol.DidChangeWatchedFilesRegistrationOptions{
+		Watchers: []protocol.FileSystemWatcher{
+			{GlobPattern: protocol.Pattern("**/*.rms"), Kind: watchAll},
+			{GlobPattern: protocol.Pattern("**/*.xs"), Kind: watchAll},
+		},
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "watcher options marshal failed", "err", err)
+
+		return
+	}
+
+	err = client.RegisterCapability(ctx, &protocol.RegistrationParams{
+		Registrations: []protocol.Registration{{
+			ID:              "aoe2lsp/watched-files",
+			Method:          "workspace/didChangeWatchedFiles",
+			RegisterOptions: jsontext.Value(options),
+		}},
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "watcher registration failed", "err", err)
+
+		return
+	}
+
+	slog.DebugContext(ctx, "watchers registered")
+}
+
+// DidChangeWatchedFiles force-reloads the changed disk files (even
+// with an unchanged size/mtime fingerprint) and republishes the
+// diagnostics of every open document — the include closure may have
+// shifted under the editor.
+func (s *Server) DidChangeWatchedFiles(
+	ctx context.Context,
+	params *protocol.DidChangeWatchedFilesParams,
+) (err error) {
+	defer recoverNotification(ctx, "DidChangeWatchedFiles", &err)
+
+	paths := make([]string, 0, len(params.Changes))
+
+	for _, change := range params.Changes {
+		if change.URI.IsFile() {
+			paths = append(paths, change.URI.FsPath())
+		}
+	}
+
+	s.resolver.Drop(paths)
 	s.republishAll(ctx)
 
 	return nil
@@ -262,8 +330,14 @@ func (s *Server) Initialize(
 		}
 	}
 
-	if ws := params.Capabilities.Workspace; ws != nil && ws.Configuration != nil && *ws.Configuration {
-		s.clientConfigCap.Store(true)
+	if ws := params.Capabilities.Workspace; ws != nil {
+		if ws.Configuration != nil && *ws.Configuration {
+			s.clientConfigCap.Store(true)
+		}
+
+		if w := ws.DidChangeWatchedFiles; w != nil && w.DynamicRegistration != nil && *w.DynamicRegistration {
+			s.clientWatchCap.Store(true)
+		}
 	}
 
 	slog.DebugContext(ctx, "initialized", "encoding", s.encodingName())

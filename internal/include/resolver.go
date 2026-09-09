@@ -201,6 +201,18 @@ func (r *Resolver) rootsSnapshot() []string {
 	return slices.Clone(r.roots)
 }
 
+// Drop force-invalidates the disk-cache entries for the given paths;
+// later closures re-read these files regardless of their stat
+// fingerprint. Unknown paths are a no-op.
+func (r *Resolver) Drop(paths []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, path := range paths {
+		delete(r.cache, path)
+	}
+}
+
 // withinRoot reports whether target stays inside rootDir; an empty
 // rootDir (non-disk root) disables the bound.
 func withinRoot(rootDir string, target string) bool {

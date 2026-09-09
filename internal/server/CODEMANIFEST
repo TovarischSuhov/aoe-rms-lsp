@@ -101,6 +101,10 @@ Annotations: |
   (код → error/warning/info/hint/none) применяются при конвертации
   диагностик (none — подавить); includeRoots → SetRoots резолвера.
   После применения — переиздать диагностику всех открытых документов.
+  DidChangeWatchedFiles: Drop путей событий у резолвера (форс-перечёт
+  с диска) и переиздание диагностики всех открытых документов;
+  Initialized при клиентской capability didChangeWatchedFiles.
+  dynamicRegistration регистрирует watchers **/*.rms и **/*.xs.
 
 ---
 
@@ -125,12 +129,20 @@ Annotations: |
       SignatureHelpProvider с триггерами «(» и «,»; CodeActionProvider
       с CodeActionKinds=[QuickFix];
       согласовать positionEncoding (utf-8 при поддержке клиентом);
-      запомнить клиентскую capability workspace.configuration.
+      запомнить клиентские capability workspace.configuration и
+      workspace.didChangeWatchedFiles.dynamicRegistration.
     "Initialized(ctx: Context, params: InitializedParams) -> err: error": |
       Начальный pull настроек: при запомненной capability
       workspace.configuration запросить у клиента (из ctx) секцию
       "aoe2lsp" и применить (общая функция с DidChangeConfiguration);
-      без capability — no-op.
+      при capability didChangeWatchedFiles.dynamicRegistration —
+      зарегистрировать watchers **/*.rms и **/*.xs
+      (client.RegisterCapability); без capability — no-op.
+    "DidChangeWatchedFiles(ctx: Context, params: DidChangeWatchedFilesParams) -> err: error": |
+      Algorithm:
+      1. События params.Changes → пути (FsPath)
+      2. Drop путей у резолвера (форс-перечёт с диска)
+      3. Переиздать диагностику всех открытых документов
     "DidChangeConfiguration(ctx: Context, params: DidChangeConfigurationParams) -> err: error": |
       Algorithm:
       1. Разобрать params.Settings: diagnostics.severityOverrides
