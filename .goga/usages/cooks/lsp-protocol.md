@@ -262,6 +262,24 @@ it ignore the operation silently.
 
 Empty result is an empty slice, not nil.
 
+### Workspace Symbols
+
+`workspace/symbol` lists symbols matching a query across the server's
+universe. Advertise `WorkspaceSymbolProvider: protocol.Boolean(true)` in
+Initialize. The server-interface method is `WorkspaceSymbol`; it returns
+`WorkspaceSymbolResult` — return `protocol.SymbolInformationSlice{}` (flat
+form: `Name`, `Kind`, `Location{URI, Range}`); `WorkspaceSymbolResolveSupport`
+is not advertised.
+
+Rules:
+- Universe = open documents plus their include-closure files (disk-backed
+  entries allowed); no filesystem workspace scan.
+- Empty query → all universe symbols; non-empty → fuzzy subsequence
+  scoring server-side, score descending, (URI, position) tie-break.
+- `Location` points at the symbol's selection range; the target file is
+  NOT required to be an open document (Cross-file Navigation Results).
+- Empty result is an empty slice, not nil.
+
 ## Cross-file Navigation Results
 
 Definition/References may return locations in files other than the queried
