@@ -38,6 +38,9 @@ type recordingClient struct {
 	// configResult answers workspace/configuration requests (the pull
 	// channel of the settings tests).
 	configResult []protocol.LSPAny
+
+	// registrations records the server's dynamic registrations.
+	registrations []*protocol.RegistrationParams
 }
 
 // Configuration answers the server's configuration pull.
@@ -1241,4 +1244,16 @@ func utf16ServerFixture(t *testing.T, text string) (*Server, uri.URI) {
 	}))
 
 	return srv, docURI
+}
+
+// RegisterCapability records the server's dynamic registrations.
+func (c *recordingClient) RegisterCapability(
+	ctx context.Context,
+	params *protocol.RegistrationParams,
+) error {
+	c.mu.Lock()
+	c.registrations = append(c.registrations, params)
+	c.mu.Unlock()
+
+	return nil
 }

@@ -421,3 +421,40 @@ func TestResolver_SetRootsEscapeBlocked(t *testing.T) {
 
 	require.Len(t, c.Missing, 1, "escapes outside the roots stay missing")
 }
+
+// TestResolver_Drop pins the force-reload semantics: a same-size
+// rewrite with the mtime wound back fools the stat fingerprint, Drop
+// defeats it; unknown paths stay a no-op.
+func TestResolver_Drop(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	libPath := filepath.Join(dir, "lib.xs")
+	require.NoError(t, os.WriteFile(libPath, []byte("void aaaa() {}\n"), 0o644))
+
+	st, err := os.Stat(libPath)
+	require.NoError(t, err)
+
+	uris := writeTree(t, dir, map[string]string{
+		"main.rms": "#includeXS lib.xs\n",
+	})
+
+	r := NewResolver(fakeSource{})
+
+	c := r.Closure(context.Background(), uris["main.rms"])
+	require.Len(t, c.Xs, 1)
+	require.Equal(t, "aaaa", c.Xs[0].File.Decls[0].Name)
+
+	// same size, different content, mtime wound back — the cache wins
+	require.NoError(t, os.WriteFile(libPath, []byte("void bbbb() {}\n"), 0o644))
+	require.NoError(t, os.Chtimes(libPath, st.ModTime(), st.ModTime()))
+
+	c = r.Closure(context.Background(), uris["main.rms"])
+	require.Equal(t, "aaaa", c.Xs[0].File.Decls[0].Name, "an unchanged fingerprint keeps the cache")
+
+	r.Drop([]string{libPath, filepath.Join(dir, "unknown.xs")})
+
+	c = r.Closure(context.Background(), uris["main.rms"])
+	require.Equal(t, "bbbb", c.Xs[0].File.Decls[0].Name, "Drop forces the disk re-read")
+}

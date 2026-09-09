@@ -75,12 +75,12 @@ outside the editor are not tracked»): теперь отслеживаются �
 
 ## Verification Checklist
 
-- [ ] include: Drop форсит перечитывание при неизменном stat-отпечатке
+- [x] include: Drop форсит перечитывание при неизменном stat-отпечатке
       (same size + os.Chtimes назад); неизвестный путь — no-op
-- [ ] server: правка включённого lib.xs на диске + событие →
+- [x] server: правка включённого lib.xs на диске + событие →
       републикация main.rms с обновлённой диагностикой
       (undefined-symbol исчезает после появления декларации)
-- [ ] Initialized при capability регистрирует watchers (мок-клиент);
+- [x] Initialized при capability регистрирует watchers (мок-клиент);
       без capability — регистрации нет
-- [ ] `goga lint` 0; `goga contract` include+server зелёные;
+- [x] `goga lint` 0; `goga contract` include+server зелёные;
       `make check` зелёный
