@@ -1,5 +1,10 @@
 # aoe2-lsp — Language Server for AoE2 RMS + XS
 
+[![CI](https://github.com/TovarischSuhov/aoe-rms-lsp/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/TovarischSuhov/aoe-rms-lsp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/TovarischSuhov/aoe-rms-lsp)](https://github.com/TovarischSuhov/aoe-rms-lsp/releases/latest)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FTovarischSuhov%2Faoe-rms-lsp%2Fbadges%2Fcoverage.json)](https://github.com/TovarischSuhov/aoe-rms-lsp/actions/workflows/ci.yml)
+[![Go version](https://img.shields.io/github/go-mod/go-version/TovarischSuhov/aoe-rms-lsp)](go.mod)
+[![Downloads](https://img.shields.io/github/downloads/TovarischSuhov/aoe-rms-lsp/total)](https://github.com/TovarischSuhov/aoe-rms-lsp/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 Language Server Protocol implementation (Go, stdio) for two Age of Empires II:

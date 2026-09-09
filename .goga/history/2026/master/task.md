@@ -1,44 +1,74 @@
-# Ячейки под internal/ (соответствие шаблону new-go-project)
+# Бейджи README (CI, coverage, релиз, версия Go)
 
 ## Current State
 
-Девять goga-ячеек лежали в корне модуля — осознанное отклонение от шаблона
-new-go-project (`internal/` — вся логика), зафиксированное в CLAUDE.md.
-Пользователь решил привести структуру к шаблону.
+В README один бейдж — License. CI (`ci.yml`) гоняет fmt / `go test -race` /
+lint / govulncheck, но покрытие не считает; внешних badge-сервисов проект не
+использует. Go Report Card закрыт (sunset) — его бейдж недоступен.
 
 ## Description
 
-Перенести ячейки в `internal/<cell>`, обновив импорты, `From:` манифестов,
-пути kb/data в контрактах/практиках, дефолты kbgen, относительные пути
-тестов, CLAUDE.md/README. Семантика контрактов не меняется — только пути.
+Собрать в README строку бейджей: CI-статус (GitHub Actions), Release,
+Coverage, Go version (из go.mod), Downloads, License. Coverage — без сторонних
+SaaS (Codecov/Coveralls): джоба в ci.yml считает покрытие
+(`go test -race -coverprofile`), конвертирует тотал в shields-endpoint JSON и
+force-push'ит его в орфан-ветку `badges`; бейдж читает JSON через
+`img.shields.io/endpoint`.
 
 ## Scope
 
-**In scope:** git mv девяти ячеек; импорты `aoe2-lsp/internal/<cell>`;
-`From: internal/<cell>`; kbdata-текст и data-pipeline.md; kbgen default
-out; `"../docs` → `"../../docs` в тестах; CLAUDE.md Structure (флаг
-отклонения снимается); README layout.
+**In scope:**
+- `README.md` — блок бейджей
+- `.github/workflows/ci.yml` — джоба `coverage` (permissions
+  `contents: write` только у неё; публикация только на push в master)
+- посев ветки `badges` из локального прогона, чтобы бейдж жил сразу
 
-**Out of scope:** исторические доки (docs/tasks, docs/arch — snapshot
-прошлого); release.yml/ci.yml (пути не ссылаются на ячейки).
+**Out of scope:**
+- сторонние сервисы покрытия (осознанно, self-contained)
+- гейты/пороги покрытия в CI
+- другие workflows и кодовые ячейки
 
 ## Acceptance Criteria
 
-- `make check` зелёный; `goga lint` 9/0; `goga contract internal/kb` —
-  сигнатуры без изменений (только ключи ячеек с префиксом internal/)
-- `go run ./cmd/kbgen` регенерирует в internal/kb/data (пути в дефолтах)
-- CLAUDE.md/README описывают новую структуру; отклонение internal/ снято
-- Один PR, атомарные коммиты
+- README: 6 бейджей, все URL валидны и рендерятся
+- coverage-джоба публикует бейдж только на push в master; на PR —
+  прогон без публикации
+- ветка `badges` создана до пуша README
+- `make check` зелёный; прямой пуш в master (по явному указанию
+  пользователя, docs/infra вне кодовых задач)
+
+## Stack
+
+- **Frameworks:** —
+- **Libraries:** — (без новых go-зависимостей)
+- **Infrastructure:** GitHub Actions (существующий `ci.yml`), shields.io
+  endpoint-бейджи
+
+## External Dependencies
+
+| Component | Usage file | Status |
+|-----------|------------|--------|
+| shields.io | — | используется как публичный рендерер бейджей, usage-файл не требуется |
 
 ## Risks and Constraints
 
-Механический рефакторинг; goga поддерживает вложенные пути ячеек
-(проверено lint'ом до массовых правок).
+- Бейдж coverage показывает «invalid», пока ветки `badges` нет → сею ветку
+  локально до пуша README.
+- shields кэширует endpoint (~5 мин) — бейдж обновляется с задержкой после
+  CI.
+- actionlint локально нет — валидность workflow проверяет сам CI-прогон.
 
 ## Scope Estimate
 
-Одна задача, один PR.
+Одна задача (README + CI, кодовые ячейки не затрагиваются), один коммит в
+master.
 
 ## Existing Architecture
 
-Граф ячеек не меняется; потребители — cmd/ и тесты.
+Ячейки не затрагиваются; README и workflows лежат вне клеточных контрактов.
+
+## Notes
+
+- Go Report Card исключён: сервис закрыт (проверено запросом к API).
+- Решение о самодостаточном coverage (без Codecov) — по философии проекта
+  (self-contained, минимум внешних связей), принято автономно по делегированию.
