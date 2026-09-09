@@ -389,7 +389,7 @@ Annotations: |
          DocumentHighlight)
       3. .xs: `XsParse` → внешние декларации `Closure` uri → TokensXs
          у `Analyzer`
-      4. Каждый Token → (line, start, length) с конвертацией
+      4. Каждый `Token` → (line, start, length) с конвертацией
          positionEncoding; type → индекс в легенде
       5. Delta-кодировка [Δline, Δstart, length, typeIdx] в документном
          порядке; результат Data (пустой — пустой slice, не nil)
