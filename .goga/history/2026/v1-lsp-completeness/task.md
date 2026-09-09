@@ -38,6 +38,10 @@ Formatting), опубликовать VS Code-расширение (Marketplace 
   WorkspaceEdit по замыканию
 - format: новая ячейка `internal/format` (форматтеры RMS и XS, golden-тесты),
   server-хендлер Formatting
+- подсветка: TextMate-грамматики `aoe2rms`/`aoe2xs` в расширении —
+  статическая, работает без сервера; ключевые слова RMS из kb
+  (formулировка: `2026/task-vscode-highlighting/task.md`; добавлена
+  в эпик 2026-09-10)
 - публикация расширения: `vsce publish` + `ovsx` из release-workflow,
   синхронизация версий extension ↔ server в `scripts/release.sh`
 - установка: winget-манифест, Homebrew tap, README-инструкции для
@@ -68,6 +72,8 @@ Formatting), опубликовать VS Code-расширение (Marketplace 
   редакторе; prepareRename отказывает на непереименовываемой позиции
 - Инварианты форматтера: `parse(format(x)) ≡ parse(x)` и
   `format(format(x)) ≡ format(x)` на golden-фикстурах и корпусе 100 карт
+- .rms и .xs подсвечиваются статически без запущенного сервера
+  (грамматики в .vsix); с сервером слои не конфликтуют
 - `.vsix` публикуется в Marketplace и Open VSX автоматически при пуше тега
   `v*`; версии extension и server совпадают
 - `winget install` и `brew install` ставят бинарник на чистой машине;
@@ -108,7 +114,7 @@ Formatting), опубликовать VS Code-расширение (Marketplace 
 
 ## Scope Estimate
 
-Мультизадача: 9 подзадач, каждая — отдельная ветка `task/<name>` → PR.
+Мультизадача: 10 подзадач, каждая — отдельная ветка `task/<name>` → PR.
 Порядок снизу вверх по ячейкам, от быстрых побед к крупным:
 
 | # | Задача | Ячейки | Объём |
@@ -122,6 +128,7 @@ Formatting), опубликовать VS Code-расширение (Marketplace 
 | 7 | publish extension — версии, vsce/ovsx из CI | editors, scripts, CI | малый |
 | 8 | release 1.0.0 — changelog, тег, README-инструкции по платформам | docs | малый |
 | 9 | package managers — winget + Homebrew tap | внешняя инфраструктура | малый-средний |
+| 10 | highlighting — TextMate-грамматики aoe2rms/aoe2xs (добавлена 2026-09-10; формулировка готова, выполнять логически до #7) | editors/vscode | малый-средний |
 
 ## Existing Architecture
 
@@ -140,6 +147,9 @@ Formatting), опубликовать VS Code-расширение (Marketplace 
 - Граница «полного функционала» 1.0.0 = ядро (rename, documentLink,
   selectionRange) + форматтер + публикация; InlayHint и автозагрузка
   бинарника — 1.x
+- Дополнение 2026-09-10: подсветка синтаксиса (TextMate-грамматики,
+  подзадача #10, формулировка `2026/task-vscode-highlighting/task.md`)
+  включена в эпик по решению пользователя; выполнять до публикации (#7)
 - Форматтер — отдельная протоколо-независимая ячейка `internal/format`
 - Установка: README-инструкции по платформам + winget и Homebrew tap;
   scoop/AUR — 1.x
