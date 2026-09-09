@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -48,6 +49,46 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
+
+  corpus:
+    name: corpus gate (100 real maps)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Selective: PRs skip the corpus (fetch costs a network round-trip);
+    # the gate runs on master pushes, manual dispatch and could be
+    # scheduled nightly if the pool ever needs drift-watching.
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build server
+        run: go build -o aoe2-lsp ./cmd/aoe2-lsp
+
+      # The fetch sample is deterministic (pinned SHAs + stable ordering),
+      # so the whole directory is cached by the sources hash — a cache hit
+      # skips every network round-trip.
+      - name: Cache corpus sample
+        uses: actions/cache@v4
+        with:
+          path: .corpus
+          key: corpus-${{ hashFiles('scripts/corpus-sources.txt') }}
+
+      - name: Fetch corpus (skipped on cache hit)
+        run: |
+          if [ "$(find .corpus -type f 2>/dev/null | wc -l)" -ge 100 ]; then
+            echo "corpus: sample cached ($(find .corpus -type f | wc -l) files)"
+          else
+            scripts/corpus-fetch.sh .corpus
+          fi
+
+      - name: Run corpus gate
+        run: go run ./cmd/corpus -bin ./aoe2-lsp -dir .corpus
 
   coverage:
     name: coverage badge
