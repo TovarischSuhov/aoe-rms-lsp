@@ -316,8 +316,14 @@ func (s *Server) Initialize(
 		DocumentSymbolProvider:    protocol.Boolean(true),
 		DocumentHighlightProvider: protocol.Boolean(true),
 		WorkspaceSymbolProvider:   protocol.Boolean(true),
-		FoldingRangeProvider:      protocol.Boolean(true),
-		SignatureHelpProvider:     &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}},
+		SemanticTokensProvider: &protocol.SemanticTokensOptions{
+			Legend: protocol.SemanticTokensLegend{
+				TokenTypes:     semanticTokenTypes,
+				TokenModifiers: []string{},
+			},
+		},
+		FoldingRangeProvider:  protocol.Boolean(true),
+		SignatureHelpProvider: &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}},
 		CodeActionProvider: &protocol.CodeActionOptions{
 			CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
 		},
@@ -1306,6 +1312,99 @@ func sectionsOnly(syms []common.Symbol) []common.Symbol {
 	}
 
 	return out
+}
+
+// semanticTokenTypes is the fixed server-side legend: a token type's
+// slice index is its protocol token-type index. The legend is not
+// client-negotiable — editors map the types to their own highlight
+// groups.
+var semanticTokenTypes = []string{
+	"known",
+	"unknown",
+	"deprecated",
+	"section",
+	"kind",
+}
+
+// SemanticTokensFull answers textDocument/semanticTokens/full with the
+// classified identifiers of one document: RMS names and values plus
+// inline XS blocks (shifted into file coordinates) for .rms, XS
+// declarations and identifiers (with the include closure's externals)
+// for .xs. Data is delta-encoded quintuples; full-document only, no
+// range requests, no deltas. Empty documents answer empty Data — not
+// nil, not an error.
+func (s *Server) SemanticTokensFull(
+	ctx context.Context,
+	params *protocol.SemanticTokensParams,
+) (*protocol.SemanticTokens, error) {
+	docURI := params.TextDocument.URI
+	text, name, _ := s.openDocument(docURI)
+
+	var toks []common.Token
+
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		file, _ := rms.Parse(text, name)
+
+		toks = s.analyzer.TokensRms(file)
+
+		for _, block := range file.XsBlocks {
+			xsFile, _ := xs.XsParse(block.Code, "inline:"+name)
+
+			for _, tok := range s.analyzer.TokensXs(xsFile, nil) {
+				tok.Range = common.Range{
+					Start: shiftPos(tok.Range.Start, block.Range.Start),
+					End:   shiftPos(tok.Range.End, block.Range.Start),
+				}
+
+				toks = append(toks, tok)
+			}
+		}
+	case strings.HasSuffix(name, ".xs"):
+		xsFile, _ := xs.XsParse(text, name)
+
+		externals := s.resolver.Closure(ctx, string(docURI)).ExternalDecls(string(docURI))
+		toks = s.analyzer.TokensXs(xsFile, externals)
+	}
+
+	data := s.encodeSemanticTokens(text, toks)
+
+	slog.DebugContext(ctx, "semantic_tokens", "uri", docURI, "tokens", len(toks))
+
+	return &protocol.SemanticTokens{Data: data}, nil
+}
+
+// encodeSemanticTokens converts classified tokens into delta-encoded
+// quintuples [Δline, Δstart, length, typeIdx, modifiers] in the
+// negotiated position encoding; the input is position-sorted with no
+// overlaps (analysis guarantee).
+func (s *Server) encodeSemanticTokens(text string, toks []common.Token) []uint32 {
+	data := make([]uint32, 0, len(toks)*5)
+
+	prevLine, prevStart := uint32(0), uint32(0)
+
+	for _, tok := range toks {
+		typeIdx := slices.Index(semanticTokenTypes, tok.Type)
+		if typeIdx < 0 {
+			continue
+		}
+
+		start := s.toProtocolPos(text, tok.Range.Start)
+		end := s.toProtocolPos(text, tok.Range.End)
+
+		dLine := start.Line - prevLine
+
+		dStart := start.Character
+		if dLine == 0 {
+			dStart -= prevStart
+		}
+
+		data = append(data, dLine, dStart, end.Character-start.Character, uint32(typeIdx), 0)
+
+		prevLine, prevStart = start.Line, start.Character
+	}
+
+	return data
 }
 
 // symbolKindTable maps the producer kind vocabularies to protocol
