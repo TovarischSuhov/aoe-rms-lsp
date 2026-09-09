@@ -50,6 +50,46 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
+  vscode:
+    name: vscode extension (.vsix)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No lockfile: the npm registry is unreachable from some dev
+      # environments, so versions are pinned exactly in package.json
+      # and the install cache is keyed by its hash.
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: editors/vscode/node_modules
+          key: vscode-nm-${{ hashFiles('editors/vscode/package.json') }}
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Type-check
+        run: npm run check
+
+      - name: Package .vsix
+        run: npm run package
+
+      - name: Upload .vsix
+        uses: actions/upload-artifact@v4
+        with:
+          name: aoe2-lsp-vsix
+          path: editors/vscode/*.vsix
+
   corpus:
     name: corpus gate (100 real maps)
     runs-on: ubuntu-latest

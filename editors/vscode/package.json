@@ -1,0 +1,95 @@
+{
+  "name": "aoe2-lsp",
+  "displayName": "AoE2 RMS/XS Language Server",
+  "description": "Language server support for Age of Empires II random map scripts (.rms) and XS (.xs), powered by the aoe2-lsp binary.",
+  "publisher": "tovarischsuhov",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TovarischSuhov/aoe-rms-lsp"
+  },
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "aoe2rms",
+        "aliases": [
+          "AoE2 Random Map Script",
+          "aoe2rms"
+        ],
+        "extensions": [
+          ".rms"
+        ],
+        "configuration": "./language-configuration.rms.json"
+      },
+      {
+        "id": "aoe2xs",
+        "aliases": [
+          "AoE2 XS",
+          "aoe2xs"
+        ],
+        "extensions": [
+          ".xs"
+        ],
+        "configuration": "./language-configuration.xs.json"
+      }
+    ],
+    "configuration": {
+      "title": "AoE2 LSP",
+      "properties": {
+        "aoe2lsp.serverPath": {
+          "type": "string",
+          "default": "aoe2-lsp",
+          "markdownDescription": "Path to the `aoe2-lsp` binary. A bare name resolves through PATH; an absolute path works too. Build it from the aoe-rms-lsp repository (`go build ./cmd/aoe2-lsp`) or install a release binary."
+        },
+        "aoe2lsp.diagnostics.severityOverrides": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Maps a diagnostic code (`unknown-command`, `undefined-symbol`, `deprecated-effect-percent`, ...) to a severity: `error`, `warning`, `info`, `hint` or `none` (suppresses the diagnostic).",
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning",
+              "info",
+              "hint",
+              "none"
+            ]
+          }
+        },
+        "aoe2lsp.includeRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Extra absolute directories searched (in order, after the including file's directory) when resolving `#include` / `#includeXS`. Point it at the game's `ai-rms` folder to resolve stock includes."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node build.mjs",
+    "package": "npm run compile && vsce package --no-dependencies",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "3.1.1",
+    "esbuild": "0.24.2",
+    "typescript": "5.6.3"
+  }
+}
