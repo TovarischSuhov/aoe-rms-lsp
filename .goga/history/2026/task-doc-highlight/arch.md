@@ -49,9 +49,9 @@
       1. Язык по расширению URI (общий шаблон Hover/SignatureHelp);
          неизвестный — пустой список
       2. .rms: `Parse`; позиция внутри `XsBlock` → сдвиг в координаты
-         блока → `XsParse` → `XsFile.ReferencesAt` → сдвиг диапазонов
-         назад в координаты файла; иначе `RmsFile.ReferencesAt`
-      3. .xs: `XsParse` → `XsFile.ReferencesAt`
+         блока → `XsParse` → ReferencesAt по `XsFile` → сдвиг диапазонов
+         назад в координаты файла; иначе ReferencesAt по `RmsFile`
+      3. .xs: `XsParse` → ReferencesAt по `XsFile`
       4. Каждый Range → protocol DocumentHighlight: Range с конвертацией
          positionEncoding, Kind=Text
 

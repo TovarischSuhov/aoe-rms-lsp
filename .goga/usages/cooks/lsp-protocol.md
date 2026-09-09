@@ -218,6 +218,18 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
 - map kinds via `protocol.SymbolKind` constants (`Function`, `Constant`,
   `Variable`, ...).
 
+### Document Highlight
+
+`textDocument/documentHighlight` returns in-file occurrences of the
+word under the cursor. Advertise `DocumentHighlightProvider:
+protocol.Boolean(true)` in Initialize. Return
+`[]protocol.DocumentHighlight` — each entry carries `Range` (converted
+per the negotiated positionEncoding) and `Kind` (`protocol.Text`).
+Empty result is an empty slice, not nil. Unlike Definition/References,
+no include closure is computed: highlights never cross file
+boundaries; inline-XS regions of .rms files shift block coordinates
+back to the outer file before returning.
+
 ## Cross-file Navigation Results
 
 Definition/References may return locations in files other than the queried

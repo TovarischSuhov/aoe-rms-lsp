@@ -25,8 +25,8 @@ Preconditions:
 ## Advertised capabilities
 
 Initialize advertises: diagnostics (Full sync + OpenClose), hover,
-completion, navigation — definition, references, documentSymbol — and
-signature help (TriggerCharacters "(" and ","). Editor configs need no
+completion, navigation — definition, references, documentSymbol,
+documentHighlight — and signature help (TriggerCharacters "(" and ","). Editor configs need no
 extra flags; positionEncoding is negotiated (prefer utf-8 when the
 client offers it). Signature-help widgets refresh on client re-requests
 while open; the manual signature-help binding is the guaranteed path.
@@ -44,4 +44,14 @@ Preconditions:
   game's installation root is not searched.
 - Files changed outside the editor without a size/mtime change are not
   reloaded (no file watcher).
+
+## In-file highlights
+
+documentHighlight returns every occurrence of the word under the cursor
+within the current file only — RMS word tokens (section/command/attribute
+names, ident/const values) or XS names, including inline-XS regions of
+.rms files. All highlights carry kind Text: occurrences are syntactic
+name matches, the server does not distinguish reads from writes.
+Inline regions report ranges in the outer .rms file's coordinates, so
+the editor highlights the source text as written.
 
