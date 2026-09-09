@@ -79,7 +79,7 @@
   },
   "scripts": {
     "compile": "node build.mjs",
-    "package": "npm run compile && vsce package",
+    "package": "npm run compile && vsce package --no-dependencies",
     "check": "tsc --noEmit"
   },
   "dependencies": {
