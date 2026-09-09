@@ -24,6 +24,10 @@ func main() {
 	}
 
 	debug := flag.Bool("debug", false, "enable debug logging to stderr")
+	// Some LSP clients pass -stdio/--stdio on the command line by
+	// convention; the server has no other transport, so the flag is
+	// registered to be ignored rather than rejected.
+	flag.Bool("stdio", false, "accepted and ignored; the server always speaks LSP over stdio")
 	flag.Parse()
 
 	// stdout carries the protocol; logs must go to stderr only.
