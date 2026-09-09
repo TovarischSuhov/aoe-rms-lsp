@@ -34,6 +34,18 @@ type recordingClient struct {
 	mu      sync.Mutex
 	batches []*protocol.PublishDiagnosticsParams
 	notify  chan struct{}
+
+	// configResult answers workspace/configuration requests (the pull
+	// channel of the settings tests).
+	configResult []protocol.LSPAny
+}
+
+// Configuration answers the server's configuration pull.
+func (c *recordingClient) Configuration(
+	ctx context.Context,
+	params *protocol.ConfigurationParams,
+) ([]protocol.LSPAny, error) {
+	return c.configResult, nil
 }
 
 // PublishDiagnostics records the batch and wakes waiting tests.

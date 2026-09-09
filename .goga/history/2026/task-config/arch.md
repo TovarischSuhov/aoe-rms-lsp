@@ -83,14 +83,14 @@ workspace.configuration.
 
 ## Verification Checklist
 
-- [ ] include: SetRoots — fallback в корень, порядок приоритета,
+- [x] include: SetRoots — fallback в корень, порядок приоритета,
       гард (цель вне корней — Missing), замена набора, конкурентный
       доступ не гоняется
-- [ ] server: severity override (hint/none/повышение) в
+- [x] server: severity override (hint/none/повышение) в
       диагностики; неизвестный код/severity — WARN-игнор; includeRoots
       доходят до резолвера (замыкание находит файл в корне)
-- [ ] DidChangeConfiguration переиздаёт диагностику открытых доков
+- [x] DidChangeConfiguration переиздаёт диагностику открытых доков
       (stdio: didOpen с unknown-command → override none → батч пуст)
-- [ ] Initialized: с capability делает pull (мок-клиент), без — no-op
-- [ ] `goga lint` 0; `goga contract` include+server зелёные;
+- [x] Initialized: с capability делает pull (мок-клиент), без — no-op
+- [x] `goga lint` 0; `goga contract` include+server зелёные;
       `make check` зелёный

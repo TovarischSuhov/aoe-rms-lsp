@@ -55,9 +55,10 @@ server requests it on `initialized` when the client supports
 
 - `severityOverrides` maps a diagnostic code (see analysis checks) to
   `error` / `warning` / `info` / `hint` / `none`; `none` suppresses the
-  diagnostic. Unknown codes and unknown severity names are ignored
-  with a WARN log. Applied without a server restart: every open
-  document's diagnostics are republished after a settings change.
+  diagnostic. Unknown severity names are ignored with a WARN log
+  (an unknown code simply never matches). Applied without a server
+  restart: every open document's diagnostics are republished after a
+  settings change.
 - `includeRoots` adds absolute directories searched after the
   including file's own directory (in order) when resolving
   `#include` / `#includeXS` — point it at the game's `ai-rms` folder

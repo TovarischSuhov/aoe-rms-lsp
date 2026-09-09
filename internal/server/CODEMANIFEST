@@ -135,7 +135,8 @@ Annotations: |
       1. Разобрать params.Settings: diagnostics.severityOverrides
          (код → error/warning/info/hint/none), includeRoots
          (абсолютные пути)
-      2. Неизвестные коды/имена severity — WARN, игнорировать
+      2. Неизвестные имена severity — WARN, игнорировать (код без
+         валидации: неизвестный просто не совпадает)
       3. Сохранить настройки; includeRoots → SetRoots резолвера
       4. Переиздать диагностику всех открытых документов
     "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |

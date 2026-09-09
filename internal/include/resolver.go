@@ -28,6 +28,8 @@ const (
 type Resolver struct {
 	source Source
 
+	roots []string
+
 	mu    sync.Mutex
 	cache map[string]*cachedFile
 }
@@ -128,9 +130,9 @@ func (r *Resolver) expandDirectives(
 	directives = append(directives, file.XsIncludes...)
 
 	for _, inc := range directives {
-		target := filepath.Join(filepath.Dir(ownerPath), inc.Path)
+		target, found := r.resolveTarget(ownerPath, inc.Path, rootDir)
 
-		if st, err := os.Stat(target); err != nil || !st.Mode().IsRegular() || !withinRoot(rootDir, target) {
+		if !found {
 			c.Missing = append(c.Missing, MissingInclude{
 				Owner: ownerURI,
 				Path:  inc.Path,
@@ -149,6 +151,54 @@ func (r *Resolver) expandDirectives(
 
 		r.expand(ctx, c, targetURI, rootDir, depth+1, visited)
 	}
+}
+
+// resolveTarget picks the first existing include target: the owner's
+// directory first, then the configured roots in priority order. A
+// target must stay inside the closure root's directory or one of the
+// configured roots (the ../-escape guard).
+func (r *Resolver) resolveTarget(ownerPath string, incPath string, rootDir string) (string, bool) {
+	roots := r.rootsSnapshot()
+
+	candidates := make([]string, 0, len(roots)+1)
+	candidates = append(candidates, filepath.Join(filepath.Dir(ownerPath), incPath))
+
+	for _, root := range roots {
+		candidates = append(candidates, filepath.Join(root, incPath))
+	}
+
+	for _, target := range candidates {
+		if st, err := os.Stat(target); err != nil || !st.Mode().IsRegular() {
+			continue
+		}
+
+		if withinRoot(rootDir, target) {
+			return target, true
+		}
+
+		if slices.ContainsFunc(roots, func(root string) bool { return withinRoot(root, target) }) {
+			return target, true
+		}
+	}
+
+	return "", false
+}
+
+// SetRoots replaces the extra include search roots; later closures
+// resolve through the new set (the stat-keyed disk cache stays valid).
+func (r *Resolver) SetRoots(roots []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.roots = slices.Clone(roots)
+}
+
+// rootsSnapshot copies the configured roots under the lock.
+func (r *Resolver) rootsSnapshot() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return slices.Clone(r.roots)
 }
 
 // withinRoot reports whether target stays inside rootDir; an empty
