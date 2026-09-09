@@ -82,13 +82,13 @@ RmsFile/XsFile. Новых Imports нет.
 
 ## Verification Checklist
 
-- [ ] `goga lint` — 0 ошибок после диффов
-- [ ] `goga contract internal/server` зелёный после реализации
-- [ ] Тесты: capability; закрытый/неизвестный док → пустой slice ≠ nil;
+- [x] `goga lint` — 0 ошибок после диффов
+- [x] `goga contract internal/server` зелёный после реализации
+- [x] Тесты: capability; закрытый/неизвестный док → пустой slice ≠ nil;
       .rms: секция + многострочная команда + inline-XS, однолинейная
       команда не отдаётся; .xs: функция и rule сворачиваются,
       переменная нет; порядок документный
-- [ ] `make check` зелёный
+- [x] `make check` зелёный
 
 ## Принятые решения
 
