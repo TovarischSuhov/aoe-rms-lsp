@@ -151,7 +151,9 @@ internal/include ┘
       Navigation, до `Cross-file Navigation Results`
 - [ ] Итог: `make check` зелёный; stdio-интеграционный тест
       documentHighlight (позиция на вхождении → все вхождения файла,
-      kind=Text; позиция на слове без пар → пустой список)
+      kind=Text; уникальное слово → ровно 1 хайлайт — само вхождение,
+      ReferencesAt включает его; позиция вне слова-токена → пустой
+      список)
 
 ## Принятые решения (из brainstorm)
 
