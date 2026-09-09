@@ -191,7 +191,15 @@ type session struct {
 // startSession spawns the server binary and wires the client protocol
 // over its stdio.
 func startSession(ctx context.Context, bin string, root string) (*session, error) {
-	cmd := exec.Command(bin)
+	// The child runs with Dir=root, so a relative binary path would
+	// otherwise resolve against the corpus root instead of the caller's
+	// working directory (the CI gate passes ./aoe2-lsp).
+	abs, err := filepath.Abs(bin)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", bin, err)
+	}
+
+	cmd := exec.Command(abs)
 	cmd.Dir = root
 
 	stdin, err := cmd.StdinPipe()
