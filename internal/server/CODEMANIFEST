@@ -302,11 +302,13 @@ Annotations: |
       - xs — только топ-декларации (тела не раскрываются, семантика
         Symbols); вложенные области не сворачиваются
 
-    "CodeAction(ctx: Context, params: CodeActionParams) -> actions: []CodeAction, err: error": |
+    "CodeAction(ctx: Context, params: CodeActionParams) -> actions: []CommandOrCodeAction, err: error": |
       Квикфиксы по диагностикам контекста запроса (stateless).
 
       `params`: диапазон запроса, диагностики клиента и фильтр Only;
-      `actions`: QuickFix-действия; `err`: только протокольные сбои
+      `actions`: QuickFix-действия — срез юниона CommandOrCodeAction
+      по `lsp-protocol`, производятся только arm'ы CodeAction;
+      `err`: только протокольные сбои
 
       Algorithm:
       1. Отобрать диагностики контекста с кодами unknown-command/
