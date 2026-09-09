@@ -105,6 +105,9 @@ Annotations: |
   с диска) и переиздание диагностики всех открытых документов;
   Initialized при клиентской capability didChangeWatchedFiles.
   dynamicRegistration регистрирует watchers **/*.rms и **/*.xs.
+  WorkspaceSymbol следует секции Workspace Symbols `lsp-protocol`:
+  вселенная — открытые доки + их замыкания, fuzzy score desc с
+  тай-брейком (URI, позиция), пустой результат — пустой slice, не nil.
 
 ---
 
@@ -127,7 +130,8 @@ Annotations: |
       ReferencesProvider, DocumentSymbolProvider,
       DocumentHighlightProvider, FoldingRangeProvider — Boolean(true);
       SignatureHelpProvider с триггерами «(» и «,»; CodeActionProvider
-      с CodeActionKinds=[QuickFix];
+      с CodeActionKinds=[QuickFix]; WorkspaceSymbolProvider —
+      Boolean(true);
       согласовать positionEncoding (utf-8 при поддержке клиентом);
       запомнить клиентские capability workspace.configuration и
       workspace.didChangeWatchedFiles.dynamicRegistration.
@@ -334,6 +338,36 @@ Annotations: |
 
       Requirements:
       - Selection ⊆ Range сохраняется при маппинге (инвариант `symbols`)
+    "WorkspaceSymbol(ctx: Context, params: WorkspaceSymbolParams) -> result: WorkspaceSymbolResult, err: error": |
+      Fuzzy-поиск символов по вселенной «открытые доки + их замыкания»
+      (stateless, read-only).
+
+      `params`: query-строка фильтра; `result`: плоский список
+      SymbolInformation (возможно пустой — не ошибка)
+
+      Algorithm:
+      1. Вселенная: URIs() `DocStore`; для каждого ури — текст из DocStore
+         (парс по расширению по `rms-parsing`/`xs-parsing`) плюс `Closure`
+         ури по `closure`; дедуп по URI (editor-state выигрывает у диска)
+      2. Сбор: RMS — рекурсивный обход Symbols() с отбором kind=section
+         (команды и xs-узлы пропускаются); XS — все топ-декларации Symbols()
+      3. Фильтр: пустой query — все символы; иначе fuzzy subsequence-скоринг
+         (case-insensitive, бонусы за подряд/начало имени), несовпавшие
+         пропускаются
+      4. Сортировка: score desc, тай-брейк (URI, позиция Selection)
+      5. Каждый Symbol → SymbolInformation по `lsp-protocol` (Workspace
+         Symbols): Name, Kind по таблице DocumentSymbol, Location{URI,
+         Selection}; конвертация позиций по positionEncoding
+
+      Requirements:
+      - детерминированность: одинаковый вход → одинаковый порядок
+      - пустой результат — пустой SymbolInformationSlice, не nil и не ошибка
+      - stateless/read-only: состояние сервера не меняется
+
+      Constraints:
+      - без скана ФС воркспейса (только DocStore + Closure)
+      - RMS-команды и inline-XS в выдачу не входят;
+        workspaceSymbol/resolve не заявляем
     "Shutdown(ctx: Context) -> err: error": |
       Вернуть nil (default Unimplemented возвращает not-implemented).
     "Exit(ctx: Context) -> err: error": |
