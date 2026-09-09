@@ -87,6 +87,7 @@ func (s *Server) Initialize(
 		ReferencesProvider:        protocol.Boolean(true),
 		DocumentSymbolProvider:    protocol.Boolean(true),
 		DocumentHighlightProvider: protocol.Boolean(true),
+		FoldingRangeProvider:      protocol.Boolean(true),
 		SignatureHelpProvider:     &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}},
 	}
 
@@ -654,6 +655,53 @@ func (s *Server) highlightRms(text string, name string, pos common.Pos) []common
 	}
 
 	return file.ReferencesAt(pos)
+}
+
+// FoldingRanges answers textDocument/foldingRange with the foldable
+// regions of the document: every outline node spanning more than one
+// line, in document order. Only StartLine/EndLine are set — characters
+// and kind stay to the client defaults. Empty results are empty
+// slices, not nil.
+func (s *Server) FoldingRanges(
+	ctx context.Context,
+	params *protocol.FoldingRangeParams,
+) ([]protocol.FoldingRange, error) {
+	docURI := params.TextDocument.URI
+	text, name, _ := s.openDocument(docURI)
+
+	var syms []common.Symbol
+
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		file, _ := rms.Parse(text, name)
+		syms = file.Symbols()
+	case strings.HasSuffix(name, ".xs"):
+		file, _ := xs.XsParse(text, name)
+		syms = file.Symbols()
+	}
+
+	out := make([]protocol.FoldingRange, 0, len(syms))
+	collectFoldables(syms, &out)
+
+	slog.DebugContext(ctx, "folding_ranges", "uri", docURI, "count", len(out))
+
+	return out, nil
+}
+
+// collectFoldables walks the outline tree depth-first, appending a
+// region for every node whose range spans more than one line — the
+// traversal order keeps the result in document order.
+func collectFoldables(syms []common.Symbol, out *[]protocol.FoldingRange) {
+	for _, sym := range syms {
+		if sym.Range.End.Line > sym.Range.Start.Line {
+			*out = append(*out, protocol.FoldingRange{
+				StartLine: sym.Range.Start.Line,
+				EndLine:   sym.Range.End.Line,
+			})
+		}
+
+		collectFoldables(sym.Children, out)
+	}
 }
 
 // DocumentSymbol answers textDocument/documentSymbol with the

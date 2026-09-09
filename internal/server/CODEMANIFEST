@@ -70,6 +70,9 @@ Annotations: |
   Навигационные хендлеры (Definition/References/DocumentSymbol/
   DocumentHighlight) следуют секции Navigation `lsp-protocol`: пустой
   результат — пустой slice, не nil.
+  FoldingRanges строится из Symbols() по языку: регионы — узлы дерева
+  диапазоном больше одной строки; пустой результат — пустой slice,
+  не nil.
   Definition/References резолвятся через `Resolver` по include-замыканию
   (Cross-file Navigation Results): цели могут жить в неоткрытых файлах.
 
@@ -110,7 +113,7 @@ Annotations: |
       Заявить возможности: TextDocumentSync Full+OpenClose, HoverProvider
       Boolean(true), CompletionProvider с триггерами; DefinitionProvider,
       ReferencesProvider, DocumentSymbolProvider,
-      DocumentHighlightProvider — Boolean(true);
+      DocumentHighlightProvider, FoldingRangeProvider — Boolean(true);
       SignatureHelpProvider с триггерами «(» и «,»;
       согласовать positionEncoding (utf-8 при поддержке клиентом).
     "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |
@@ -229,6 +232,29 @@ Annotations: |
       - без `Resolver`/`Closure`: замыкание не вычисляется, вхождения
         только текущего файла
       - без Read/Write-дискриминации: Kind=Text всем вхождениям
+
+    "FoldingRanges(ctx: Context, params: FoldingRangeParams) -> ranges: []FoldingRange, err: error": |
+      Регионы сворачивания текущего файла (stateless, read-only).
+
+      `params`: документ запроса; `ranges`: построчные регионы; `err`:
+      только протокольные сбои
+
+      Algorithm:
+      1. Язык по расширению URI (общий шаблон Hover/SignatureHelp);
+         неизвестный — пустой список
+      2. Symbols() по языку (`xs-parsing` / `rms-parsing`)
+      3. Рекурсивный обход дерева (xs — плоский список): узел с
+         End.Line > Start.Line → FoldingRange (StartLine, EndLine;
+         символы и kind опускаются)
+      4. Порядок — порядок обхода (документный)
+
+      Requirements:
+      - пустой результат — пустой slice, не nil
+      - однолинейные узлы не отдаются
+
+      Constraints:
+      - xs — только топ-декларации (тела не раскрываются, семантика
+        Symbols); вложенные области не сворачиваются
 
     "DocumentSymbol(ctx: Context, params: DocumentSymbolParams) -> result: DocumentSymbolResult, err: error": |
       Outline документа.
