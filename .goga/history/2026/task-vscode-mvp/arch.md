@@ -50,9 +50,10 @@ M; статус утверждён: «MVP + .vsix в CI», без marketplace).
 
 ## Verification Checklist
 
-- [ ] `npm install && npm run compile`; `vsce package` — **локально
-      НЕ проверено**: npm-реестр недоступен из этого окружения;
-      верифицирует CI-джоба vscode (первый прогон на PR этой ветки)
+- [x] `npm install && npm run compile`; `vsce package` — верифицировано
+      CI-джобой vscode на PR этой ветки (первый прогон упал на
+      пропущенном compile перед vsce — фикс `npm run package`, второй
+      прогон зелёный, .vsix в артефактах)
 - [x] CI-джоба: YAML валиден, шаги идут на ubuntu (npm install →
       check → package → artifact); JSON-манифесты валидны
 - [x] `make check` зелёный (Go не тронут); `goga lint` 0
