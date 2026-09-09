@@ -65,9 +65,35 @@ func runCorpus(t *testing.T, mode string) Report {
 	return report
 }
 
+// TestRunner_RelativeBinResolvesFromCwd pins the -bin semantics: a
+// relative binary path resolves against the caller's working directory,
+// not the corpus root (the child runs with Dir=root) — the CI gate
+// passes ./aoe2-lsp.
+func TestRunner_RelativeBinResolvesFromCwd(t *testing.T) {
+	t.Setenv(fakeEnv, "ok")
+
+	// The test binary lives at an absolute path, so reference a copy by
+	// its bare relative name from a scratch cwd — no accidental ".."
+	// hops can make the wrong root resolve to the right file.
+	binDir := t.TempDir()
+
+	raw, err := os.ReadFile(os.Args[0])
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "fake-lsp.test"), raw, 0o755))
+
+	t.Chdir(binDir)
+
+	dir := corpusFixture(t)
+
+	report, err := NewRunner("./fake-lsp.test").Run(context.Background(), dir)
+
+	require.NoError(t, err, "a relative bin path must resolve from the caller's cwd")
+	assert.Equal(t, 2, len(report.Files))
+	assert.Equal(t, 0, report.HardFailures)
+}
+
 func TestRunner_CleanSessionIsOK(t *testing.T) {
 	report := runCorpus(t, "ok")
-
 	require.Len(t, report.Files, 2)
 	assert.Equal(t, 0, report.HardFailures)
 
