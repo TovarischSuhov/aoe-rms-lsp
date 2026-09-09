@@ -338,9 +338,10 @@ Annotations: |
 
       Requirements:
       - Selection ⊆ Range сохраняется при маппинге (инвариант `symbols`)
-    "WorkspaceSymbol(ctx: Context, params: WorkspaceSymbolParams) -> result: WorkspaceSymbolResult, err: error": |
+    "Symbols(ctx: Context, params: WorkspaceSymbolParams) -> result: WorkspaceSymbolResult, err: error": |
       Fuzzy-поиск символов по вселенной «открытые доки + их замыкания»
-      (stateless, read-only).
+      (stateless, read-only); запрос workspace/symbol — протокольное
+      имя метода Symbols (как FoldingRanges).
 
       `params`: query-строка фильтра; `result`: плоский список
       SymbolInformation (возможно пустой — не ошибка)

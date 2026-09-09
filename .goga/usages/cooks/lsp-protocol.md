@@ -266,7 +266,8 @@ Empty result is an empty slice, not nil.
 
 `workspace/symbol` lists symbols matching a query across the server's
 universe. Advertise `WorkspaceSymbolProvider: protocol.Boolean(true)` in
-Initialize. The server-interface method is `WorkspaceSymbol`; it returns
+Initialize. The server-interface method is `Symbols` (the interface names
+it after the request's result, like `FoldingRanges`); it returns
 `WorkspaceSymbolResult` — return `protocol.SymbolInformationSlice{}` (flat
 form: `Name`, `Kind`, `Location{URI, Range}`); `WorkspaceSymbolResolveSupport`
 is not advertised.
