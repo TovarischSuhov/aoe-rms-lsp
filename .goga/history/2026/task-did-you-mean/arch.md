@@ -68,16 +68,16 @@ analysis уже импортирует Store (Types). Новых Imports нет.
 
 ## Verification Checklist
 
-- [ ] `goga lint` 0 ошибок; `goga contract internal/kb internal/analysis`
+- [x] `goga lint` 0 ошибок; `goga contract internal/kb internal/analysis`
       зелёные после реализации
-- [ ] kb: CommandNames/ConstantNames — отсортированы, без повторов,
+- [x] kb: CommandNames/ConstantNames — отсортированы, без повторов,
       длины согласуются с данными (204 функции → имена констант/команд
       из фикстур)
-- [ ] analysis: `creat_object` → did you mean "create_object";
+- [x] analysis: `creat_object` → did you mean "create_object";
       garbage-имя → суффикса нет; опечатка в локальной XS-переменной →
       подсказка из declared; unknown-attribute → подсказка из атрибутов
       команды; unknown-section без подсказки; сообщения без подсказки
       не изменились
-- [ ] server: существующие диагностики едут с суффиксом без изменений
+- [x] server: существующие диагностики едут с суффиксом без изменений
       кодов/range (передаётся в Message)
-- [ ] `make check` зелёный
+- [x] `make check` зелёный

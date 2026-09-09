@@ -144,7 +144,7 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 		diags = append(diags, common.Diagnostic{
 			Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
 			Severity: common.SeverityError,
-			Message:  fmt.Sprintf("unknown command %q", stmt.Name),
+			Message:  fmt.Sprintf("unknown command %q", stmt.Name) + suggestSuffix(a.commandNames(), stmt.Name),
 			Code:     CodeUnknownCommand,
 		})
 
@@ -173,11 +173,17 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 
 		spec, known := a.store.Attribute(cmd.Name, attr.Name)
 		if !known {
+			attrNames := make([]string, 0, len(cmd.Attributes))
+			for _, attrSpec := range cmd.Attributes {
+				attrNames = append(attrNames, attrSpec.Name)
+			}
+
 			diags = append(diags, common.Diagnostic{
 				Range:    attr.Range,
 				Severity: common.SeverityError,
-				Message:  fmt.Sprintf("unknown attribute %q of %q", attr.Name, cmd.Name),
-				Code:     CodeUnknownAttribute,
+				Message: fmt.Sprintf("unknown attribute %q of %q", attr.Name, cmd.Name) +
+					suggestSuffix(attrNames, attr.Name),
+				Code: CodeUnknownAttribute,
 			})
 
 			continue
@@ -405,9 +411,17 @@ func (a *Analyzer) checkIdent(e xs.Expr, declared map[string]bool, diags []commo
 	return append(diags, common.Diagnostic{
 		Range:    e.Range,
 		Severity: common.SeverityError,
-		Message:  fmt.Sprintf("undefined symbol %q", e.Value),
+		Message:  fmt.Sprintf("undefined symbol %q", e.Value) + a.symbolSuggestion(declared, e.Value),
 		Code:     CodeUndefinedSymbol,
 	})
+}
+
+// symbolSuggestion renders the undefined-symbol suggestion over kb
+// names joined with the file's declared names.
+func (a *Analyzer) symbolSuggestion(declared map[string]bool, typo string) string {
+	names := append(a.xsSymbolNames(), declaredNames(declared)...)
+
+	return suggestSuffix(names, typo)
 }
 
 // checkCall validates the callee name, the argument count and the
@@ -421,7 +435,7 @@ func (a *Analyzer) checkCall(e xs.Expr, declared map[string]bool, env *TypeEnv, 
 			diags = append(diags, common.Diagnostic{
 				Range:    e.Range,
 				Severity: common.SeverityError,
-				Message:  fmt.Sprintf("undefined symbol %q", callee),
+				Message:  fmt.Sprintf("undefined symbol %q", callee) + a.symbolSuggestion(declared, callee),
 				Code:     CodeUndefinedSymbol,
 			})
 		}
