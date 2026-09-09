@@ -198,23 +198,23 @@ navigation_test.go; assertion'ы с точными координатами. К�
 
 **Covered contract entities:** `Server.DocumentHighlight` (поведение).
 
-- [ ] T1 `TestDocumentHighlight_XsOccurrences`: map.xs с
+- [x] T1 `TestDocumentHighlight_XsOccurrences`: map.xs с
       `int towerCount = 2;` и двумя использованиеми; highlight на
       использовании → len==3 (декларация+2), все Kind==1, координаты
       по фикстуре
-- [ ] T2 `TestDocumentHighlight_RmsAttributeName`: map.rms с
+- [x] T2 `TestDocumentHighlight_RmsAttributeName`: map.rms с
       `land_percent` в двух секциях; highlight на имени атрибута →
       len==2, Kind==1
-- [ ] T3 `TestDocumentHighlight_InlineXsShift`: map.rms с
+- [x] T3 `TestDocumentHighlight_InlineXsShift`: map.rms с
       `#includeXS`-блоком (шаблон includes.rms: `seed` ×3); highlight
       на `seed` вне первой строки блока → len==3, все range в
       координатах внешнего .rms (первая строка блока — со сдвигом
       колонки)
-- [ ] Прогон всех тестов ячейки под memory cap; `make check` зелёный
-- [ ] `goga lint` + `goga contract internal/server` зелёные
-- [ ] STEP 8 (COMPLETION): коммит
+- [x] Прогон всех тестов ячейки под memory cap; `make check` зелёный
+- [x] `goga lint` + `goga contract internal/server` зелёные
+- [x] STEP 8 (COMPLETION): коммит
       `test: server cell — интеграционные сценарии documentHighlight T1–T3 (doc-highlight, task 2)`
-- [ ] Открыть PR `task/doc-highlight` → `master` (мерджит пользователь)
+- [x] Открыть PR `task/doc-highlight` → `master` (мерджит пользователь)
 
 ## Validation Commands
 

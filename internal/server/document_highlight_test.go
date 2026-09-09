@@ -121,3 +121,104 @@ func TestServerDocumentHighlight_UniqueWord(t *testing.T) {
 	require.Equal(t, uint32(0), highlights[0].Range.Start.Line)
 	require.Equal(t, uint32(len("void h() { ")), highlights[0].Range.Start.Character)
 }
+
+// TestServerDocumentHighlight_XsOccurrences checks the core behavior in a
+// pure .xs document: the declaration and every use of the word under the
+// cursor come back with exact ranges, all kind Text.
+func TestServerDocumentHighlight_XsOccurrences(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	src := "int towerCount = 2;\nvoid bump() {\n\ttowerCount = towerCount + 1;\n}\n"
+	s.docs.Put("file:///t.xs", src, 1)
+
+	highlights, err := s.DocumentHighlight(context.Background(), &protocol.DocumentHighlightParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///t.xs"},
+			Position:     protocol.Position{Line: 2, Character: 5},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, highlights, 3, "declaration plus both uses")
+
+	expected := []protocol.Range{
+		{Start: protocol.Position{Line: 0, Character: 4}, End: protocol.Position{Line: 0, Character: 14}},
+		{Start: protocol.Position{Line: 2, Character: 1}, End: protocol.Position{Line: 2, Character: 11}},
+		{Start: protocol.Position{Line: 2, Character: 14}, End: protocol.Position{Line: 2, Character: 24}},
+	}
+
+	for i, h := range highlights {
+		require.Equal(t, protocol.DocumentHighlightKindText, h.Kind, "highlight %d", i)
+		require.Equal(t, expected[i], h.Range, "highlight %d", i)
+	}
+}
+
+// TestServerDocumentHighlight_RmsAttributeName checks the plain .rms
+// path: same-name attribute tokens across commands highlight together.
+func TestServerDocumentHighlight_RmsAttributeName(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	src := "<LAND_GENERATION>\ncreate_land {\n\tland_percent 20\n}\n" +
+		"create_land {\n\tland_percent 40\n}\n"
+	s.docs.Put("file:///t.rms", src, 1)
+
+	highlights, err := s.DocumentHighlight(context.Background(), &protocol.DocumentHighlightParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///t.rms"},
+			Position:     protocol.Position{Line: 2, Character: 4},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, highlights, 2)
+
+	expected := []protocol.Range{
+		{Start: protocol.Position{Line: 2, Character: 1}, End: protocol.Position{Line: 2, Character: 13}},
+		{Start: protocol.Position{Line: 5, Character: 1}, End: protocol.Position{Line: 5, Character: 13}},
+	}
+
+	for i, h := range highlights {
+		require.Equal(t, protocol.DocumentHighlightKindText, h.Kind, "highlight %d", i)
+		require.Equal(t, expected[i], h.Range, "highlight %d", i)
+	}
+}
+
+// TestServerDocumentHighlight_InlineXsShift checks the inline-XS path: a
+// highlight inside an #includeXS block reports document coordinates —
+// the declaration on the first block line gains the block's column
+// offset, later lines only the line offset.
+func TestServerDocumentHighlight_InlineXsShift(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	src := "<PLAYER_SETUP>\n#includeXS\n" +
+		"int seed = 0;\nvoid main() {\n\tseed = xsGetMapSeed();\n\tif (seed % 2 == 0) {\n\t\txsSetRiverHeight(3.0);\n\t}\n}\n" +
+		"</PLAYER_SETUP>\n"
+	s.docs.Put("file:///t.rms", src, 1)
+
+	highlights, err := s.DocumentHighlight(context.Background(), &protocol.DocumentHighlightParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///t.rms"},
+			Position:     protocol.Position{Line: 4, Character: 3},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, highlights, 3, "declaration, assignment and condition uses")
+
+	expected := []protocol.Range{
+		{Start: protocol.Position{Line: 2, Character: 4}, End: protocol.Position{Line: 2, Character: 8}},
+		{Start: protocol.Position{Line: 4, Character: 1}, End: protocol.Position{Line: 4, Character: 5}},
+		{Start: protocol.Position{Line: 5, Character: 5}, End: protocol.Position{Line: 5, Character: 9}},
+	}
+
+	for i, h := range highlights {
+		require.Equal(t, protocol.DocumentHighlightKindText, h.Kind, "highlight %d", i)
+		require.Equal(t, expected[i], h.Range, "highlight %d is in document coordinates", i)
+	}
+}
