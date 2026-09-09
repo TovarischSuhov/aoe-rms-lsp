@@ -182,9 +182,17 @@ Annotations: |
       DocStore.Remove(uri); опубликовать пустой список диагностик.
     "Hover(ctx: Context, params: HoverParams) -> hover: Hover, err: error": |
       Algorithm:
-      1. Для .rms: StatementAt → Store.Command → Markdown (сигнатура+desc+
+      1. Для .rms: позиция на атрибуте блока команды (ArgAt Kind=attr —
+         имя или значение атрибута) → Store.Attribute(владелец, имя) →
+         Markdown (имя, владелец, desc, kind, mined-диапазон); атрибут
+         неизвестен kb → деградация к справке команды. Иначе StatementAt →
+         Store.Command → Markdown (сигнатура+desc+
          GameVersions/SinceUpdate); для .xs: SymbolAt → Store.Function
       2. nil, nil когда под курсором ничего нет
+
+      Requirements:
+      - справка атрибута не затрагивает позиции на самой команде и её
+        позиционных аргументах (Kind=arg) — там остаётся справка команды
     "Completion(ctx: Context, params: CompletionParams) -> result: CompletionResult, err: error": |
       Кандидаты для позиции в документе (stateless, read-only).
 

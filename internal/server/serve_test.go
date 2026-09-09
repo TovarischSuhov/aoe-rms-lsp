@@ -387,6 +387,73 @@ func TestServe_HoverXsFunction(t *testing.T) {
 	assert.Contains(t, contents.Value, "(")
 }
 
+func TestServe_HoverRmsAttribute(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	docURI := uri.URI("file:///work/objects.rms")
+
+	require.NoError(t, h.disp.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI: docURI, LanguageID: "aoe2rms", Version: 1,
+			Text: "<OBJECTS_GENERATION>\ncreate_object TOWN_CENTER\n{\n\tnumber_of_objects 5\n\tset_place_for_every_player\n}\n",
+		},
+	}))
+	h.waitDiagnostics(docURI)
+
+	hoverAt := func(line, character uint32) *protocol.Hover {
+		t.Helper()
+
+		hover, err := h.disp.Hover(ctx, &protocol.HoverParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+				Position:     protocol.Position{Line: line, Character: character},
+			},
+		})
+		require.NoError(t, err)
+
+		return hover
+	}
+
+	// On the attribute name: the attribute's own help, not the owner's.
+	hover := hoverAt(3, 3)
+	require.NotNil(t, hover, "hover over number_of_objects must return content")
+
+	contents, ok := hover.Contents.(*protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Contains(t, contents.Value, "**number_of_objects**")
+	assert.Contains(t, contents.Value, "attribute of `create_object`")
+	assert.Contains(t, contents.Value, "Value: `number`")
+
+	// On the attribute value: same attribute help (ArgAt name-or-value).
+	hover = hoverAt(3, 19)
+	require.NotNil(t, hover, "hover over the attribute value must return content")
+
+	contents, ok = hover.Contents.(*protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Contains(t, contents.Value, "**number_of_objects**")
+
+	// Flag attribute (no value): the name position still resolves.
+	hover = hoverAt(4, 4)
+	require.NotNil(t, hover, "hover over set_place_for_every_player must return content")
+
+	contents, ok = hover.Contents.(*protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Contains(t, contents.Value, "**set_place_for_every_player**")
+
+	// On the command itself: command help is unchanged (regression).
+	hover = hoverAt(1, 4)
+	require.NotNil(t, hover, "hover over create_object must return content")
+
+	contents, ok = hover.Contents.(*protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Contains(t, contents.Value, "**create_object(")
+	assert.NotContains(t, contents.Value, "attribute of")
+}
+
 func TestServe_HoverNothingUnderCursor(t *testing.T) {
 	h := startHarness(t)
 	ctx := context.Background()
