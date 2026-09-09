@@ -122,12 +122,13 @@ go build -o aoe2-lsp ./cmd/aoe2-lsp
 ./aoe2-lsp   # speaks LSP over stdio; logs go to stderr
 ```
 
-One compatibility flag: `-stdio` (and `--stdio`) is accepted and ignored —
-the server always speaks LSP over stdio, and some clients pass the flag on
-the command line. Capabilities are declared in `initialize` — full-text sync,
-hover, completion, signature help, definition, references, document and
-workspace symbols, document highlight, semantic tokens, folding ranges and
-quick fixes. Position encoding is negotiated per client (utf-8 preferred).
+Unknown flags are logged to stderr and ignored instead of aborting startup
+— a mismatched client configuration (e.g. one passing the widespread
+`--stdio` convention) must not lose the server. Capabilities are declared
+in `initialize` — full-text sync, hover, completion, signature help,
+definition, references, document and workspace symbols, document highlight,
+semantic tokens, folding ranges and quick fixes. Position encoding is
+negotiated per client (utf-8 preferred).
 
 ## Debugging
 
