@@ -94,6 +94,14 @@ Annotations: |
   MVP-алгоритм Completion (прямые Store-запросы в server) упраздняется —
   вычисление уходит в complete.
 
+  Настройки (секция "aoe2lsp", форма в lifecycle.md): Initialized при
+  запомненной из Initialize клиентской capability
+  workspace.configuration делает pull секции; DidChangeConfiguration
+  применяет params.Settings той же функцией. severityOverrides
+  (код → error/warning/info/hint/none) применяются при конвертации
+  диагностик (none — подавить); includeRoots → SetRoots резолвера.
+  После применения — переиздать диагностику всех открытых документов.
+
 ---
 
 "Server(store: Store, analyzer: Analyzer, computer: Computer, completer: Completer)":
@@ -116,7 +124,22 @@ Annotations: |
       DocumentHighlightProvider, FoldingRangeProvider — Boolean(true);
       SignatureHelpProvider с триггерами «(» и «,»; CodeActionProvider
       с CodeActionKinds=[QuickFix];
-      согласовать positionEncoding (utf-8 при поддержке клиентом).
+      согласовать positionEncoding (utf-8 при поддержке клиентом);
+      запомнить клиентскую capability workspace.configuration.
+    "Initialized(ctx: Context, params: InitializedParams) -> err: error": |
+      Начальный pull настроек: при запомненной capability
+      workspace.configuration запросить у клиента (из ctx) секцию
+      "aoe2lsp" и применить (общая функция с DidChangeConfiguration);
+      без capability — no-op.
+    "DidChangeConfiguration(ctx: Context, params: DidChangeConfigurationParams) -> err: error": |
+      Algorithm:
+      1. Разобрать params.Settings: diagnostics.severityOverrides
+         (код → error/warning/info/hint/none), includeRoots
+         (абсолютные пути)
+      2. Неизвестные имена severity — WARN, игнорировать (код без
+         валидации: неизвестный просто не совпадает)
+      3. Сохранить настройки; includeRoots → SetRoots резолвера
+      4. Переиздать диагностику всех открытых документов
     "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |
       Algorithm:
       1. Сохранить текст и версию документа в `DocStore`

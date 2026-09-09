@@ -335,3 +335,89 @@ func TestResolver_TwoSpellingsOwnTargetURI(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, dotted, t2.URI)
 }
+
+// TestResolver_SetRootsFallback checks the resolution order: the
+// owner's directory first, then the configured roots in priority
+// order; SetRoots replaces the whole set.
+func TestResolver_SetRootsFallback(t *testing.T) {
+	t.Parallel()
+
+	mapDir := t.TempDir()
+	first := t.TempDir()
+	second := t.TempDir()
+
+	uris := writeTree(t, mapDir, map[string]string{
+		"main.rms": "#include \"shared.rms\"\n",
+	})
+	writeTree(t, first, map[string]string{"shared.rms": "base_terrain GRASS\n"})
+	writeTree(t, second, map[string]string{"shared.rms": "base_terrain DIRT\n"})
+
+	r := NewResolver(fakeSource{})
+
+	c := r.Closure(context.Background(), uris["main.rms"])
+	require.Len(t, c.Missing, 1, "without roots the include is missing")
+
+	r.SetRoots([]string{first, second})
+
+	c = r.Closure(context.Background(), uris["main.rms"])
+	require.Empty(t, c.Missing)
+	require.Len(t, c.Rms, 2)
+	assert.Contains(t, c.Resolved[0].Target, first, "the first root wins")
+
+	// replacement: only the second root stays
+	r.SetRoots([]string{second})
+
+	c = r.Closure(context.Background(), uris["main.rms"])
+	require.Empty(t, c.Missing)
+	assert.Contains(t, c.Resolved[0].Target, second, "SetRoots replaces the set")
+
+	// clearing returns to the missing state
+	r.SetRoots(nil)
+
+	c = r.Closure(context.Background(), uris["main.rms"])
+	require.Len(t, c.Missing, 1)
+}
+
+// TestResolver_SetRootsOwnerDirWins checks that a file next to the
+// includer beats the same-named file in a configured root.
+func TestResolver_SetRootsOwnerDirWins(t *testing.T) {
+	t.Parallel()
+
+	mapDir := t.TempDir()
+	root := t.TempDir()
+
+	uris := writeTree(t, mapDir, map[string]string{
+		"main.rms":   "#include \"shared.rms\"\n",
+		"shared.rms": "base_terrain GRASS\n",
+	})
+	writeTree(t, root, map[string]string{"shared.rms": "base_terrain DIRT\n"})
+
+	r := NewResolver(fakeSource{})
+	r.SetRoots([]string{root})
+
+	c := r.Closure(context.Background(), uris["main.rms"])
+
+	require.Empty(t, c.Missing)
+	assert.Contains(t, c.Resolved[0].Target, mapDir, "the owner directory resolves first")
+}
+
+// TestResolver_SetRootsEscapeBlocked checks that a root-relative
+// ../-path escaping every root stays missing.
+func TestResolver_SetRootsEscapeBlocked(t *testing.T) {
+	t.Parallel()
+
+	outside := t.TempDir()
+	root := t.TempDir()
+
+	uris := writeTree(t, root, map[string]string{
+		"map/main.rms": "#include \"../escape.rms\"\n",
+	})
+	writeTree(t, outside, map[string]string{"escape.rms": "base_terrain GRASS\n"})
+
+	r := NewResolver(fakeSource{})
+	r.SetRoots([]string{root})
+
+	c := r.Closure(context.Background(), uris["map/main.rms"])
+
+	require.Len(t, c.Missing, 1, "escapes outside the roots stay missing")
+}

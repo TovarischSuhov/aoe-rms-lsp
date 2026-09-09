@@ -10,6 +10,7 @@ import (
 	"aoe2-lsp/internal/rms"
 	"aoe2-lsp/internal/xs"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -40,6 +41,164 @@ type Server struct {
 	exitOnce  sync.Once
 
 	utf16 atomic.Bool // protocol default: translate byte columns unless utf-8 is negotiated
+
+	clientConfigCap atomic.Bool // the client answers workspace/configuration
+	settings        atomic.Pointer[settingsState]
+}
+
+// settingsState is the applied "aoe2lsp" configuration section.
+type settingsState struct {
+	// severityOverrides maps a diagnostic code to a protocol severity;
+	// the zero value suppresses the diagnostic ("none").
+	severityOverrides map[string]protocol.DiagnosticSeverity
+
+	// includeRoots are the extra absolute include search roots.
+	includeRoots []string
+}
+
+// severityFor resolves the effective severity for a code: the override
+// when configured (zero = suppress), the diagnostic's own otherwise.
+func (st *settingsState) severityFor(code string, own int) (protocol.DiagnosticSeverity, bool) {
+	if st == nil {
+		return protocol.DiagnosticSeverity(own), true
+	}
+
+	sev, ok := st.severityOverrides[code]
+	if !ok {
+		return protocol.DiagnosticSeverity(own), true
+	}
+
+	return sev, sev != 0
+}
+
+// settingsJSON mirrors the "aoe2lsp" section schema.
+type settingsJSON struct {
+	Diagnostics struct {
+		SeverityOverrides map[string]string `json:"severityOverrides"`
+	} `json:"diagnostics"`
+	IncludeRoots []string `json:"includeRoots"`
+}
+
+// applySettings parses one raw settings payload (a pull item or the
+// didChangeConfiguration settings), stores the result and pushes the
+// include roots into the resolver. Unknown severity names are ignored
+// with a WARN log (an unknown code simply never matches); diagnostics
+// are republished afterwards by the caller-side handlers.
+func (s *Server) applySettings(ctx context.Context, raw any) {
+	if raw == nil {
+		return
+	}
+
+	var parsed settingsJSON
+
+	b, err := json.Marshal(raw)
+	if err != nil {
+		slog.WarnContext(ctx, "settings marshal failed", "err", err)
+
+		return
+	}
+
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		slog.WarnContext(ctx, "settings parse failed", "err", err)
+
+		return
+	}
+
+	overrides := make(map[string]protocol.DiagnosticSeverity, len(parsed.Diagnostics.SeverityOverrides))
+
+	for code, name := range parsed.Diagnostics.SeverityOverrides {
+		sev, ok := severityByName(name)
+		if !ok {
+			slog.WarnContext(ctx, "settings: unknown severity", "code", code, "severity", name)
+
+			continue
+		}
+
+		overrides[code] = sev
+	}
+
+	state := &settingsState{severityOverrides: overrides, includeRoots: parsed.IncludeRoots}
+	s.settings.Store(state)
+	s.resolver.SetRoots(state.includeRoots)
+
+	slog.DebugContext(ctx, "settings applied",
+		"overrides", len(overrides), "roots", len(state.includeRoots))
+}
+
+// severityByName maps a settings severity name to its protocol value;
+// "none" maps to zero (suppress), unknown names fail.
+func severityByName(name string) (protocol.DiagnosticSeverity, bool) {
+	switch name {
+	case "error":
+		return protocol.DiagnosticSeverityError, true
+	case "warning":
+		return protocol.DiagnosticSeverityWarning, true
+	case "info":
+		return protocol.DiagnosticSeverityInformation, true
+	case "hint":
+		return protocol.DiagnosticSeverityHint, true
+	case "none":
+		return 0, true
+	}
+
+	return 0, false
+}
+
+// Initialized pulls the initial configuration: when the client
+// supports workspace/configuration, ask for the "aoe2lsp" section and
+// run it through the same application path as pushes.
+func (s *Server) Initialized(
+	ctx context.Context,
+	params *protocol.InitializedParams,
+) error {
+	if !s.clientConfigCap.Load() {
+		return nil
+	}
+
+	client, ok := protocol.ClientFromContext(ctx)
+	if !ok {
+		return nil
+	}
+
+	section := "aoe2lsp"
+
+	items, err := client.Configuration(ctx, &protocol.ConfigurationParams{
+		Items: []protocol.ConfigurationItem{{Section: &section}},
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "configuration pull failed", "err", err)
+
+		return nil
+	}
+
+	if len(items) > 0 {
+		s.applySettings(ctx, items[0])
+	}
+
+	s.republishAll(ctx)
+
+	return nil
+}
+
+// DidChangeConfiguration applies pushed settings and republishes every
+// open document — severity overrides change published diagnostics.
+func (s *Server) DidChangeConfiguration(
+	ctx context.Context,
+	params *protocol.DidChangeConfigurationParams,
+) (err error) {
+	defer recoverNotification(ctx, "DidChangeConfiguration", &err)
+
+	s.applySettings(ctx, params.Settings)
+	s.republishAll(ctx)
+
+	return nil
+}
+
+// republishAll recomputes diagnostics for every open document.
+func (s *Server) republishAll(ctx context.Context) {
+	for _, uriArg := range s.docs.URIs() {
+		s.publishDiagnostics(ctx, uri.URI(uriArg))
+	}
 }
 
 // NewServer builds the server from its knowledge base, analyzer, hint
@@ -101,6 +260,10 @@ func (s *Server) Initialize(
 		if enc == protocol.PositionEncodingKindUTF8 {
 			s.utf16.Store(false)
 		}
+	}
+
+	if ws := params.Capabilities.Workspace; ws != nil && ws.Configuration != nil && *ws.Configuration {
+		s.clientConfigCap.Store(true)
 	}
 
 	slog.DebugContext(ctx, "initialized", "encoding", s.encodingName())
@@ -1189,14 +1352,20 @@ func comparePos(a, b common.Pos) int {
 }
 
 // toProtocolDiags converts shared diagnostics to the protocol shape,
-// translating columns for the negotiated encoding.
+// translating columns for the negotiated encoding and applying the
+// configured severity overrides (none suppresses the diagnostic).
 func (s *Server) toProtocolDiags(text string, diags []common.Diagnostic) []protocol.Diagnostic {
 	out := make([]protocol.Diagnostic, 0, len(diags))
 
 	for _, d := range diags {
+		severity, keep := s.settings.Load().severityFor(d.Code, d.Severity)
+		if !keep {
+			continue
+		}
+
 		out = append(out, protocol.Diagnostic{
 			Range:    s.toProtocolRange(text, d.Range),
-			Severity: protocol.DiagnosticSeverity(d.Severity),
+			Severity: severity,
 			Code:     protocol.String(d.Code),
 			Source:   protocol.NewOptional(serverName),
 			Message:  protocol.String(d.Message),
