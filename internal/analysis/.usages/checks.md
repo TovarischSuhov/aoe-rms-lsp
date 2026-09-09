@@ -70,3 +70,25 @@ Preconditions:
 
 Constraints:
 - No IO, no mutation of the AST.
+
+## Semantic tokens
+
+TokensRms / TokensXs classify identifiers for semanticTokens/full — the
+diagnostic pass's classification exposed as ranges instead of problems.
+
+```go
+for _, tok := range analyzer.TokensRms(rmsFile) {
+    // tok.Type: known / unknown / deprecated / section / kind
+    // tok.Range: exact source span of the identifier
+}
+```
+
+- known/unknown use the same lookups as the diagnostics (commands,
+  attributes, XS idents); deprecated marks effect_percent; section
+  covers RMS section names (the span inside the angle brackets); kind
+  covers XS declaration names (overriding known on that span).
+- No did-you-mean thresholds apply — tokenization never suggests.
+- The result is sorted by position; spans never overlap.
+
+Preconditions: same as the diagnostic passes — parse first, partial
+ASTs are fine, no IO, the AST is not mutated.
