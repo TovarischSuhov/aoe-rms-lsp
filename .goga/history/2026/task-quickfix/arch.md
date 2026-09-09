@@ -84,14 +84,14 @@ DocumentChanges/CreateFile, Only).
 
 ## Verification Checklist
 
-- [ ] `goga lint` 0; `goga contract internal/server` зелёный после
+- [x] `goga lint` 0; `goga contract internal/server` зелёный после
       реализации
-- [ ] capability: codeActionProvider с kinds=[quickfix]
-- [ ] did-you-mean rename: TextEdit покрывает ровно слово, NewText —
+- [x] capability: codeActionProvider с kinds=[quickfix]
+- [x] did-you-mean rename: TextEdit покрывает ровно слово, NewText —
       подсказка; для .rms с inline-XS — координаты документа
-- [ ] effect_percent: замена токена, аргументы нетронуты
-- [ ] missing-include: CreateFile с IgnoreIfExists и путём от
+- [x] effect_percent: замена токена, аргументы нетронуты
+- [x] missing-include: CreateFile с IgnoreIfExists и путём от
       директории документа
-- [ ] Only без QuickFix → пусто; без диагностик → пустой slice ≠ nil;
+- [x] Only без QuickFix → пусто; без диагностик → пустой slice ≠ nil;
       диагностики без суффикса/чужие коды → действий нет
-- [ ] `make check` зелёный
+- [x] `make check` зелёный
