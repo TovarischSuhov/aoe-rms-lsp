@@ -32,6 +32,39 @@ extra flags; positionEncoding is negotiated (prefer utf-8 when the
 client offers it). Signature-help widgets refresh on client re-requests
 while open; the manual signature-help binding is the guaranteed path.
 
+## Settings
+
+The `"aoe2lsp"` configuration section, delivered both by pull (the
+server requests it on `initialized` when the client supports
+`workspace/configuration` — VS Code) and push
+(`workspace/didChangeConfiguration` — Neovim lspconfig `settings`):
+
+```json
+{
+  "aoe2lsp": {
+    "diagnostics": {
+      "severityOverrides": {
+        "undefined-symbol": "hint",
+        "deprecated-effect-percent": "none"
+      }
+    },
+    "includeRoots": ["/abs/path/to/ai-rms"]
+  }
+}
+```
+
+- `severityOverrides` maps a diagnostic code (see analysis checks) to
+  `error` / `warning` / `info` / `hint` / `none`; `none` suppresses the
+  diagnostic. Unknown codes and unknown severity names are ignored
+  with a WARN log. Applied without a server restart: every open
+  document's diagnostics are republished after a settings change.
+- `includeRoots` adds absolute directories searched after the
+  including file's own directory (in order) when resolving
+  `#include` / `#includeXS` — point it at the game's `ai-rms` folder
+  to resolve stock includes. Each call replaces the whole set.
+
+Defaults: no overrides, no extra roots.
+
 ## Cross-file navigation
 
 Definition and references resolve across the document's include closure:
