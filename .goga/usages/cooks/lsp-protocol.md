@@ -240,6 +240,28 @@ characters and kind stay unset (the client applies its defaults).
 Emit every outline node whose range spans more than one line, in
 document order; empty result is an empty slice, not nil.
 
+### Code Actions
+
+`textDocument/codeAction` returns `[]protocol.CommandOrCodeAction` —
+append `&protocol.CodeAction{...}` (the union's code-action arm).
+Advertise `CodeActionProvider: &protocol.CodeActionOptions{
+CodeActionKinds: []protocol.CodeActionKind{protocol.QuickFix}}`. The
+client echoes the displayed diagnostics in
+`params.Context.Diagnostics` — build fixes from them (stateless; never
+store diagnostics server-side). Honor `params.Context.Only`: a
+non-empty list without your kind means silence.
+
+Two edit shapes:
+- in-document rename → `WorkspaceEdit{Changes: map[uri.URI][]TextEdit{...}}`
+  (plain edits, supported by every client);
+- file creation → `WorkspaceEdit{DocumentChanges: []DocumentChange{
+&protocol.CreateFile{Kind: "create", URI: target,
+Options: &protocol.CreateFileOptions{IgnoreIfExists: true}}}}` —
+requires the client's `resourceOperations` capability; clients without
+it ignore the operation silently.
+
+Empty result is an empty slice, not nil.
+
 ## Cross-file Navigation Results
 
 Definition/References may return locations in files other than the queried
