@@ -32,7 +32,7 @@ Roadmap-пачка самостоятельных задач: каждый сл�
 | 0 | `folding` | `textDocument/foldingRange`: секции RMS (start_random, if/elseif, <player_setup>…), тела XS-функций/правил | server | S |
 | 1 | `did-you-mean` | unknown-command/attribute/symbol → «а может: X» по edit-distance/prefix к именам kb | analysis, kb | S–M |
 | 1 | `quickfix` | `textDocument/codeAction`: вставить `#include` (missing-include), заменить deprecated `effect_percent`, применить did-you-mean | server | M |
-| 1 | `nuance-rules` | вердикты real-map-nuances → данные в kb (алиасы/опечатки/no-op списки) + правила: «вероятно игнорируется»=hint, ✍️=warning | analysis, kb | M |
+| 1 | `nuance-rules` | вердикты real-map-nuances → данные в kb (алиасы/опечатки/no-op списки) + правила: «вероятно игнорируется»=hint, ✍️=warning | analysis, kb | M — **отложено 2026-09-09: требует ручной верификации кейсов** |
 | 2 | `config` | `workspace/configuration`: severity-оверрайды, include-корни | server | M |
 | 2 | `watched-files` | `didChangeWatchedFiles` → инвалидация кэша замыкания при правках файлов на диске | server, include | M |
 | 2 | `corpus-ci` | corpus-прогон как CI-гейт: fetch по pinned SHA (кэш), fail на panic/timeout/exit | corpus, CI | S–M |
