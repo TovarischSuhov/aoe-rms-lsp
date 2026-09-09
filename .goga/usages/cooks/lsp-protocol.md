@@ -230,6 +230,16 @@ no include closure is computed: highlights never cross file
 boundaries; inline-XS regions of .rms files shift block coordinates
 back to the outer file before returning.
 
+### Folding Ranges
+
+`textDocument/foldingRange` returns line regions from the symbol tree.
+Advertise `FoldingRangeProvider: protocol.Boolean(true)`. The protocol
+server-interface method is `FoldingRanges` (plural). Return
+`[]protocol.FoldingRange` with only `StartLine`/`EndLine` set —
+characters and kind stay unset (the client applies its defaults).
+Emit every outline node whose range spans more than one line, in
+document order; empty result is an empty slice, not nil.
+
 ## Cross-file Navigation Results
 
 Definition/References may return locations in files other than the queried

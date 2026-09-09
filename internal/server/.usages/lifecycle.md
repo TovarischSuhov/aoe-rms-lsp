@@ -26,7 +26,8 @@ Preconditions:
 
 Initialize advertises: diagnostics (Full sync + OpenClose), hover,
 completion, navigation — definition, references, documentSymbol,
-documentHighlight — and signature help (TriggerCharacters "(" and ","). Editor configs need no
+documentHighlight — folding ranges, and signature help
+(TriggerCharacters "(" and ","). Editor configs need no
 extra flags; positionEncoding is negotiated (prefer utf-8 when the
 client offers it). Signature-help widgets refresh on client re-requests
 while open; the manual signature-help binding is the guaranteed path.
