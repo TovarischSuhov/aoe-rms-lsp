@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0 (2026-09-09)
+
+### Docs
+
+- docs: бейджи README + самодостаточный coverage-бейдж в CI
+
 ## v0.2.0 (2026-09-09)
 
 ### Features
