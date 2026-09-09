@@ -495,6 +495,10 @@ func (s *Server) Hover(
 func (s *Server) hoverRms(text string, name string, pos common.Pos) string {
 	file, _ := rms.Parse(text, name)
 
+	if markdown, ok := s.hoverAttribute(file, pos); ok {
+		return markdown
+	}
+
 	stmt, ok := file.StatementAt(pos)
 	if !ok {
 		return ""
@@ -506,6 +510,24 @@ func (s *Server) hoverRms(text string, name string, pos common.Pos) string {
 	}
 
 	return commandMarkdown(cmd)
+}
+
+// hoverAttribute resolves a hover on an attribute of a command block:
+// ArgAt Kind=attr names the owning command and the attribute (name or
+// value position). An attribute unknown to the kb answers found=false so
+// the caller degrades to command help.
+func (s *Server) hoverAttribute(file rms.RmsFile, pos common.Pos) (string, bool) {
+	site, ok := file.ArgAt(pos)
+	if !ok || site.Kind != rms.KindAttr {
+		return "", false
+	}
+
+	attr, found := s.store.Attribute(site.Stmt.Name, site.Name)
+	if !found {
+		return "", false
+	}
+
+	return attributeMarkdown(site.Stmt.Name, attr), true
 }
 
 // hoverXs renders the function named by the symbol under pos, if the kb
@@ -1841,6 +1863,31 @@ func commandMarkdown(cmd kb.Command) string {
 
 	if cmd.SinceUpdate != "" {
 		fmt.Fprintf(&b, "\n\nSince update %s.", cmd.SinceUpdate)
+	}
+
+	return b.String()
+}
+
+// attributeMarkdown renders a command-attribute hover: the owning command
+// for context, then description, value shape and mined bounds (same
+// vocabulary as signature-help labels).
+func attributeMarkdown(owner string, attr kb.CommandArg) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "**%s** — attribute of `%s`", attr.Name, owner)
+
+	if attr.Desc != "" {
+		fmt.Fprintf(&b, "\n\n%s", attr.Desc)
+	}
+
+	if attr.Kind != "" {
+		fmt.Fprintf(&b, "\n\nValue: `%s`", attr.Kind)
+
+		if attr.Range != (kb.ValueRange{}) {
+			fmt.Fprintf(&b, " (%s..%s)", attr.Range.Min, attr.Range.Max)
+		}
+
+		b.WriteString(".")
 	}
 
 	return b.String()
