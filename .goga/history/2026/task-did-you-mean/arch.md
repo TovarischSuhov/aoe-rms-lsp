@@ -70,9 +70,10 @@ analysis уже импортирует Store (Types). Новых Imports нет.
 
 - [x] `goga lint` 0 ошибок; `goga contract internal/kb internal/analysis`
       зелёные после реализации
-- [x] kb: CommandNames/ConstantNames — отсортированы, без повторов,
-      длины согласуются с данными (204 функции → имена констант/команд
-      из фикстур)
+- [x] kb: изменений не потребовалось — кандидаты собраны из существующих
+      `Commands("")`, `Command(name).Attributes`, `Functions()`,
+      `Constants("")` (находка разведки; изначально планировались два
+      новых метода)
 - [x] analysis: `creat_object` → did you mean "create_object";
       garbage-имя → суффикса нет; опечатка в локальной XS-переменной →
       подсказка из declared; unknown-attribute → подсказка из атрибутов
