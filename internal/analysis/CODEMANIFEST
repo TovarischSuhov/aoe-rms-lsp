@@ -166,8 +166,8 @@ Annotations: |
       Algorithm:
       1. Собрать объявленные имена (файл + externals) — шаблон
          AnalyzeXs шаги 1–2
-      2. Каждое ident-вхождение: объявлен или в kb (`Store.Function`,
-         `Store.Constant`) → known, иначе → unknown
+      2. Каждое ident-вхождение: объявлен или в kb (Store.Function,
+         Store.Constant — как AnalyzeXs) → known, иначе → unknown
       3. Имя каждой декларации (function/variable/rule/event) → kind
          (перекрывает known на этом диапазоне)
       4. Отсортировать по позиции; перекрытий нет

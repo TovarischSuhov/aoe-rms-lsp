@@ -383,11 +383,12 @@ Annotations: |
       Algorithm:
       1. Язык по расширению URI (общий шаблон Hover); неизвестный —
          Data:[] (не nil, не ошибка)
-      2. .rms: `Parse` → `Analyzer.TokensRms`; каждый inline `XsBlock`:
-         XsParse → `Analyzer.TokensXs` (externals — пустые), сдвиг
-         диапазонов в координаты файла (шаблон DocumentHighlight)
-      3. .xs: `XsParse` → внешние декларации `Closure` uri →
-         `Analyzer.TokensXs`
+      2. .rms: `Parse` → TokensRms у `Analyzer`; каждый inline
+         `XsBlock`: XsParse → TokensXs у `Analyzer` (externals —
+         пустые), сдвиг диапазонов в координаты файла (шаблон
+         DocumentHighlight)
+      3. .xs: `XsParse` → внешние декларации `Closure` uri → TokensXs
+         у `Analyzer`
       4. Каждый Token → (line, start, length) с конвертацией
          positionEncoding; type → индекс в легенде
       5. Delta-кодировка [Δline, Δstart, length, typeIdx] в документном
