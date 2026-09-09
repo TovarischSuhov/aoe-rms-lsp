@@ -81,12 +81,13 @@ func (s *Server) Initialize(
 			OpenClose: &[]bool{true}[0],
 			Change:    &full,
 		},
-		HoverProvider:          protocol.Boolean(true),
-		CompletionProvider:     &protocol.CompletionOptions{TriggerCharacters: []string{" ", "<"}},
-		DefinitionProvider:     protocol.Boolean(true),
-		ReferencesProvider:     protocol.Boolean(true),
-		DocumentSymbolProvider: protocol.Boolean(true),
-		SignatureHelpProvider:  &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}},
+		HoverProvider:             protocol.Boolean(true),
+		CompletionProvider:        &protocol.CompletionOptions{TriggerCharacters: []string{" ", "<"}},
+		DefinitionProvider:        protocol.Boolean(true),
+		ReferencesProvider:        protocol.Boolean(true),
+		DocumentSymbolProvider:    protocol.Boolean(true),
+		DocumentHighlightProvider: protocol.Boolean(true),
+		SignatureHelpProvider:     &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}},
 	}
 
 	if enc, ok := negotiateEncoding(params); ok {
@@ -595,6 +596,66 @@ func (s *Server) excludeLocalDeclaration(
 	return out
 }
 
+// DocumentHighlight answers textDocument/documentHighlight: every
+// in-file occurrence of the word under the cursor, all kind Text —
+// occurrences are syntactic name matches (ReferencesAt), the server
+// does not split reads from writes. Unlike Definition/References no
+// include closure is computed: highlights never cross file boundaries;
+// inline-XS blocks shift their block-local hits back into document
+// coordinates. Empty results are empty slices, not nil.
+func (s *Server) DocumentHighlight(
+	ctx context.Context,
+	params *protocol.DocumentHighlightParams,
+) ([]protocol.DocumentHighlight, error) {
+	docURI := params.TextDocument.URI
+	text, name, _ := s.openDocument(docURI)
+	pos := s.fromProtocolPos(text, params.Position)
+
+	var ranges []common.Range
+
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		ranges = s.highlightRms(text, name, pos)
+	case strings.HasSuffix(name, ".xs"):
+		file, _ := xs.XsParse(text, name)
+		ranges = file.ReferencesAt(pos)
+	}
+
+	out := make([]protocol.DocumentHighlight, 0, len(ranges))
+
+	for _, r := range ranges {
+		out = append(out, protocol.DocumentHighlight{
+			Range: s.toProtocolRange(text, r),
+			Kind:  protocol.DocumentHighlightKindText,
+		})
+	}
+
+	slog.DebugContext(ctx, "document_highlight", "uri", docURI,
+		"line", params.Position.Line, "col", params.Position.Character, "count", len(out))
+
+	return out, nil
+}
+
+// highlightRms collects highlight ranges for a .rms document: a position
+// inside an inline XS block routes to the XS word index in block-local
+// coordinates and shifts the hits back (the signatureHelpRms template);
+// any other position takes the RMS word index.
+func (s *Server) highlightRms(text string, name string, pos common.Pos) []common.Range {
+	file, _ := rms.Parse(text, name)
+
+	for _, block := range file.XsBlocks {
+		if !block.Range.Contains(pos) {
+			continue
+		}
+
+		xsFile, _ := xs.XsParse(block.Code, "inline:"+name)
+
+		return shiftRanges(xsFile.ReferencesAt(unshiftPos(pos, block.Range.Start)), block.Range.Start)
+	}
+
+	return file.ReferencesAt(pos)
+}
+
 // DocumentSymbol answers textDocument/documentSymbol with the
 // hierarchical outline of the document.
 func (s *Server) DocumentSymbol(
@@ -840,6 +901,21 @@ func unshiftPos(p common.Pos, base common.Pos) common.Pos {
 	}
 
 	return unshifted
+}
+
+// shiftRanges moves block-relative highlight ranges into document
+// coordinates — the range counterpart of shiftDiags.
+func shiftRanges(ranges []common.Range, base common.Pos) []common.Range {
+	out := make([]common.Range, 0, len(ranges))
+
+	for _, r := range ranges {
+		out = append(out, common.Range{
+			Start: shiftPos(r.Start, base),
+			End:   shiftPos(r.End, base),
+		})
+	}
+
+	return out
 }
 
 // sortDiags orders diagnostics by start position, then message, so every

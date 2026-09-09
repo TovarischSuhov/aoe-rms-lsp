@@ -163,30 +163,30 @@ entity `Server`, `location: server/server.go`; изменение `Initialize`
 **Covered contract entities:** `Server.DocumentHighlight`,
 `Server.Initialize` (capability).
 
-- [ ] STEP 0: объявить задачу Task 1
-- [ ] STEP 1 (CONTRACT TESTS): stdio-сценарий: initialize отвечает
+- [x] STEP 0: объявить задачу Task 1
+- [x] STEP 1 (CONTRACT TESTS): stdio-сценарий: initialize отвечает
       `documentHighlightProvider=true`; запрос documentHighlight к
       .xs-документу НЕ возвращает MethodNotFound (заглушка отвечала
       бы ошибкой) — до реализации падает
-- [ ] STEP 2 (IMPLEMENTATION): метод `DocumentHighlight` по Code Stack
+- [x] STEP 2 (IMPLEMENTATION): метод `DocumentHighlight` по Code Stack
       Trace (маршрутизация по расширению; inline-блок через
       `unshiftPos`/`shiftRange`; `make(…, 0, len)`; debug-строка
       `document_highlight`); `DocumentHighlightProvider:
       protocol.Boolean(true)` в capabilities Initialize; хелпер
       `shiftRange` с doc-комментарием
-- [ ] STEP 3 (INTERFACE VERIFICATION): контракт-тесты STEP 1 зелёные;
+- [x] STEP 3 (INTERFACE VERIFICATION): контракт-тесты STEP 1 зелёные;
       `goga contract internal/server` зелёный
-- [ ] STEP 4 (LOGIC TESTS): сценарии T4 (позиция вне слова-токена →
+- [x] STEP 4 (LOGIC TESTS): сценарии T4 (позиция вне слова-токена →
       len==0, err==nil), T5 (неизвестное расширение → len==0),
       T6 (уникальное слово → len==1, Kind==1) — table-driven где
       уместно, stdio-харнесс navigation_test.go
-- [ ] STEP 5 (DEBUGGING): все тесты ячейки зелёные под memory cap;
+- [x] STEP 5 (DEBUGGING): все тесты ячейки зелёные под memory cap;
       фиксить реализацию, не тесты
-- [ ] STEP 6 (CONTRACT RE-VERIFICATION): `goga contract internal/server`
+- [x] STEP 6 (CONTRACT RE-VERIFICATION): `goga contract internal/server`
       зелёный; пустой slice ≠ nil на всех ветках
-- [ ] STEP 7 (LINT): `golangci-lint run`, `golangci-lint fmt`; при
+- [x] STEP 7 (LINT): `golangci-lint run`, `golangci-lint fmt`; при
       необходимости декомпозировать (выделить documentHighlightRms)
-- [ ] STEP 8 (COMPLETION): отметить чекбоксы; коммит
+- [x] STEP 8 (COMPLETION): отметить чекбоксы; коммит
       `feat: server cell — DocumentHighlight хендлер + capability (doc-highlight, task 1)`
 
 ### Task 2: Интеграционные сценарии T1–T3 (integration tests)
