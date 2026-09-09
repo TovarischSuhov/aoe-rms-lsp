@@ -67,8 +67,9 @@ Annotations: |
   Protocol types (InitializeParams, Hover, CompletionList, ...) belong to
   go.lsp.dev/protocol — follow `lsp-protocol` for their construction.
 
-  Навигационные хендлеры (Definition/References/DocumentSymbol) следуют
-  секции Navigation `lsp-protocol`: пустой результат — пустой slice, не nil.
+  Навигационные хендлеры (Definition/References/DocumentSymbol/
+  DocumentHighlight) следуют секции Navigation `lsp-protocol`: пустой
+  результат — пустой slice, не nil.
   Definition/References резолвятся через `Resolver` по include-замыканию
   (Cross-file Navigation Results): цели могут жить в неоткрытых файлах.
 
@@ -108,7 +109,8 @@ Annotations: |
     "Initialize(ctx: Context, params: InitializeParams) -> result: InitializeResult, err: error": |
       Заявить возможности: TextDocumentSync Full+OpenClose, HoverProvider
       Boolean(true), CompletionProvider с триггерами; DefinitionProvider,
-      ReferencesProvider, DocumentSymbolProvider — Boolean(true);
+      ReferencesProvider, DocumentSymbolProvider,
+      DocumentHighlightProvider — Boolean(true);
       SignatureHelpProvider с триггерами «(» и «,»;
       согласовать positionEncoding (utf-8 при поддержке клиентом).
     "DidOpen(ctx: Context, params: DidOpenTextDocumentParams) -> err: error": |
@@ -203,6 +205,30 @@ Annotations: |
       2. IncludeDeclaration=false → исключить range локальной декларации
          (range Definition в запрошенном файле)
       3. Пустой результат — пустой список, не nil
+
+    "DocumentHighlight(ctx: Context, params: DocumentHighlightParams) -> highlights: []DocumentHighlight, err: error": |
+      Вхождения имени под позицией в текущем файле (stateless, read-only).
+
+      `params`: позиция и документ запроса; `highlights`: подсвечиваемые
+      диапазоны текущего файла; `err`: только протокольные сбои
+
+      Algorithm:
+      1. Язык по расширению URI (общий шаблон Hover/SignatureHelp);
+         неизвестный — пустой список
+      2. .rms: `Parse`; позиция внутри `XsBlock` → сдвиг в координаты
+         блока → `XsParse` → ReferencesAt по `XsFile` → сдвиг диапазонов
+         назад в координаты файла; иначе ReferencesAt по `RmsFile`
+      3. .xs: `XsParse` → ReferencesAt по `XsFile`
+      4. Каждый Range → protocol DocumentHighlight: Range с конвертацией
+         positionEncoding, Kind=Text
+
+      Requirements:
+      - пустой результат — пустой slice, не nil
+
+      Constraints:
+      - без `Resolver`/`Closure`: замыкание не вычисляется, вхождения
+        только текущего файла
+      - без Read/Write-дискриминации: Kind=Text всем вхождениям
 
     "DocumentSymbol(ctx: Context, params: DocumentSymbolParams) -> result: DocumentSymbolResult, err: error": |
       Outline документа.
