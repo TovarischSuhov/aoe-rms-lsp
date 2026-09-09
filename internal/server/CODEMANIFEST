@@ -122,7 +122,8 @@ Annotations: |
       Boolean(true), CompletionProvider с триггерами; DefinitionProvider,
       ReferencesProvider, DocumentSymbolProvider,
       DocumentHighlightProvider, FoldingRangeProvider — Boolean(true);
-      SignatureHelpProvider с триггерами «(» и «,»;
+      SignatureHelpProvider с триггерами «(» и «,»; CodeActionProvider
+      с CodeActionKinds=[QuickFix];
       согласовать positionEncoding (utf-8 при поддержке клиентом);
       запомнить клиентскую capability workspace.configuration.
     "Initialized(ctx: Context, params: InitializedParams) -> err: error": |
@@ -278,6 +279,34 @@ Annotations: |
       Constraints:
       - xs — только топ-декларации (тела не раскрываются, семантика
         Symbols); вложенные области не сворачиваются
+
+    "CodeAction(ctx: Context, params: CodeActionParams) -> actions: []CodeAction, err: error": |
+      Квикфиксы по диагностикам контекста запроса (stateless).
+
+      `params`: диапазон запроса, диагностики клиента и фильтр Only;
+      `actions`: QuickFix-действия; `err`: только протокольные сбои
+
+      Algorithm:
+      1. Отобрать диагностики контекста с кодами unknown-command/
+         unknown-attribute/undefined-symbol/
+         deprecated-effect-percent/missing-include, пересекающиеся
+         с params.Range
+      2. unknown-* с суффиксом '; did you mean "X"?' в сообщении →
+         Change to 'X': замена слова под началом диагностики
+         (ReferencesAt-роутинг как DocumentHighlight)
+      3. deprecated-effect-percent → Replace with effect_amount:
+         замена токена команды (аргументы не трогаются)
+      4. missing-include → Create '<path>': CreateFile по пути из
+         сообщения, разрешённому относительно директории документа
+         (IgnoreIfExists)
+      5. Only непусто и без QuickFix → пустой ответ
+
+      Requirements:
+      - пустой результат — пустой slice, не nil
+      - stateless: только params, без сохранённых состояний
+
+      Constraints:
+      - файловая система не читается и не меняется (только Edit)
 
     "DocumentSymbol(ctx: Context, params: DocumentSymbolParams) -> result: DocumentSymbolResult, err: error": |
       Outline документа.

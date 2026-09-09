@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -248,6 +249,9 @@ func (s *Server) Initialize(
 		DocumentHighlightProvider: protocol.Boolean(true),
 		FoldingRangeProvider:      protocol.Boolean(true),
 		SignatureHelpProvider:     &protocol.SignatureHelpOptions{TriggerCharacters: []string{"(", ","}},
+		CodeActionProvider: &protocol.CodeActionOptions{
+			CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
+		},
 	}
 
 	if enc, ok := negotiateEncoding(params); ok {
@@ -775,15 +779,7 @@ func (s *Server) DocumentHighlight(
 	text, name, _ := s.openDocument(docURI)
 	pos := s.fromProtocolPos(text, params.Position)
 
-	var ranges []common.Range
-
-	switch {
-	case strings.HasSuffix(name, ".rms"):
-		ranges = s.highlightRms(text, name, pos)
-	case strings.HasSuffix(name, ".xs"):
-		file, _ := xs.XsParse(text, name)
-		ranges = file.ReferencesAt(pos)
-	}
+	ranges := s.occurrenceRanges(text, name, pos)
 
 	out := make([]protocol.DocumentHighlight, 0, len(ranges))
 
@@ -798,6 +794,21 @@ func (s *Server) DocumentHighlight(
 		"line", params.Position.Line, "col", params.Position.Character, "count", len(out))
 
 	return out, nil
+}
+
+// occurrenceRanges routes a position through the document language and
+// returns every same-name occurrence in document coordinates — the
+// shared word machinery of documentHighlight and quickfix edits.
+func (s *Server) occurrenceRanges(text string, name string, pos common.Pos) []common.Range {
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		return s.highlightRms(text, name, pos)
+	case strings.HasSuffix(name, ".xs"):
+		file, _ := xs.XsParse(text, name)
+		return file.ReferencesAt(pos)
+	}
+
+	return nil
 }
 
 // highlightRms collects highlight ranges for a .rms document: a position
@@ -865,6 +876,196 @@ func collectFoldables(syms []common.Symbol, out *[]protocol.FoldingRange) {
 
 		collectFoldables(sym.Children, out)
 	}
+}
+
+// codeMissingInclude mirrors the analyzer-side missing-include code.
+const codeMissingInclude = "missing-include"
+
+// CodeAction answers textDocument/codeAction with quickfixes built
+// from the diagnostics the client echoes in the request context:
+// did-you-mean renames, the effect_percent replacement and
+// missing-include file creation. Stateless — everything derives from
+// params; the filesystem is neither read nor written (the create-file
+// fix is an edit the client applies). Empty results are empty slices,
+// not nil.
+func (s *Server) CodeAction(
+	ctx context.Context,
+	params *protocol.CodeActionParams,
+) ([]protocol.CommandOrCodeAction, error) {
+	if !onlyAllowsQuickFix(params.Context.Only) {
+		return []protocol.CommandOrCodeAction{}, nil
+	}
+
+	out := make([]protocol.CommandOrCodeAction, 0, len(params.Context.Diagnostics))
+
+	for i := range params.Context.Diagnostics {
+		diag := &params.Context.Diagnostics[i]
+
+		if !rangesOverlap(diag.Range, params.Range) {
+			continue
+		}
+
+		switch fmt.Sprint(diag.Code) {
+		case analysis.CodeUnknownCommand, analysis.CodeUnknownAttribute, analysis.CodeUndefinedSymbol:
+			out = appendAction(out, s.renameAction(params, diag))
+		case analysis.CodeDeprecatedEffectPercent:
+			out = appendAction(out, s.replaceEffectPercentAction(params, diag))
+		case codeMissingInclude:
+			out = appendAction(out, s.createIncludeAction(params, diag))
+		}
+	}
+
+	slog.DebugContext(ctx, "code_action", "uri", params.TextDocument.URI, "count", len(out))
+
+	return out, nil
+}
+
+// appendAction adds a built action when present.
+func appendAction(out []protocol.CommandOrCodeAction, action *protocol.CodeAction) []protocol.CommandOrCodeAction {
+	if action == nil {
+		return out
+	}
+
+	return append(out, action)
+}
+
+// renameAction builds the did-you-mean fix: replace the word under the
+// diagnostic start with the suggested name from the message suffix.
+func (s *Server) renameAction(
+	params *protocol.CodeActionParams,
+	diag *protocol.Diagnostic,
+) *protocol.CodeAction {
+	name, ok := suggestedName(messageText(diag.Message))
+	if !ok {
+		return nil
+	}
+
+	return s.replaceWordAction(params, diag, "Change to '"+name+"'", name)
+}
+
+// replaceEffectPercentAction renames the deprecated command token; the
+// percent-vs-absolute argument semantics stay with the author.
+func (s *Server) replaceEffectPercentAction(
+	params *protocol.CodeActionParams,
+	diag *protocol.Diagnostic,
+) *protocol.CodeAction {
+	return s.replaceWordAction(params, diag, "Replace with effect_amount", "effect_amount")
+}
+
+// replaceWordAction builds a quickfix replacing the word at the
+// diagnostic start with newText; nil when the document has no word
+// token under the position.
+func (s *Server) replaceWordAction(
+	params *protocol.CodeActionParams,
+	diag *protocol.Diagnostic,
+	title string,
+	newText string,
+) *protocol.CodeAction {
+	text, name, _ := s.openDocument(params.TextDocument.URI)
+	pos := s.fromProtocolPos(text, diag.Range.Start)
+
+	var word common.Range
+
+	found := false
+
+	for _, r := range s.occurrenceRanges(text, name, pos) {
+		if r.Contains(pos) {
+			word, found = r, true
+
+			break
+		}
+	}
+
+	if !found {
+		return nil
+	}
+
+	kind := protocol.CodeActionKindQuickFix
+
+	return &protocol.CodeAction{
+		Title:       title,
+		Kind:        &kind,
+		Diagnostics: []protocol.Diagnostic{*diag},
+		Edit: &protocol.WorkspaceEdit{Changes: map[uri.URI][]protocol.TextEdit{
+			params.TextDocument.URI: {{Range: s.toProtocolRange(text, word), NewText: newText}},
+		}},
+	}
+}
+
+// createIncludeAction builds the missing-include fix: create the target
+// file next to the including document (idempotent).
+func (s *Server) createIncludeAction(
+	params *protocol.CodeActionParams,
+	diag *protocol.Diagnostic,
+) *protocol.CodeAction {
+	path, ok := strings.CutPrefix(messageText(diag.Message), "include not found: ")
+	if !ok || path == "" {
+		return nil
+	}
+
+	dir := filepath.Dir(params.TextDocument.URI.FsPath())
+	kind := protocol.CodeActionKindQuickFix
+
+	return &protocol.CodeAction{
+		Title:       "Create '" + path + "'",
+		Kind:        &kind,
+		Diagnostics: []protocol.Diagnostic{*diag},
+		Edit: &protocol.WorkspaceEdit{DocumentChanges: []protocol.DocumentChange{
+			&protocol.CreateFile{
+				Kind:    "create",
+				URI:     uri.File(filepath.Join(dir, path)),
+				Options: &protocol.CreateFileOptions{IgnoreIfExists: &[]bool{true}[0]},
+			},
+		}},
+	}
+}
+
+// messageText projects the diagnostic message union onto its plain
+// string arm (the only arm the server itself ever sends).
+func messageText(m protocol.InlayHintTooltip) string {
+	if s, ok := m.(protocol.String); ok {
+		return string(s)
+	}
+
+	return fmt.Sprint(m)
+}
+
+// suggestedName extracts X from a message carrying the documented
+// did-you-mean suffix; false when the message has none.
+func suggestedName(msg string) (string, bool) {
+	_, rest, ok := strings.Cut(msg, `; did you mean "`)
+	if !ok {
+		return "", false
+	}
+
+	name, _, ok := strings.Cut(rest, `"?`)
+
+	return name, ok
+}
+
+// onlyAllowsQuickFix reports whether the Only filter permits quickfix
+// actions (an empty filter permits everything).
+func onlyAllowsQuickFix(only []protocol.CodeActionKind) bool {
+	if len(only) == 0 {
+		return true
+	}
+
+	return slices.Contains(only, protocol.CodeActionKindQuickFix)
+}
+
+// rangesOverlap reports whether two protocol ranges share at least one
+// position (inclusive start, exclusive end).
+func rangesOverlap(a, b protocol.Range) bool {
+	return !posBefore(a.End, b.Start) && !posBefore(b.End, a.Start)
+}
+
+// posBefore orders protocol positions by line, then character.
+func posBefore(a, b protocol.Position) bool {
+	if a.Line != b.Line {
+		return a.Line < b.Line
+	}
+
+	return a.Character < b.Character
 }
 
 // DocumentSymbol answers textDocument/documentSymbol with the
