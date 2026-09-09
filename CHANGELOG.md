@@ -1,5 +1,77 @@
 # Changelog
 
+## v0.4.0 (2026-09-09)
+
+### Features
+
+- feat: server cell — SemanticTokensFull, легенда + delta-кодирование (semantic-tokens)
+- feat: analysis cell — TokensRms/TokensXs, классификация идентификаторов (semantic-tokens)
+- feat: common cell — Token, классифицированный диапазон (semantic-tokens)
+- feat: CODEMANIFEST semantic-tokens — Token + TokensRms/TokensXs + SemanticTokensFull (apply)
+- feat: server cell — хендлер Symbols (workspace/symbol) + capability (workspace-symbol)
+- feat: server cell — fuzzyMatch, компактный subsequence-скоринг (workspace-symbol)
+- feat: CODEMANIFEST workspace-symbol — контракт WorkspaceSymbol (apply)
+- feat: vscode extension MVP — languageclient обёртка + .vsix в CI (vscode-mvp)
+- feat: didChangeWatchedFiles — форс-перечёт включённых файлов (watched-files)
+- feat: CODEMANIFEST watched-files — Drop + DidChangeWatchedFiles (apply)
+- feat: настройки aoe2lsp — severityOverrides + includeRoots (config)
+- feat: CODEMANIFEST config — настройки aoe2lsp + include SetRoots (apply)
+- feat: server cell — CodeAction хендлер: 3 квикфикса (quickfix)
+- feat: CODEMANIFEST quickfix — контракт CodeAction (apply)
+- feat: analysis cell — did-you-mean подсказки в unknown-диагностиках (did-you-mean)
+- feat: CODEMANIFEST did-you-mean — подсказки ближайшего имени в unknown-* (apply)
+- feat: server cell — FoldingRanges хендлер + capability (folding)
+- feat: CODEMANIFEST folding — контракт FoldingRanges (apply)
+- feat: server cell — DocumentHighlight хендлер + capability (doc-highlight, task 1)
+- feat: CODEMANIFEST doc-highlight — контракт documentHighlight (apply)
+
+### Fixes
+
+- fix: неизвестные флаги CLI логируются и игнорируются, старт не прерывается — вместо no-op -stdio принята генерическая толерантность (Fixes #37)
+- fix: no-op -stdio flag в cmd/aoe2-lsp — чужие LSP-клиенты передают --stdio по конвенции и валились на 'flag provided but not defined' (Fixes #37)
+- fix: ссылка Token в аннотации SemanticTokensFull (lint)
+- fix: ссылки аннотаций semantic-tokens — без точечной нотации (lint)
+- fix: corpus — относительный -bin резолвится от cwd воркера, не от корня корпуса
+- fix: контракт workspace/symbol — интерфейсный метод Symbols, не WorkspaceSymbol (design-трассировка)
+- fix: vscode-джоба — compile перед vsce package (vscode-mvp)
+
+### Tests
+
+- test: server cell — интеграционный stdio workspace/symbol (workspace-symbol)
+- test: server cell — интеграционные сценарии documentHighlight T1–T3 (doc-highlight, task 2)
+
+### CI
+
+- ci: корпус-гейт — выборочный прогон 100 реальных карт (corpus-ci)
+
+### Docs
+
+- docs: task-fix-stdio-flag — отклонена генерическая толерантность к неизвестным флагам, только явное исключение -stdio
+- docs: задача fix-stdio-flag — no-op -stdio в cmd/aoe2-lsp для совместимости с чужими LSP-клиентами (issue #37)
+- docs: бэклог 1.x — автодетект установленной игры расширением VS Code, проброс ai-rms в includeRoots; автозагрузка помечена сформулированной
+- docs: задача vscode-autodownload — расширение само скачивает бинарник из GitHub Releases (резолв serverPath→кэш→PATH→download, SHA256, системный tar, режимы auto/off)
+- docs: arch.md document-link — server.DocumentLinks над Closure.Resolved, 4 хунка CODEMANIFEST + usage-секции (brainstorm)
+- docs: задача v1-lsp-completeness — эпик 1.0.0: 9 подзадач (rename, documentLink, selectionRange, format, публикация, пакетные менеджеры)
+- docs: README — фичи v0.3 (semantic tokens, workspace/symbol, folding, quick fixes), VS Code расширение, corpus gate, development-секция
+- docs: plan.md semantic-tokens — 4 таска (Token → проходы → хендлер → интеграция)
+- docs: analysis checks.md — секция Semantic tokens (design)
+- docs: design.md semantic-tokens — трассировка проходов и delta-кодирования
+- docs: arch.md semantic-tokens — план ячеек (brainstorm)
+- docs: plan.md workspace-symbol — 3 таска ralphex (fuzzy → хендлер → интеграция)
+- docs: design.md workspace-symbol — трассировка, fuzzy-модель, тест-сценарии
+- docs: arch.md workspace-symbol — план ячеек (brainstorm)
+- docs: формулировка workspace-symbol + секция lsp-protocol Workspace Symbols
+- docs: чек-лист vscode-mvp — CI подтвердил сборку .vsix
+- docs: чек-лист did-you-mean под факты — kb без изменений
+- docs: plan doc-highlight — 2 задачи ralphex (хендлер TDD + интеграция T1–T3)
+- docs: design doc-highlight — трассировки, решения, тест-сценарии T1–T6
+- docs: arch doc-highlight — контракт documentHighlight (brainstorm)
+- docs: задача — пачка editor experience (13 слотов, 5 волн, goga history)
+
+### Chore
+
+- Update missing skills
+
 ## v0.3.0 (2026-09-09)
 
 ### Docs
