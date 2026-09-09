@@ -281,6 +281,33 @@ Rules:
   NOT required to be an open document (Cross-file Navigation Results).
 - Empty result is an empty slice, not nil.
 
+### Semantic Tokens
+
+`textDocument/semanticTokens/full` classifies identifiers of one
+document. Advertise `SemanticTokensProvider:
+&protocol.SemanticTokensOptions{Legend: protocol.SemanticTokensLegend{
+TokenTypes: [...], TokenModifiers: []string{}}}` in Initialize — the
+legend lives on the server in full (client legends differ); leave
+`Range`/`Full` sub-options unset for full-only support without deltas.
+The server-interface method is `SemanticTokensFull` (one arm of the
+SemanticTokens* trio; the others stay unimplemented).
+
+```go
+func (s *Server) SemanticTokensFull(ctx context.Context, params *protocol.SemanticTokensParams) (*protocol.SemanticTokens, error) {
+	return &protocol.SemanticTokens{Data: data}, nil // []uint32, never nil
+}
+```
+
+Rules:
+- Data is delta-encoded quintuples flattened to `[Δline, ΔstartChar,
+  length, tokenType, tokenModifiers]` — first token absolute, each
+  next relative to the previous; tokens sorted by (line, startChar),
+  no overlaps.
+- `length`/`startChar` are in the negotiated positionEncoding units
+  (same conversion as ranges).
+- Empty/unknown documents answer `Data: []uint32{}` — an empty slice,
+  not nil, not an error.
+
 ## Cross-file Navigation Results
 
 Definition/References may return locations in files other than the queried

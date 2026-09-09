@@ -26,9 +26,10 @@ Preconditions:
 
 Initialize advertises: diagnostics (Full sync + OpenClose), hover,
 completion, navigation — definition, references, documentSymbol,
-documentHighlight, workspace symbol search — folding ranges, quick
-fixes (did-you-mean renames, effect_percent replacement, missing-include
-file creation), and signature help (TriggerCharacters "(" and ","). Editor configs need no
+documentHighlight, workspace symbol search — semantic tokens (full
+document), folding ranges, quick fixes (did-you-mean renames,
+effect_percent replacement, missing-include file creation), and
+signature help (TriggerCharacters "(" and ","). Editor configs need no
 extra flags; positionEncoding is negotiated (prefer utf-8 when the
 client offers it). Signature-help widgets refresh on client re-requests
 while open; the manual signature-help binding is the guaranteed path.
@@ -85,6 +86,21 @@ Preconditions:
   events force-reload the changed files (even with an unchanged
   size/mtime fingerprint) and republish the diagnostics of every open
   document.
+
+## Semantic tokens
+
+semanticTokens/full classifies identifiers of one document with the
+server-side legend `known, unknown, deprecated, section, kind`: RMS
+command/attribute/constant names (known/unknown), effect_percent
+(deprecated), section names, XS declaration names (kind) and XS
+identifier occurrences (known/unknown). Inline-XS regions of .rms files
+report ranges in the outer file's coordinates.
+
+Preconditions:
+- Full-document only: no range requests, no delta updates.
+- The legend is fixed on the server — editors map token types to their
+  own highlight groups.
+- Empty or unknown documents answer with empty data, not an error.
 
 ## Workspace symbol search
 
