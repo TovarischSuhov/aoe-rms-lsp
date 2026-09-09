@@ -43,6 +43,26 @@ diags := analyzer.AnalyzeXs(xsFile, externals)
 | bad-arity | error | неверное число аргументов вызова |
 | bad-type | error | несовместимый тип аргумента/присваивания/return |
 
+## Did-you-mean suggestions
+
+unknown-command, unknown-attribute and undefined-symbol append the
+closest known name to the message when one is close enough:
+
+```go
+// typo'd command → message suggests the fix
+// unknown command "creat_object"; did you mean "create_object"?
+```
+
+- candidates: unknown-command — every kb command; unknown-attribute —
+  the known command's attributes; undefined-symbol — kb function and
+  constant names plus the file's declared names (a typo'd local
+  suggests the local)
+- closeness: case-insensitive Levenshtein distance ≤ max(1, len/4);
+  ties resolve to the lexicographically smaller name — suggestions
+  are deterministic
+- nothing within the threshold → plain message, no suffix
+- unknown-section never carries a suggestion
+
 Preconditions:
 - Input must come from a successful Parse call (partial AST is fine —
   analyzer walks what exists).

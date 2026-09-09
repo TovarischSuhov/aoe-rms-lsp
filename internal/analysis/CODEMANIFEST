@@ -70,10 +70,14 @@ Annotations: |
       Algorithm:
       1. Пройти все statement (вкл. Children блоков)
       2. Неизвестная команда/секция — lookup через `Store` по `lookups`;
-         Diagnostic severity=error, code="unknown-command"/"unknown-section"
+         Diagnostic severity=error, code="unknown-command"/"unknown-section";
+         к unknown-command дописывается подсказка ближайшего имени из
+         Commands("") (Левенштейн без регистра, порог max(1, len/4)):
+         '; did you mean "X"?'; unknown-section — без подсказки
       3. Для известных команд: неизвестные атрибуты через `Store` —
-         code="unknown-attribute"; несоответствие числа/вида аргументов —
-         code="bad-argument"
+         code="unknown-attribute" с той же подсказкой (кандидаты —
+         Attributes известной команды); несоответствие числа/вида
+         аргументов — code="bad-argument"
       4. Для каждого позиционного аргумента с имеющейся спецификацией и
          каждого атрибута вызвать `CheckRmsValue` с kind, value и
          диапазоном значения (значения с операндами — выражения и
@@ -84,6 +88,9 @@ Annotations: |
 
       Requirements:
       - не дублировать синтаксические diags парсера
+      - подсказка детерминирована: порог max(1, len/4), при равных
+        дистанциях — лексикографически меньшее имя; нет кандидата в
+        пороге — суффикса нет
 
       Constraints:
       - не изменять входной AST
@@ -108,7 +115,9 @@ Annotations: |
          использование после оператора консервативно не маркируется —
          как у локалей вложенных блоков). ident вне объявленных и вне kb
          (Store.Function,
-         Store.Constant) — code="undefined-symbol", severity=error
+         Store.Constant) — code="undefined-symbol", severity=error,
+         с подсказкой ближайшего имени (кандидаты — имена Functions(),
+         Constants("") и объявленные имена файла; порог как в AnalyzeRms)
       4. Для вызовов известных функций: число аргументов vs Params
          (Required=false — можно опускать) — code="bad-arity"
       5. Для каждого аргумента вызова известной функции: тип через
@@ -122,6 +131,8 @@ Annotations: |
       - externals подавляют undefined-symbol и предоставляют типы для
         InferType; локальные декларации file всегда приоритетнее внешних
       - не дублировать синтаксические diags парсера
+      - подсказка детерминирована (порог max(1, len/4), при равных
+        дистанциях — меньшее имя); нет кандидата — суффикса нет
 
       Constraints:
       - не изменять входной AST и externals
