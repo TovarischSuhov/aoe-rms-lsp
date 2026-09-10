@@ -249,6 +249,112 @@ func ownerIn(stmts []Statement, pos common.Pos) (Statement, bool) {
 	return stmts[candidate], true
 }
 
+// EnclosingRanges returns the chain of AST nodes containing pos,
+// innermost first (LSP textDocument/selectionRange): an expression
+// subtree, its attribute line, the statements nesting outward, the
+// section. Containment only — positions outside every node (section
+// headers, directives, gaps) answer the section alone or nothing,
+// never a neighbouring statement.
+func (f RmsFile) EnclosingRanges(pos common.Pos) []common.Range {
+	for i := range f.Sections {
+		sec := &f.Sections[i]
+		if !sec.Range.Contains(pos) {
+			continue
+		}
+
+		var chain []common.Range
+
+		if stmts := enclosingStmts(sec.Statements, pos); len(stmts) > 0 {
+			chain = append(chain, stmtMembers(stmts[0], pos)...)
+
+			for j := range stmts {
+				chain = append(chain, stmts[j].Range)
+			}
+		}
+
+		return dedupChain(append(chain, sec.Range))
+	}
+
+	return nil
+}
+
+// enclosingStmts returns the chain of statements containing pos,
+// innermost first, or nil when no statement of the list contains it.
+func enclosingStmts(stmts []Statement, pos common.Pos) []Statement {
+	for i := range stmts {
+		if !stmts[i].Range.Contains(pos) {
+			continue
+		}
+
+		if nested := enclosingStmts(stmts[i].Children, pos); nested != nil {
+			return append(nested, stmts[i])
+		}
+
+		return []Statement{stmts[i]}
+	}
+
+	return nil
+}
+
+// stmtMembers returns the member ranges of stmt under pos: the
+// expression subtree of an argument or attribute value (innermost
+// first), then the attribute line. Flag attributes, the command name
+// and braces answer nil — the statement range is their level.
+func stmtMembers(stmt Statement, pos common.Pos) []common.Range {
+	for i := range stmt.Args {
+		if chain := exprChain(stmt.Args[i], pos); chain != nil {
+			return chain
+		}
+	}
+
+	for i := range stmt.Attributes {
+		attr := &stmt.Attributes[i]
+		if !attr.Range.Contains(pos) {
+			continue
+		}
+
+		if chain := exprChain(attr.Value, pos); chain != nil {
+			return append(chain, attr.Range)
+		}
+
+		return []common.Range{attr.Range}
+	}
+
+	return nil
+}
+
+// exprChain returns the chain of expression nodes containing pos,
+// innermost first, or nil when the expression does not contain it.
+func exprChain(e Expr, pos common.Pos) []common.Range {
+	if !e.Range.Contains(pos) {
+		return nil
+	}
+
+	for i := range e.Children {
+		if chain := exprChain(e.Children[i], pos); chain != nil {
+			return append(chain, e.Range)
+		}
+	}
+
+	return []common.Range{e.Range}
+}
+
+// dedupChain drops entries equal to their predecessor — an empty
+// nesting step is noise for selection expansion.
+func dedupChain(chain []common.Range) []common.Range {
+	out := chain[:0]
+
+	for _, r := range chain {
+		if len(out) > 0 && out[len(out)-1] == r {
+			continue
+		}
+
+		out = append(out, r)
+	}
+
+	return out
+}
+
 // Symbols returns the outline tree of the file (LSP
 // textDocument/documentSymbol): section nodes with statement children,
 // random/conditional blocks recursing into Children, #includeXS nodes
