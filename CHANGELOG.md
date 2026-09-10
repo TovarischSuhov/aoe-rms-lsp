@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.5.0 (2026-09-10)
+
+### Features
+
+- feat: selectionRange — расширение выделения по AST rms/xs (selection-range)
+- feat: server cell — documentLink: ссылки на резолвленные include-директивы (document-link)
+- feat: server cell — hover на атрибуте блока команды показывает справку атрибута, а не владельца (hover-attribute)
+
+### Tests
+
+- test: rms/xs — fuzz-цели парсеров с сидами из фикстур и корпуса (fuzz)
+
+### CI
+
+- ci: короткая seeded fuzz-джоба парсеров (fuzz)
+
+### Docs
+
+- docs: контракты selection-range — EnclosingRanges в rms/xs, SelectionRange в server
+- docs: server cell — контракт DocumentLink (apply arch.md)
+- docs: правило CLAUDE.md — сформулированные задачи дублируются зеркалом в GitHub issues
+- docs: бэклог-пачка kb-freshness — 2 слота (release-notes-monitor, kb-live-update design)
+- docs: эпик v1.0.0 — подсветка (TextMate-грамматики) включена как подзадача #10, выполнять до публикации #7
+- docs: бэклог-пачка ux-and-data-quality — 7 слотов (nuance-rules, snippets, map-structure, fuzz, kb-refresh, duplicate-include, kb-attribute-desc) + 2 кандидата 1.x
+- docs: задачи hover-attribute (баг: справка владельца на вложенном поле) и vscode-highlighting (TextMate-грамматики aoe2rms/aoe2xs)
+- docs: CODEMANIFEST sync — Server.CodeAction возвращает []CommandOrCodeAction (по lsp-protocol/protocol.Server), параметры Resolver uri→uriArg вслед за кодом
+
 ## v0.4.0 (2026-09-09)
 
 ### Features
