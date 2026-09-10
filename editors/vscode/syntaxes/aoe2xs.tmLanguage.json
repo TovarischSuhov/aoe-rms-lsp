@@ -1,0 +1,83 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "AoE2 XS",
+  "scopeName": "source.aoe2xs",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#function-calls"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.aoe2xs",
+          "begin": "/\\*",
+          "end": "\\*/"
+        },
+        {
+          "name": "comment.line.double-slash.aoe2xs",
+          "match": "//.*"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.aoe2xs",
+          "match": "\"(?:[^\"\\\\\\n]|\\\\.)*\""
+        },
+        {
+          "name": "string.quoted.single.aoe2xs",
+          "match": "'(?:[^'\\\\\\n]|\\\\.)'"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.aoe2xs",
+      "match": "\\b(?:0[xX][0-9a-fA-F]+|\\d+(?:\\.\\d+)?)\\b"
+    },
+    "keywords": {
+      "name": "keyword.control.aoe2xs",
+      "match": "\\b(?:if|else|for|while|do|switch|case|default|break|continue|return)\\b"
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.aoe2xs",
+          "match": "\\b(?:int|float|bool|string|void|vector)\\b"
+        },
+        {
+          "name": "storage.modifier.aoe2xs",
+          "match": "\\b(?:const|static)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "name": "constant.language.aoe2xs",
+      "match": "\\b(?:true|false)\\b"
+    },
+    "function-calls": {
+      "name": "entity.name.function.aoe2xs",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+    }
+  }
+}
