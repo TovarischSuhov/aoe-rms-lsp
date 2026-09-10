@@ -90,6 +90,35 @@ jobs:
           name: aoe2-lsp-vsix
           path: editors/vscode/*.vsix
 
+  fuzz:
+    name: fuzz parsers (short seeded run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      # Seeds only: on a warm corpus cache the fuzz targets also pick up
+      # the 100 real maps under .corpus; a cache miss degrades to the
+      # in-repo fixtures — no network round-trip on PRs, the same policy
+      # as the corpus gate.
+      - name: Restore corpus sample (seeds only)
+        uses: actions/cache@v4
+        with:
+          path: .corpus
+          key: corpus-${{ hashFiles('scripts/corpus-sources.txt') }}
+
+      - name: Fuzz rms parser
+        run: go test -run '^$' -fuzz '^FuzzParse$' -fuzztime 30s ./internal/rms
+
+      - name: Fuzz xs parser
+        run: go test -run '^$' -fuzz '^FuzzXsParse$' -fuzztime 30s ./internal/xs
+
   corpus:
     name: corpus gate (100 real maps)
     runs-on: ubuntu-latest
