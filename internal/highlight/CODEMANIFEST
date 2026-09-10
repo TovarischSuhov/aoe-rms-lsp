@@ -1,0 +1,77 @@
+Imports:
+  - Types:
+      - Store
+      - Command
+      - Constant
+    Usages:
+      - lookups
+      - data-pipeline
+    From: internal/kb
+
+Usages:
+  conventions: .goga/usages/conventions.md
+  vscode-extension: .goga/usages/cooks/vscode-extension.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `vscode-extension` for the artifact home and tmLanguage structure
+  (scope naming, contributes.grammars).
+  Use `data-pipeline` from Imports for the regeneration order: kb data
+  (kbgen) first, then grammar (tmgen) — artifact must never drift from
+  committed kb data.
+
+  Ячейка — оффлайн-генерация статической подсветки: читает загруженную
+  базу знаний kb и эмитет RMS-грамматику; утилита сборки, в рантайме
+  сервера не участвует. Модель грамматики (скелет, scope-константы,
+  keyword-наборы) — внутренняя реализация, вне публичной поверхности.
+
+---
+
+"GenTmLanguage(store: Store, outPath: string, log: Logger) -> err: error":
+  location: gen.go
+  annotations: |
+    Генерация TextMate-грамматики aoe2rms.tmLanguage.json: hand-written
+    скелет + сгенерированные keyword-альтернации из базы знаний.
+
+    `store`: загруженная база знаний (kb.NewStore); read-only
+    `outPath`: путь к целевому файлу
+    (editors/vscode/syntaxes/aoe2rms.tmLanguage.json)
+    `log`: инжектированный логгер сборки (в Go — *slog.Logger;
+    nil → slog.Default())
+    `err`: ошибки записи; обёрнуты с путём файла
+
+    Use `lookups` from Imports for keyword collection via Store.
+
+    Algorithm:
+    1. Собрать keyword-наборы: имена команд (`Command` из Commands("")),
+       имена атрибутов из Attributes каждой команды, имена констант
+       (`Constant` из Constants(""))
+    2. Построить модель грамматики: скелет (секции, #-директивы,
+       блок-комментарии, числа/проценты, строки) + keyword-альтернации
+       трёх классов (команды/атрибуты/константы); имена экранированы,
+       порядок стабилен
+    3. Сериализовать в JSON детерминированно (стабильный порядок ключей)
+    4. Записать файл в outPath
+
+    Requirements:
+    - повторный запуск на тех же данных → побайтово идентичный файл
+    - RMS-имена матчатся case-insensitively; границы слов учитывают
+      подчёркивания и цифры в именах
+    - три keyword-класса с раздельными scope'ами; нейминг согласован
+      с легендой semantic tokens сервера (по `vscode-extension`)
+    - пустой keyword-набор → соответствующий паттерн опускается,
+      не ошибка
+
+    Constraints:
+    - утилита сборки, не вызывается в рантайме сервера
+    - Store не модифицируется
+    - скелет грамматики определён в коде ячейки, не читается из
+      внешних файлов
+
+---
+
+Author: Goga
+CreatedAt: 10/09/26
+Description: |
+  Оффлайн-генерация TextMate-грамматики aoe2rms.tmLanguage.json из базы
+  знаний kb (скелет + keyword-альтернации): статическая подсветка RMS.
