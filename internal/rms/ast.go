@@ -65,6 +65,14 @@ type RmsFile struct {
 	// attribute names, identifier/constant values) recorded at parse
 	// time; ReferencesAt answers from here.
 	words []wordOcc
+	// userDecls are the declared #const/#define names with their
+	// name-token spans; RenameSites answers from here and valueWords.
+	userDecls []wordOcc
+	// valueWords are the identifier leaves of value positions (argument
+	// and attribute-value expressions) recorded at parse time — command,
+	// attribute and section names never enter, which is what makes rename
+	// positionally discriminated.
+	valueWords []wordOcc
 	// strings are the string-token spans of statement lines (attribute
 	// values); ArgAt answers silence from here.
 	strings []common.Range
@@ -523,6 +531,109 @@ func (f RmsFile) References(name string) []common.Range {
 	})
 
 	return out
+}
+
+// indexRename builds the declaration half of the rename index (parse
+// step 7): the declared #const/#define names with their name ranges.
+// The value-occurrence half (valueWords) is recorded by the parser's
+// expression builder as values are parsed.
+func (f *RmsFile) indexRename() {
+	for i := range f.Sections {
+		f.indexStmts(f.Sections[i].Statements)
+	}
+}
+
+// indexStmts indexes the declared names of the statements and their
+// nested children.
+func (f *RmsFile) indexStmts(stmts []Statement) {
+	for i := range stmts {
+		stmt := &stmts[i]
+
+		if (stmt.Name == "#const" || stmt.Name == "#define") && len(stmt.Args) > 0 {
+			f.userDecls = append(f.userDecls, wordOcc{
+				name: stmt.Args[0].Value,
+				at:   stmt.Args[0].Range,
+			})
+		}
+
+		f.indexStmts(stmt.Children)
+	}
+}
+
+// RenameSites returns the rename sites of the user-declared symbol
+// under pos — a #const/#define name: the declaration plus every
+// value-position occurrence of the name, sorted by position (LSP
+// prepareRename/rename; closure merging is the server's). found is
+// false for the language vocabulary (command, attribute and section
+// names), directives other than the const/define names, strings,
+// comments and builtin constants — those positions are not renameable.
+func (f RmsFile) RenameSites(pos common.Pos) ([]common.Range, bool) {
+	name, ok := f.renameableAt(pos)
+	if !ok {
+		return nil, false
+	}
+
+	out := make([]common.Range, 0, 2)
+
+	for _, d := range f.userDecls {
+		if d.name == name {
+			out = append(out, d.at)
+		}
+	}
+
+	for _, w := range f.valueWords {
+		if w.name == name {
+			out = append(out, w.at)
+		}
+	}
+
+	slices.SortFunc(out, func(a, b common.Range) int {
+		switch {
+		case a.Start.Before(b.Start):
+			return -1
+		case b.Start.Before(a.Start):
+			return 1
+		default:
+			return 0
+		}
+	})
+
+	// A declaration's own argument also walks into valueWords — keep
+	// one site per range.
+	out = slices.Compact(out)
+
+	return out, true
+}
+
+// renameableAt resolves the user-declared symbol at pos: an index
+// occurrence under the cursor whose name is declared. Value
+// occurrences of undeclared names — builtin constants, unknown
+// identifiers — are not renameable.
+func (f RmsFile) renameableAt(pos common.Pos) (string, bool) {
+	for _, w := range f.valueWords {
+		if w.at.Contains(pos) {
+			return w.name, f.isDeclared(w.name)
+		}
+	}
+
+	for _, d := range f.userDecls {
+		if d.at.Contains(pos) {
+			return d.name, true
+		}
+	}
+
+	return "", false
+}
+
+// isDeclared reports whether name has a #const/#define declaration.
+func (f RmsFile) isDeclared(name string) bool {
+	for _, d := range f.userDecls {
+		if d.name == name {
+			return true
+		}
+	}
+
+	return false
 }
 
 // XsBlock is embedded XS code (after #includeXS) with its source range.
