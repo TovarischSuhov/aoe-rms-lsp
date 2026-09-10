@@ -243,6 +243,96 @@ func (f XsFile) References(name string) []common.Range {
 // documentSymbol) in source order; include declarations are skipped —
 // the kind vocabulary has no entry for them, and their names are string
 // paths, not identifiers.
+// EnclosingRanges returns the chain of AST nodes containing pos,
+// innermost first (LSP textDocument/selectionRange): an expression
+// subtree, its statement, blocks nesting outward, the declaration.
+// Containment only — positions outside every node (gaps, strings,
+// comments) answer nil, never a neighbouring node.
+func (f XsFile) EnclosingRanges(pos common.Pos) []common.Range {
+	for i := range f.Decls {
+		decl := &f.Decls[i]
+		if !decl.Range.Contains(pos) {
+			continue
+		}
+
+		var chain []common.Range
+
+		if stmts := enclosingXsStmts(decl.Body, pos); len(stmts) > 0 {
+			chain = append(chain, xsExprMembers(stmts[0], pos)...)
+
+			for j := range stmts {
+				chain = append(chain, stmts[j].Range)
+			}
+		}
+
+		return dedupChain(append(chain, decl.Range))
+	}
+
+	return nil
+}
+
+// enclosingXsStmts returns the chain of statements containing pos,
+// innermost first, or nil when no statement of the list contains it.
+func enclosingXsStmts(stmts []Stmt, pos common.Pos) []Stmt {
+	for i := range stmts {
+		if !stmts[i].Range.Contains(pos) {
+			continue
+		}
+
+		if nested := enclosingXsStmts(stmts[i].Body, pos); nested != nil {
+			return append(nested, stmts[i])
+		}
+
+		return []Stmt{stmts[i]}
+	}
+
+	return nil
+}
+
+// xsExprMembers returns the innermost-first expression chain of the
+// statement's expressions containing pos, or nil.
+func xsExprMembers(stmt Stmt, pos common.Pos) []common.Range {
+	for i := range stmt.Exprs {
+		if chain := xsExprChain(stmt.Exprs[i], pos); chain != nil {
+			return chain
+		}
+	}
+
+	return nil
+}
+
+// xsExprChain returns the chain of expression nodes containing pos,
+// innermost first, or nil when the expression does not contain it.
+func xsExprChain(e Expr, pos common.Pos) []common.Range {
+	if !e.Range.Contains(pos) {
+		return nil
+	}
+
+	for i := range e.Children {
+		if chain := xsExprChain(e.Children[i], pos); chain != nil {
+			return append(chain, e.Range)
+		}
+	}
+
+	return []common.Range{e.Range}
+}
+
+// dedupChain drops entries equal to their predecessor — an empty
+// nesting step is noise for selection expansion.
+func dedupChain(chain []common.Range) []common.Range {
+	out := chain[:0]
+
+	for _, r := range chain {
+		if len(out) > 0 && out[len(out)-1] == r {
+			continue
+		}
+
+		out = append(out, r)
+	}
+
+	return out
+}
+
 func (f XsFile) Symbols() []common.Symbol {
 	out := make([]common.Symbol, 0, len(f.Decls))
 

@@ -26,14 +26,14 @@ Preconditions:
 
 Initialize advertises: diagnostics (Full sync + OpenClose), hover,
 completion, navigation — definition, references, documentSymbol,
-documentHighlight, workspace symbol search, document links — semantic
-tokens (full document), folding ranges, quick fixes (did-you-mean
-renames, effect_percent replacement, missing-include file creation),
-and signature help (TriggerCharacters "(" and ","). Editor configs
-need no extra flags; positionEncoding is negotiated (prefer utf-8 when
-the client offers it). Signature-help widgets refresh on client
-re-requests while open; the manual signature-help binding is the
-guaranteed path.
+documentHighlight, workspace symbol search, document links, selection
+ranges — semantic tokens (full document), folding ranges, quick fixes
+(did-you-mean renames, effect_percent replacement, missing-include
+file creation), and signature help (TriggerCharacters "(" and ",").
+Editor configs need no extra flags; positionEncoding is negotiated
+(prefer utf-8 when the client offers it). Signature-help widgets
+refresh on client re-requests while open; the manual signature-help
+binding is the guaranteed path.
 
 ## Settings
 
@@ -130,6 +130,22 @@ Preconditions:
   missing-include diagnostics.
 - Unresolved directives are skipped (the missing-include diagnostic is
   the signal); .xs documents return an empty list.
+
+## Selection ranges
+
+textDocument/selectionRange answers one nesting chain per requested
+position: every AST node containing the position, innermost first —
+an expression, its attribute or argument site, the statement, nested
+blocks, the section (.rms); an expression, statement, block and
+declaration (.xs). Positions inside inline-XS regions of .rms files
+chain the XS levels first, then the block, then the RMS levels.
+Expanding further falls back to the whole line, so every position
+gets at least one range.
+
+Preconditions:
+- The response has exactly one entry per position, in request order.
+- Selection expansion is AST containment only — no word or quote
+  heuristics; the editor's own word-level select comes first.
 
 ## In-file highlights
 

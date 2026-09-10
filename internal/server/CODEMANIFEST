@@ -117,6 +117,11 @@ Annotations: |
   резолвленных include-директив запрошенного .rms-документа по `closure`
   (Owner == uri); missing-директивы пропускаются; пустой результат —
   пустой slice, не nil.
+  SelectionRange следует секции Selection Ranges `lsp-protocol`: для каждой
+  позиции — цепочка объемлющих AST-узлов (EnclosingRanges по языку из
+  Imports rms/xs; inline-XS — цепочка XS в координатах блока + сам блок +
+  RMS-цепочка), пустая цепочка — диапазон строки позиции; длина ответа
+  равна числу позиций.
 
 ---
 
@@ -142,6 +147,7 @@ Annotations: |
       с CodeActionKinds=[QuickFix]; WorkspaceSymbolProvider —
       Boolean(true); DocumentLinkProvider — DocumentLinkOptions{}
       (в go.lsp.dev поле типизировано опциями, не Boolean);
+      SelectionRangeProvider — Boolean(true);
       SemanticTokensProvider — SemanticTokensOptions{
       Legend: TokenTypes=[known, unknown, deprecated, section, kind],
       TokenModifiers=[]};
@@ -448,6 +454,33 @@ Annotations: |
       - собственный резолв путей не строится — только Closure (includeRoots
         и watch-инвалидация уже в Resolver)
       - documentLink/resolve не заявляем (Target известен сразу)
+    "SelectionRange(ctx: Context, params: SelectionRangeParams) -> ranges: []SelectionRange, err: error": |
+      Цепочки расширения выделения для позиций документа (stateless,
+      read-only); имя метода — по интерфейсу go.lsp.dev (SelectionRange).
+
+      `params`: документ и позиции запроса; `ranges`: по одной записи
+      на позицию, в порядке позиций; `err`: только протокольные сбои
+
+      Algorithm:
+      1. Язык по расширению URI; текст документа; неизвестный язык —
+         по позиции отвечает только диапазон строки
+      2. Для каждой позиции: цепочка объемлющих диапазонов —
+         EnclosingRanges по языку; .rms: позиция внутри `XsBlock` —
+         цепочка XS в координатах блока (unshift) + Range блока +
+         цепочка EnclosingRanges от начала блока; пустая цепочка —
+         диапазон строки позиции
+      3. Цепочка → вложенные SelectionRange: внутренний без Parent,
+         каждый следующий — Parent предыдущего; конвертация
+         positionEncoding
+
+      Requirements:
+      - длина ответа равна числу позиций; пустых записей нет
+      - stateless/read-only: состояние сервера не меняется
+      - детерминированность: одинаковый вход → одинаковый ответ
+
+      Constraints:
+      - эвристики «умного выделения» (слова, кавычки) не строятся —
+        только AST-узлы и строка позиции
     "Shutdown(ctx: Context) -> err: error": |
       Вернуть nil (default Unimplemented возвращает not-implemented).
     "Exit(ctx: Context) -> err: error": |

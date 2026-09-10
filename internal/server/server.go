@@ -317,6 +317,7 @@ func (s *Server) Initialize(
 		DocumentHighlightProvider: protocol.Boolean(true),
 		WorkspaceSymbolProvider:   protocol.Boolean(true),
 		DocumentLinkProvider:      &protocol.DocumentLinkOptions{},
+		SelectionRangeProvider:    protocol.Boolean(true),
 		SemanticTokensProvider: &protocol.SemanticTokensOptions{
 			Legend: protocol.SemanticTokensLegend{
 				TokenTypes:     semanticTokenTypes,
@@ -1513,6 +1514,93 @@ func (s *Server) DocumentLink(
 	slog.DebugContext(ctx, "document_link", "uri", docURI, "count", len(out))
 
 	return out, nil
+}
+
+// SelectionRange answers textDocument/selectionRange: for every
+// requested position the chain of enclosing AST nodes, innermost
+// first — one entry per position, in request order. A position no AST
+// node contains (a comment, a gap) still answers its whole line.
+func (s *Server) SelectionRange(
+	ctx context.Context,
+	params *protocol.SelectionRangeParams,
+) ([]protocol.SelectionRange, error) {
+	docURI := params.TextDocument.URI
+	text, name, _ := s.openDocument(docURI)
+
+	out := make([]protocol.SelectionRange, 0, len(params.Positions))
+
+	for _, p := range params.Positions {
+		out = append(out, *s.selectionChain(text, name, s.fromProtocolPos(text, p)))
+	}
+
+	slog.DebugContext(ctx, "selection_range", "uri", docURI, "positions", len(params.Positions))
+
+	return out, nil
+}
+
+// selectionChain builds the nested protocol.SelectionRange of one
+// position: the innermost entry carries the position's range, every
+// Parent is the next enclosing level; equal adjacent levels collapse.
+func (s *Server) selectionChain(text, name string, pos common.Pos) *protocol.SelectionRange {
+	chain := s.enclosingRanges(text, name, pos)
+
+	if len(chain) == 0 {
+		chain = []common.Range{lineRange(text, pos.Line)}
+	}
+
+	var head *protocol.SelectionRange
+
+	for i, r := range slices.Backward(chain) {
+		if i+1 < len(chain) && chain[i] == chain[i+1] {
+			continue
+		}
+
+		head = &protocol.SelectionRange{
+			Range:  s.toProtocolRange(text, r),
+			Parent: head,
+		}
+	}
+
+	return head
+}
+
+// enclosingRanges routes the position to its language AST. .rms
+// positions inside an inline-XS block chain the XS levels (shifted to
+// file coordinates), then the block, then the RMS levels of the
+// block's start.
+func (s *Server) enclosingRanges(text, name string, pos common.Pos) []common.Range {
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		file, _ := rms.Parse(text, name)
+
+		for _, block := range file.XsBlocks {
+			if !block.Range.Contains(pos) {
+				continue
+			}
+
+			xsFile, _ := xs.XsParse(block.Code, "inline:"+name)
+			chain := shiftRanges(xsFile.EnclosingRanges(unshiftPos(pos, block.Range.Start)), block.Range.Start)
+
+			return append(append(chain, block.Range), file.EnclosingRanges(block.Range.Start)...)
+		}
+
+		return file.EnclosingRanges(pos)
+	case strings.HasSuffix(name, ".xs"):
+		file, _ := xs.XsParse(text, name)
+
+		return file.EnclosingRanges(pos)
+	}
+
+	return nil
+}
+
+// lineRange spans the whole line — the fallback selection level of
+// positions no AST node contains.
+func lineRange(text string, line uint32) common.Range {
+	return common.Range{
+		Start: common.Pos{Line: line},
+		End:   common.Pos{Line: line, Column: uint32(len(lineOf(text, line)))},
+	}
 }
 
 // Shutdown acknowledges a clean shutdown request.
