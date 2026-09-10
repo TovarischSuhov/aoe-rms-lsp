@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.6.0 (2026-09-10)
+
+### Features
+
+- feat: rms cell — RenameSites: пользовательские символы #const/#define
+- feat: xs cell — RenameSites: скоуп-aware сайты переименования
+- feat: vscode — hand-written XS-грамматика + contributes.grammars
+- feat: highlight cell — генерация RMS tmLanguage из kb (GenTmLanguage + tmgen)
+
+### Docs
+
+- docs: rename-парсеры — контракты xs/rms + arch.md (brainstorm завершён)
+- docs: rename-парсеры — формулировка задачи (propose, #43)
+- docs: cook vscode-extension — секция Static highlighting
+- docs: vscode-highlighting — brainstorm завершён: контракт internal/highlight + arch.md
+- docs: vscode-highlighting — состояние brainstorm-пайплайна (пауза после Фазы 7)
+- docs: vscode-highlighting — propose-рафининг: kb-генерация зафиксирована, целевой tmLanguage-фрагмент
+
 ## v0.5.0 (2026-09-10)
 
 ### Features
