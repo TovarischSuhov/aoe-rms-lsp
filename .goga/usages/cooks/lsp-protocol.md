@@ -276,6 +276,20 @@ may point at a file that is not open. Skip unresolved directives (the
 missing-include diagnostic is the signal, not a targetless link);
 empty result is an empty slice, not nil.
 
+### Selection Ranges
+
+`textDocument/selectionRange` returns `[]protocol.SelectionRange` — one
+entry per position of `params.Positions`, in request order. Each entry
+is a nesting chain: `Range` plus `Parent *SelectionRange` pointing at
+the next enclosing level (innermost entry carries the innermost range;
+the outermost has no Parent). Advertise
+`SelectionRangeProvider: protocol.Boolean(true)` in Initialize; the
+server-interface method is `SelectionRange` (named after the request —
+match the interface). Build the chain from innermost to outermost and
+link with Parent; equal adjacent ranges collapse (an empty parent step
+is noise). Give every position at least one range (a whole-line
+fallback is typical) — the response length must match the positions.
+
 ### Workspace Symbols
 
 `workspace/symbol` lists symbols matching a query across the server's
