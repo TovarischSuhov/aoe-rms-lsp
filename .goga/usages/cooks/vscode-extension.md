@@ -50,6 +50,29 @@ directives, not comments. `aoe2xs` (.xs): C-like (`//`, `/* */`,
 brace/paren/bracket pairs, indent rules). Keep the configs as JSON
 files referenced from `contributes.languages[].configuration`.
 
+## Static highlighting
+
+TextMate grammars color both languages without the server:
+`syntaxes/aoe2rms.tmLanguage.json` (generated) and
+`syntaxes/aoe2xs.tmLanguage.json` (hand-written), registered through
+`contributes.grammars` (scopeName `source.aoe2rms` / `source.aoe2xs`).
+
+The RMS grammar is a build artifact: `go run ./cmd/tmgen` regenerates
+it from the embedded kb data. Its skeleton (comments `/* */`, `//` and
+non-directive `#` lines; sections; `#` directives; strings; numbers)
+is hand-written in `internal/highlight`; the three keyword classes
+(commands, attributes, constants) are alternations rebuilt from kb.
+Never edit the artifact by hand — change the skeleton and regenerate.
+When docs/ref changes, regenerate in order: kbgen first, then tmgen
+(see `internal/highlight/.usages/grammar-pipeline.md`).
+
+Scope naming follows TextMate conventions and mirrors the server's
+semantic-token legend where it can (`entity.name.section.aoe2rms` ↔
+token type `section`): with the server running, semantic tokens refine
+identifiers on top of the grammar's syntax layer. The XS grammar is
+syntax-only — XS constants (cColorBlue and friends) are colored by
+semantic tokens, not by the grammar.
+
 ## Build & package
 
 - `npm run compile` — esbuild bundles `src/extension.ts` to a single

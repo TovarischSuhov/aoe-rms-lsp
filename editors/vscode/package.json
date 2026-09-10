@@ -43,6 +43,18 @@
         "configuration": "./language-configuration.xs.json"
       }
     ],
+    "grammars": [
+      {
+        "language": "aoe2rms",
+        "scopeName": "source.aoe2rms",
+        "path": "./syntaxes/aoe2rms.tmLanguage.json"
+      },
+      {
+        "language": "aoe2xs",
+        "scopeName": "source.aoe2xs",
+        "path": "./syntaxes/aoe2xs.tmLanguage.json"
+      }
+    ],
     "configuration": {
       "title": "AoE2 LSP",
       "properties": {
