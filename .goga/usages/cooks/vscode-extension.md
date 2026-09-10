@@ -73,6 +73,27 @@ identifiers on top of the grammar's syntax layer. The XS grammar is
 syntax-only — XS constants (cColorBlue and friends) are colored by
 semantic tokens, not by the grammar.
 
+## Packaging policy
+
+- The extension version is owned by the release process:
+  `scripts/release.sh` sets `version` in `package.json` to the release
+  tag and commits it together with the changelog — the committed version
+  always equals the last tag, and the packaged `.vsix` carries the
+  release version. Never bump it by hand.
+- The package must be self-contained: every path referenced from
+  `contributes` (`grammars[].path`, `languages[].configuration`) has to
+  exist inside the built `.vsix` — VS Code silently ignores dead
+  references, so CI verifies them against the archive listing
+  (see `github-actions.md`, "packaged-artifact contributes check").
+  Keep `.vscodeignore` from excluding anything `contributes` points at
+  (including `LICENSE`).
+- A copy of the root `LICENSE` lives in `editors/vscode/` and
+  `license` points at it as `"SEE LICENSE IN LICENSE"` — vsce resolves
+  the license inside the package root without warnings.
+- `capabilities`: `virtualWorkspaces: false` (the server is a native
+  binary, unusable in vscode.dev/github.dev); `untrustedWorkspaces` —
+  the server only parses files, it does not execute them.
+
 ## Build & package
 
 - `npm run compile` — esbuild bundles `src/extension.ts` to a single
@@ -81,7 +102,9 @@ semantic tokens, not by the grammar.
 - `npx vsce package --no-dependencies` — produces
   `aoe2-lsp-<version>.vsix`; `--no-dependencies` is correct because
   esbuild already inlined `vscode-languageclient` into the bundle.
-- CI builds the .vsix and uploads it as an artifact; marketplace
+- CI builds the .vsix (artifact on every push/PR); the release workflow
+  attaches it to the GitHub Release next to the platform binaries —
+  it lands in `SHA256SUMS` like every other asset. Marketplace
   publishing stays out of scope.
 
 ## Manual acceptance
