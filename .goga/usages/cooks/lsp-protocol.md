@@ -262,6 +262,20 @@ it ignore the operation silently.
 
 Empty result is an empty slice, not nil.
 
+### Document Links
+
+`textDocument/documentLink` returns `[]protocol.DocumentLink` — one
+link per resolved include directive of the queried document. Advertise
+`DocumentLinkProvider: &protocol.DocumentLinkOptions{}` in Initialize
+(go.lsp.dev types this field as options, not a `Boolean` arm); the
+server-interface method is `DocumentLink` (unlike `FoldingRanges`/
+`Symbols`, go.lsp.dev names this one after the request — match the
+interface or UnimplementedServer answers for you). Link `Range` covers
+the directive's path argument; `Target` is the resolved file URI — it
+may point at a file that is not open. Skip unresolved directives (the
+missing-include diagnostic is the signal, not a targetless link);
+empty result is an empty slice, not nil.
+
 ### Workspace Symbols
 
 `workspace/symbol` lists symbols matching a query across the server's
