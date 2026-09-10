@@ -66,6 +66,35 @@ Preconditions:
   the parser recorded — ranges are valid for that parse only.
 - Definition on a declaration name returns that declaration itself.
 
+## Rename sites (rename, prepareRename)
+
+RenameSites answers "which occurrences belong to the binding under the
+cursor" — scope-aware, unlike the syntactic ReferencesAt. Binding
+resolution matches Definition (innermost enclosing declarer wins:
+param > local > top-level; for-init declarations are scoped to the
+statement).
+
+```go
+if sites, ok := xsFile.RenameSites(pos); ok {
+    // sites[].Range — name range of each occurrence (declaration
+    //                  included), sorted by position
+    // sites[].Kind — the binding's kind: function | variable | rule |
+    //                event | extern (top-level) | param | local
+    // sites[].Decl — true on declaring occurrences
+}
+// ok=false → not renameable: cursor off an identifier, or the name is
+// builtin / unknown (no declaring binding)
+```
+
+Preconditions:
+- Parse the document first; sites answer from the occurrence index
+  recorded at parse time.
+- All sites of one call share the same Kind — it describes the binding,
+  not the occurrence. Cross-file merging over the include closure
+  belongs to the server: top-level kinds merge across files, param/local
+  stay file-local. A same-name occurrence resolving to a different
+  (shadowing) binding is NOT part of the result.
+
 ## Call-site lookup (signature help)
 
 CallAt answers "which call encloses the cursor, and which argument am I

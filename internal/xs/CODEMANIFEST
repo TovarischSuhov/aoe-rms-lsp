@@ -123,6 +123,38 @@ Annotations: |
       - ReferencesAt(pos) эквивалентен References(SymbolAt(pos))
       - отсутствие имени — пустой список
 
+    "RenameSites(pos: Pos) -> sites: []RenameSite, found: bool": |
+      Сайты переименования биндинга под позицией: резолв как в Definition,
+      возвращаются вхождения только этого биндинга (LSP prepareRename/rename;
+      серверная склейка — вне ячейки).
+
+      `pos`: позиция в файле
+      `sites`: сайты биндинга (декларация Decl=true + ссылки), по позиции
+      `found`: false — не-идентификатор, builtin или неизвестное имя
+
+      Algorithm:
+      1. Вхождение идентификатора под `pos` (как SymbolAt); нет — found=false
+      2. Резолв биндинга — семантика Definition: innermost объемлющая
+         декларация (параметр/локаль затеняют топ-левел; init-декларация for
+         скоупирована оператором); локальной декларации нет (builtin или
+         неизвестное) — found=false
+      3. Пройти индекс вхождений имени: каждое вхождение резолвить тем же
+         правилом; собрать резолвящиеся к тому же биндингу — name-range,
+         декларационные с Decl=true, Kind — вид биндинга
+      4. Отсортировать по позиции
+
+      Requirements:
+      - согласованность с Definition: если Definition вхождения возвращает
+        декларацию D, RenameSites того же вхождения возвращает сайты
+        биндинга D
+      - found=true ⇒ результат непуст (сайт под `pos` включён)
+      - детерминированность
+
+      Constraints:
+      - ReferencesAt и References не меняются (синтаксическая семантика
+        сохраняется)
+      - один проход по индексу вхождений, повторный парс не выполняется
+
     "Symbols() -> symbols: []Symbol": |
       Outline файла: декларации верхнего уровня (LSP documentSymbol).
 
@@ -233,6 +265,25 @@ Annotations: |
       сразу после «(» — 0; после k запятых верхнего уровня — k).
     "OnArg -> bool": |
       Курсор внутри списка аргументов (false — на имени callee).
+
+"RenameSite()":
+  location: ast.go
+  annotations: |
+    Сайт переименования: name-range одного вхождения биндинга (данные).
+
+    Requirements:
+    - Kind описывает биндинг, а не вхождение: одинаков у всех сайтов
+      одного результата RenameSites; Decl=true несут только
+      декларационные сайты
+    - construct-and-use, без мутации
+  properties:
+    "Range -> Range": |
+      Name-range вхождения (не всей декларации).
+    "Kind -> string": |
+      Вид биндинга — словарь как у VisibleAt: function/variable/rule/
+      event/extern — топ-левел, param/local — скоупированные.
+    "Decl -> bool": |
+      Вхождение — декларация биндинга.
 
 "Decl()":
   location: ast.go

@@ -48,7 +48,8 @@ syms := file.Symbols() // []common.Symbol, kinds: section/command/xs
 
 // references: every word-token matching the name under pos (section,
 // command, attribute and identifier words), sorted by position. RMS has
-// no local declarations — all occurrences are equal.
+// no local declarations — all occurrences are equal (for rename,
+// #const/#define declarations are discriminated — see Rename sites).
 for _, r := range file.ReferencesAt(pos) { ... }
 
 // by-name form for cross-file searches: same occurrences without a
@@ -59,6 +60,32 @@ for _, r := range file.References(name) { ... }
 Preconditions:
 - Navigation answers from the token/occurrence index recorded at parse
   time — reparse before querying after text changes.
+
+## Rename sites (rename, prepareRename)
+
+RenameSites exposes the user-declared symbols of a map script — the
+`#const` / `#define` names — with every occurrence that belongs to the
+symbol. Unlike references, rename is positionally discriminated:
+occurrences in command or attribute positions are never sites of a
+constant (a `#const players 5` does not make the command `players`
+renameable).
+
+```go
+if ranges, ok := file.RenameSites(pos); ok {
+    // name ranges of the declaration plus every identifier use of the
+    // same name, sorted by position — build one TextEdit per range
+}
+// ok=false → not renameable: commands, attributes, sections,
+// directives other than #const/#define names, strings, comments,
+// built-in kb constants
+```
+
+Preconditions:
+- Parse the document first; the declaration index is recorded at parse
+  time.
+- Inline-XS blocks: the rms cell does not parse XS — delegate to the xs
+  parser over XsBlock.Code and shift the returned ranges by the block's
+  Range.Start, as the server already does for semantic tokens.
 
 ## Argument lookup (signature help)
 
