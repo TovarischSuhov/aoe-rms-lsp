@@ -75,7 +75,7 @@ language-configuration (комментарии, скобки, индентаци
 
 | Component | Usage file | Status |
 |-----------|------------|--------|
-| TextMate grammars | `.goga/usages/cooks/vscode-extension.md` | update — секция Static highlighting (структура tmLanguage, contributes.grammars, scope-нейминг) |
+| TextMate grammars | `.goga/usages/cooks/vscode-extension.md` | done — секция Static highlighting (структура tmLanguage, contributes.grammars, scope-нейминг) |
 
 ## Risks and Constraints
 
