@@ -415,6 +415,74 @@ func (f XsFile) Definition(pos common.Pos) (common.Range, bool) {
 	return f.bestDeclarer(occ)
 }
 
+// RenameSite is one rename occurrence of a binding: its name range plus
+// the binding's kind. Construct-and-use data: no mutation.
+type RenameSite struct {
+	// Range is the name range of the occurrence (not the whole
+	// declaration).
+	Range common.Range
+	// Kind is the binding's kind — a top-level declaration kind
+	// (function/variable/rule/event/extern) or param/local. Identical
+	// for all sites of one RenameSites answer: it describes the
+	// binding, not the occurrence.
+	Kind string
+	// Decl reports whether this occurrence is the binding's declaration.
+	Decl bool
+}
+
+// RenameSites returns the rename sites of the binding under pos: the
+// declaration plus every occurrence of the name that resolves to the
+// same binding — the resolution of Definition, so same-name symbols of
+// other (shadowing) scopes are excluded (LSP prepareRename/rename;
+// cross-file merging is the server's). found is false when pos is not
+// on an identifier or the name has no declaring binding (builtin or
+// unknown) — such positions are not renameable.
+func (f XsFile) RenameSites(pos common.Pos) ([]RenameSite, bool) {
+	occ, ok := f.occurrenceAt(pos)
+	if !ok {
+		return nil, false
+	}
+
+	binding, ok := f.bestCandidate(occ)
+	if !ok {
+		return nil, false
+	}
+
+	var out []RenameSite
+
+	for i := range f.symbols {
+		s := f.symbols[i]
+
+		if s.name != occ.name {
+			continue
+		}
+
+		cand, ok := f.bestCandidate(s)
+		if !ok || cand.nameRange != binding.nameRange {
+			continue
+		}
+
+		out = append(out, RenameSite{
+			Range: s.at,
+			Kind:  binding.kind,
+			Decl:  s.at == binding.nameRange,
+		})
+	}
+
+	slices.SortFunc(out, func(a, b RenameSite) int {
+		switch {
+		case a.Range.Start.Before(b.Range.Start):
+			return -1
+		case b.Range.Start.Before(a.Range.Start):
+			return 1
+		default:
+			return 0
+		}
+	})
+
+	return out, true
+}
+
 // occurrenceAt returns the identifier occurrence containing pos.
 func (f XsFile) occurrenceAt(pos common.Pos) (symbol, bool) {
 	for i := range f.symbols {
@@ -432,6 +500,7 @@ type declCandidate struct {
 	nameRange common.Range
 	scopeEnd  common.Pos
 	depth     int
+	kind      string
 }
 
 // covers reports whether the candidate scope contains at.
@@ -453,6 +522,18 @@ func (c declCandidate) better(other declCandidate) bool {
 // the innermost scope covering the occurrence, ties broken by the
 // nearest preceding declarer.
 func (f XsFile) bestDeclarer(occ symbol) (common.Range, bool) {
+	cand, ok := f.bestCandidate(occ)
+	if !ok {
+		return common.Range{}, false
+	}
+
+	return cand.nameRange, true
+}
+
+// bestCandidate resolves the winning declaration of the occurrence to
+// its full candidate (name range, scope, kind). RenameSites groups
+// occurrences by the winning candidate, so the binding kind rides along.
+func (f XsFile) bestCandidate(occ symbol) (declCandidate, bool) {
 	var best declCandidate
 	found := false
 
@@ -468,6 +549,7 @@ func (f XsFile) bestDeclarer(occ symbol) (common.Range, bool) {
 			consider(declCandidate{
 				nameRange: f.declNameRange(decl),
 				scopeEnd:  eofPos,
+				kind:      decl.Kind,
 			})
 		}
 
@@ -477,7 +559,7 @@ func (f XsFile) bestDeclarer(occ symbol) (common.Range, bool) {
 			}
 
 			if r, ok := f.paramNameRange(decl, occ.name); ok {
-				consider(declCandidate{nameRange: r, scopeEnd: decl.Range.End, depth: 1})
+				consider(declCandidate{nameRange: r, scopeEnd: decl.Range.End, depth: 1, kind: KindParam})
 			}
 		}
 
@@ -489,11 +571,7 @@ func (f XsFile) bestDeclarer(occ symbol) (common.Range, bool) {
 		}
 	}
 
-	if !found {
-		return common.Range{}, false
-	}
-
-	return best.nameRange, true
+	return best, found
 }
 
 // paramNameRange returns the parameter-list token of name: the first
@@ -545,6 +623,7 @@ func appendDeclaredLocals(
 				nameRange: r,
 				scopeEnd:  blockEnd,
 				depth:     depth,
+				kind:      KindLocal,
 			})
 		}
 	}

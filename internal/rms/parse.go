@@ -14,6 +14,7 @@ import (
 func Parse(source string, name string) (RmsFile, []common.Diagnostic) {
 	p := newParser(name)
 	p.run(source)
+	p.file.indexRename()
 
 	slices.SortStableFunc(p.diags, func(a, b common.Diagnostic) int {
 		if a.Range.Start.Line != b.Range.Start.Line {
@@ -1075,6 +1076,22 @@ func operatorPrecedence(tok token) int {
 	}
 }
 
+// recordValueWords records the identifier leaves of one value
+// expression as rename occurrences (parse step 7): argument and
+// attribute values — including the values past an attribute's first,
+// which the AST does not keep. Words in language positions (command,
+// attribute and section names) never pass through here, which is what
+// makes rename positionally discriminated.
+func (p *parser) recordValueWords(e Expr) {
+	if e.Kind == KindConst || e.Kind == KindIdent {
+		p.file.valueWords = append(p.file.valueWords, wordOcc{name: e.Value, at: e.Range})
+	}
+
+	for i := range e.Children {
+		p.recordValueWords(e.Children[i])
+	}
+}
+
 // expressions parses a token run into a list of value expressions;
 // unknown characters are reported and skipped (recovery).
 func (p *parser) expressions(toks []token) []Expr {
@@ -1096,6 +1113,7 @@ func (p *parser) expressions(toks []token) []Expr {
 			break
 		}
 
+		p.recordValueWords(e)
 		out = append(out, e)
 
 		if lex.peek().kind == tokComma {
