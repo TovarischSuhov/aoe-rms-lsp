@@ -47,6 +47,7 @@ Imports:
       - Closure
       - Target
       - MissingInclude
+      - ResolvedInclude
     Usages:
       - closure
     From: internal/include
@@ -112,6 +113,10 @@ Annotations: |
   SemanticTokens: легенда known/unknown/deprecated/section/kind держится
   на сервере целиком (не настраиваемая — клиентские легенды
   различаются); полный файл, range-запросы и инкремент не поддерживаются.
+  DocumentLink следует секции Document Links `lsp-protocol`: ссылки только
+  резолвленных include-директив запрошенного .rms-документа по `closure`
+  (Owner == uri); missing-директивы пропускаются; пустой результат —
+  пустой slice, не nil.
 
 ---
 
@@ -135,7 +140,9 @@ Annotations: |
       DocumentHighlightProvider, FoldingRangeProvider — Boolean(true);
       SignatureHelpProvider с триггерами «(» и «,»; CodeActionProvider
       с CodeActionKinds=[QuickFix]; WorkspaceSymbolProvider —
-      Boolean(true); SemanticTokensProvider — SemanticTokensOptions{
+      Boolean(true); DocumentLinkProvider — DocumentLinkOptions{}
+      (в go.lsp.dev поле типизировано опциями, не Boolean);
+      SemanticTokensProvider — SemanticTokensOptions{
       Legend: TokenTypes=[known, unknown, deprecated, section, kind],
       TokenModifiers=[]};
       согласовать positionEncoding (utf-8 при поддержке клиентом);
@@ -411,6 +418,36 @@ Annotations: |
       Constraints:
       - без range-запросов и инкремента (Full only)
       - легенда фиксирована на сервере
+    "DocumentLink(ctx: Context, params: DocumentLinkParams) -> links: []DocumentLink, err: error": |
+      Ссылки include-директив текущего документа (stateless, read-only);
+      имя метода — по интерфейсу go.lsp.dev (DocumentLink; в отличие от
+      FoldingRanges/Symbols библиотека именует этот по запросу).
+
+      `params`: документ запроса; `links`: ссылки на файлы-цели;
+      `err`: только протокольные сбои
+
+      Algorithm:
+      1. Язык по расширению URI (общий шаблон Hover/SignatureHelp);
+         не .rms — пустой список (include-директив в .xs нет)
+      2. `Resolver`.Closure(ctx, uri) по `closure`
+      3. Отобрать `ResolvedInclude` с Owner == uri; порядок — порядок
+         директив в запрошенном файле
+      4. Каждый → DocumentLink: Range из Inc.Range с конвертацией
+         positionEncoding, Target из ResolvedInclude.Target (файл-цель
+         может быть не открыт — Cross-file Navigation Results в
+         `lsp-protocol`); Tooltip опускается
+      5. Пусто → пустой slice (не nil, не ошибка)
+
+      Requirements:
+      - stateless/read-only: состояние сервера не меняется
+      - детерминированность: одинаковый вход → одинаковый порядок
+
+      Constraints:
+      - Missing-директивы пропускаются (сигнал остаётся за диагностикой
+        missing-include)
+      - собственный резолв путей не строится — только Closure (includeRoots
+        и watch-инвалидация уже в Resolver)
+      - documentLink/resolve не заявляем (Target известен сразу)
     "Shutdown(ctx: Context) -> err: error": |
       Вернуть nil (default Unimplemented возвращает not-implemented).
     "Exit(ctx: Context) -> err: error": |

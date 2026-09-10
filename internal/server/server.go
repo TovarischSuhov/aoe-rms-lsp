@@ -316,6 +316,7 @@ func (s *Server) Initialize(
 		DocumentSymbolProvider:    protocol.Boolean(true),
 		DocumentHighlightProvider: protocol.Boolean(true),
 		WorkspaceSymbolProvider:   protocol.Boolean(true),
+		DocumentLinkProvider:      &protocol.DocumentLinkOptions{},
 		SemanticTokensProvider: &protocol.SemanticTokensOptions{
 			Legend: protocol.SemanticTokensLegend{
 				TokenTypes:     semanticTokenTypes,
@@ -1466,6 +1467,52 @@ func (s *Server) toDocumentSymbol(text string, sym common.Symbol) protocol.Docum
 	}
 
 	return out
+}
+
+// DocumentLink answers textDocument/documentLink with one link per
+// resolved #include / #includeXS directive of the queried .rms
+// document: the range covers the path argument, the target is the
+// resolved file (it need not be open). Unresolved directives are
+// skipped — the missing-include diagnostic is their signal. Empty
+// results are empty slices, not nil.
+func (s *Server) DocumentLink(
+	ctx context.Context,
+	params *protocol.DocumentLinkParams,
+) ([]protocol.DocumentLink, error) {
+	docURI := string(params.TextDocument.URI)
+	text, name, _ := s.openDocument(params.TextDocument.URI)
+
+	if !strings.HasSuffix(name, ".rms") {
+		return []protocol.DocumentLink{}, nil
+	}
+
+	closure := s.resolver.Closure(ctx, docURI)
+
+	resolved := make([]include.ResolvedInclude, 0, len(closure.Resolved))
+	for _, r := range closure.Resolved {
+		if r.Owner == docURI {
+			resolved = append(resolved, r)
+		}
+	}
+
+	// The closure groups directives by kind (#include before
+	// #includeXS); links are reported in document order instead.
+	slices.SortStableFunc(resolved, func(a, b include.ResolvedInclude) int {
+		return a.Inc.Range.Start.Offset - b.Inc.Range.Start.Offset
+	})
+
+	out := make([]protocol.DocumentLink, 0, len(resolved))
+	for _, r := range resolved {
+		target := uri.URI(r.Target)
+		out = append(out, protocol.DocumentLink{
+			Range:  s.toProtocolRange(text, r.Inc.Range),
+			Target: &target,
+		})
+	}
+
+	slog.DebugContext(ctx, "document_link", "uri", docURI, "count", len(out))
+
+	return out, nil
 }
 
 // Shutdown acknowledges a clean shutdown request.

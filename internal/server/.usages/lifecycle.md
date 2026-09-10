@@ -26,13 +26,14 @@ Preconditions:
 
 Initialize advertises: diagnostics (Full sync + OpenClose), hover,
 completion, navigation — definition, references, documentSymbol,
-documentHighlight, workspace symbol search — semantic tokens (full
-document), folding ranges, quick fixes (did-you-mean renames,
-effect_percent replacement, missing-include file creation), and
-signature help (TriggerCharacters "(" and ","). Editor configs need no
-extra flags; positionEncoding is negotiated (prefer utf-8 when the
-client offers it). Signature-help widgets refresh on client re-requests
-while open; the manual signature-help binding is the guaranteed path.
+documentHighlight, workspace symbol search, document links — semantic
+tokens (full document), folding ranges, quick fixes (did-you-mean
+renames, effect_percent replacement, missing-include file creation),
+and signature help (TriggerCharacters "(" and ","). Editor configs
+need no extra flags; positionEncoding is negotiated (prefer utf-8 when
+the client offers it). Signature-help widgets refresh on client
+re-requests while open; the manual signature-help binding is the
+guaranteed path.
 
 ## Settings
 
@@ -115,6 +116,20 @@ Preconditions:
   score higher), ties broken by URI then position — the order is stable
   across identical requests.
 - Locations may point into files that are not open in the editor.
+
+## Document links
+
+textDocument/documentLink returns one clickable link per resolved
+#include / #includeXS directive of the queried .rms document: the link
+range covers the path argument, the target is the resolved file's URI
+(opened on demand — the target need not be an open document).
+
+Preconditions:
+- Resolution follows the include closure — includeRoots and file
+  watchers apply automatically; links stay consistent with
+  missing-include diagnostics.
+- Unresolved directives are skipped (the missing-include diagnostic is
+  the signal); .xs documents return an empty list.
 
 ## In-file highlights
 
