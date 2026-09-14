@@ -81,6 +81,9 @@ jobs:
       - name: Type-check
         run: npm run check
 
+      - name: Test
+        run: npm test
+
       - name: Package .vsix
         run: npm run package
 

@@ -7,9 +7,10 @@ server cell's LSP surface (`internal/server/.usages/lifecycle.md`).
 
 ## Client bootstrap (src/extension.ts)
 
-`LanguageClient` over stdio: the server command comes from the
-client-side `aoe2lsp.serverPath` setting (bare name → PATH, absolute
-path works). The path never reaches the server.
+`LanguageClient` over stdio: the server command is whatever
+`resolveServer` produced (explicit `aoe2lsp.serverPath`, cached
+version, PATH hit or download — next section). The command never
+reaches the server.
 
 ```ts
 const serverOptions: ServerOptions = {
@@ -23,15 +24,85 @@ const clientOptions: LanguageClientOptions = {
 ```
 
 Rules:
-- `activate` starts the client; `deactivate` stops it. Activation is
-  implicit through the `languages` contribution — no manual
-  `activationEvents` needed on modern engines.
+- `activate` is async: it awaits server resolution (next section)
+  before constructing and starting the client; `deactivate` stops it.
+  Activation is implicit through the `languages` contribution — no
+  manual `activationEvents` needed on modern engines.
 - A missing binary is a setup problem: `errorHandler.closed →
   CloseAction.DoNotRestart` plus one `showErrorMessage` pointing at
-  the setting. Never crash-loop the extension host.
-- The server is external: the extension does NOT bundle or download
-  it (MVP scope). Users build `go build ./cmd/aoe2-lsp` or install a
-  release binary and point `aoe2lsp.serverPath` at it.
+  the setting/download mode. Never crash-loop the extension host.
+- The server is external: the extension does not bundle it — it
+  downloads it on demand (next section). `aoe2lsp.serverPath` is the
+  manual override for a self-built binary
+  (`go build ./cmd/aoe2-lsp`).
+
+## Server auto-download (src/install.ts)
+
+`activate` awaits `resolveServer(context, mode)` and starts the client
+with the resolved command. Priority order:
+
+1. an explicitly set `aoe2lsp.serverPath` (any settings layer; the
+   `aoe2-lsp` default does NOT count as explicit) — wins, zero network;
+2. the newest cached version under
+   `<globalStorage>/servers/<tag>/aoe2-lsp[.exe]` (tags compared
+   numerically per segment: `v0.10.0` > `v0.9.0`);
+3. an `aoe2-lsp` binary found by scanning `PATH`;
+4. with `aoe2lsp.download.mode: "auto"` (the default): download the
+   latest release of `TovarischSuhov/aoe-rms-lsp` from GitHub Releases.
+
+`aoe2lsp.download.mode: "off"` stops after step 3 — no network call
+ever leaves the extension.
+
+Download pipeline (`installFromRelease`): pick the platform asset
+(`aoe2-lsp-<goos>-<goarch>[.zip|.tar.gz]`; Node's `x64` arch maps to
+Go's `amd64` naming), stream it into
+`<storage>/servers/.tmp-<rand>/` (same filesystem as the final
+location), verify SHA256 against the release's `SHA256SUMS`
+(`<hex>␣␣<filename>` lines), extract with the system `tar -xf`
+(bsdtar ships with Windows 10 1803+ and reads `.zip` as well),
+`chmod 0o755` on unix, publish under `servers/<tag>/aoe2-lsp[.exe]`.
+Failures are classified as `InstallError.kind`: `rate-limit` |
+`network` | `unsupported-platform` | `checksum` | `archive` | `spawn`.
+
+Contracts and failure policy:
+
+- One network check per activation (`releases/latest`, ~10s
+  `AbortSignal` timeout): its answer decides cache-hit vs download.
+- The archive member name is an external contract of `release.yml`:
+  members are `aoe2-lsp-<goos>-<goarch>[.exe]` at the archive root
+  and get renamed to the suffix-free `aoe2-lsp[.exe]` on publish.
+  Change the release naming and this rename breaks.
+- Atomicity/races: work happens in `.tmp-*`, publish is a single
+  rename. An existing `<tag>` binary means another window won the
+  race — success, not an error; a `<tag>` dir without a binary is
+  stale and gets replaced. The winner's prune may also delete a
+  loser's in-flight `.tmp-*`: on a mid-install failure the loser
+  re-checks the published binary and adopts it instead of erroring.
+  A failed install leaves nothing behind (temp is cleaned in
+  `finally`).
+- Prune: after a successful resolve or install only the winning tag
+  stays — older tags and stale `.tmp-*` dirs are removed.
+- Rate limit (403/429 — 60 req/h unauthenticated): degrade silently to
+  the newest cache, no error message. Every other failure kind
+  degrades the same way (cache → PATH → bare command) with exactly one
+  `showErrorMessage` per activation. Activation never throws.
+- Progress: the download runs under `window.withProgress`
+  (ProgressLocation.Window, non-cancellable — cancelling a
+  half-written install buys nothing; cancellation is deliberately not
+  implemented). `install.ts` reports absolute fractions 0→1 (download
+  0→0.7, hash 0.7→0.8, extract 0.8→0.95), `extension.ts` converts
+  them to `withProgress` increments.
+- Proxy: downloads go through the extension host's patched `fetch`, so
+  `http.proxySupport` applies. Worst case a hostile proxy environment
+  breaks the GitHub API call — it degrades like any other `network`
+  failure (one message, PATH fallback). Escape hatches: point
+  `aoe2lsp.serverPath` at a manually installed binary, or set
+  `aoe2lsp.download.mode: "off"`.
+- The `vscode` import in `src/install.ts` is type-only on purpose: all
+  VS Code surface (settings, progress UI, messages, output channel) is
+  injected through the `wireEnv` seam, which is what lets the unit
+  tests (`test/install.test.ts`, node:test) run the module under plain
+  Node type stripping without an extension host. Keep it that way.
 
 ## Settings pass-through
 
@@ -110,9 +181,6 @@ semantic tokens, not by the grammar.
 - A copy of the root `LICENSE` lives in `editors/vscode/` and
   `license` points at it as `"SEE LICENSE IN LICENSE"` — vsce resolves
   the license inside the package root without warnings.
-- `capabilities`: `virtualWorkspaces: false` (the server is a native
-  binary, unusable in vscode.dev/github.dev); `untrustedWorkspaces` —
-  the server only parses files, it does not execute them.
 
 ## Build & package
 
@@ -122,14 +190,31 @@ semantic tokens, not by the grammar.
 - `npx vsce package --no-dependencies` — produces
   `aoe2-lsp-<version>.vsix`; `--no-dependencies` is correct because
   esbuild already inlined `vscode-languageclient` into the bundle.
-- CI builds the .vsix (artifact on every push/PR); the release workflow
-  attaches it to the GitHub Release next to the platform binaries —
-  it lands in `SHA256SUMS` like every other asset. Marketplace
-  publishing stays out of scope.
+- CI builds the .vsix and uploads it as a workflow artifact
+  (`aoe2-lsp-vsix`) on every push/PR. The Release workflow uploads
+  only `dist/*` — the four platform archives plus `SHA256SUMS`; the
+  `.vsix` is not a release asset and never lands in `SHA256SUMS`.
+  Marketplace publishing stays out of scope.
 
 ## Manual acceptance
 
-`code --install-extension aoe2-lsp-<version>.vsix`, set
-`aoe2lsp.serverPath` if the binary is not on PATH, open a `.rms`
-file: hover/completion/diagnostics flow through the language client
-(Output channel "aoe2-lsp" shows the session log).
+`code --install-extension aoe2-lsp-<version>.vsix`, open a `.rms`
+file, and check the scenario matrix (the Output channel "aoe2-lsp"
+logs the resolved command and its origin):
+
+- Clean machine — no `aoe2lsp.serverPath`, no binary on PATH, mode
+  `auto`: the download progress shows, the binary lands in
+  `<globalStorage>/servers/<tag>/aoe2-lsp`, hover/completion work.
+- Second activation with a warm cache: no download (one latest-check
+  per activation); a newer published release updates the cache and
+  prunes the old `<tag>` dir.
+- Explicit `aoe2lsp.serverPath`: that exact binary runs, network
+  stays idle.
+- `aoe2lsp.download.mode: "off"`: zero network — cache, then PATH,
+  then the bare `aoe2-lsp` command.
+- Broken network: exactly one error message, PATH/bare-command
+  fallback, activation completes.
+
+Windows specifics (bsdtar reading `.zip`, the `.exe` suffix, spawn
+failure messages without tar) are a PR checklist item — CI and the
+unit tests run Linux only.

@@ -182,8 +182,14 @@ code --install-extension aoe2-lsp-0.1.0.vsix
 ```
 
 A prebuilt `.vsix` is also attached to every CI run (artifact
-`aoe2-lsp-vsix`). The server binary itself must be installed separately and
-reachable via `aoe2lsp.serverPath` (default: `aoe2-lsp` on `PATH`).
+`aoe2-lsp-vsix`). The server binary is delivered automatically: on first
+activation the extension resolves an explicitly set `aoe2lsp.serverPath`
+first, then the newest cached version in its global storage, then `PATH`,
+and with `aoe2lsp.download.mode: "auto"` (default) downloads the latest
+GitHub Release — SHA256-verified against `SHA256SUMS`, extracted with the
+system `tar` — into a per-version cache. Set `aoe2lsp.download.mode:
+"off"` to disable all network access; `aoe2lsp.serverPath` remains the
+manual override for a self-built binary.
 
 ### Neovim (nvim-lspconfig)
 
