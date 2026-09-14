@@ -196,6 +196,24 @@ semantic tokens, not by the grammar.
   `.vsix` is not a release asset and never lands in `SHA256SUMS`.
   Marketplace publishing stays out of scope.
 
+### npm install hygiene
+
+- `package.json` carries a filled `allowScripts` (pinned `pkg@version`
+  entries for `esbuild`, `@vscode/vsce-sign`, `keytar`). npm 11 warns
+  about — and npm 12 blocks — install scripts not covered by the
+  policy: on a fresh environment without the field the postinstalls
+  are silently skipped. When bumping one of these packages, refresh
+  its pin (`npm approve-scripts <pkg>` rewrites it to the installed
+  version).
+- No lockfile is committed (the npm registry is unreachable from some
+  dev machines), so drift of the pinned transitive versions is caught
+  by the CI `vscode` job, not locally.
+- A timed-out `npm install` leaves a broken `node_modules` — the
+  telltale symptom is `Cannot find module 'es-errors/type'` from vsce
+  on the next run. Re-running `npm install` does not repair it;
+  the only recovery is a full removal and a clean install:
+  `rm -rf node_modules && npm install`.
+
 ## Manual acceptance
 
 `code --install-extension aoe2-lsp-<version>.vsix`, open a `.rms`

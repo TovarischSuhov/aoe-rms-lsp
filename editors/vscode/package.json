@@ -99,7 +99,7 @@
             "type": "string"
           },
           "default": [],
-          "markdownDescription": "Extra absolute directories searched (in order, after the including file's directory) when resolving `#include` / `#includeXS`. Point it at the game's `ai-rms` folder to resolve stock includes."
+          "markdownDescription": "Extra absolute directories searched (in order, after the including file's directory) when resolving `#include` / `#includeXS`. Useful game folders under the AoE2 DE install: `resources_common/random-map-scripts` (stock maps shipped as loose files) and `resources_common/xs` (`Constants.xs`, `Effects.xs`, `x256tech.xs`, `ailib/Geometry.xs` for `#includeXS`)."
         }
       }
     }
@@ -119,5 +119,10 @@
     "@vscode/vsce": "3.1.1",
     "esbuild": "0.24.2",
     "typescript": "5.6.3"
+  },
+  "allowScripts": {
+    "@vscode/vsce-sign@2.1.0": true,
+    "esbuild@0.24.2": true,
+    "keytar@7.9.0": true
   }
 }

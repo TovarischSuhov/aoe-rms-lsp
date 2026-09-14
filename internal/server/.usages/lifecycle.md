@@ -52,7 +52,10 @@ server requests it on `initialized` when the client supports
         "deprecated-effect-percent": "none"
       }
     },
-    "includeRoots": ["/abs/path/to/ai-rms"]
+    "includeRoots": [
+      "/abs/path/to/AoE2DE/resources_common/random-map-scripts",
+      "/abs/path/to/AoE2DE/resources_common/xs"
+    ]
   }
 }
 ```
@@ -65,8 +68,10 @@ server requests it on `initialized` when the client supports
   settings change.
 - `includeRoots` adds absolute directories searched after the
   including file's own directory (in order) when resolving
-  `#include` / `#includeXS` — point it at the game's `ai-rms` folder
-  to resolve stock includes. Each call replaces the whole set.
+  `#include` / `#includeXS` — useful game folders are
+  `<game>/resources_common/random-map-scripts` (stock maps) and
+  `<game>/resources_common/xs` (`Constants.xs`, `Effects.xs` for
+  `#includeXS`). Each call replaces the whole set.
 
 Defaults: no overrides, no extra roots.
 

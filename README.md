@@ -159,7 +159,11 @@ settings section:
     "diagnostics": {
       "severityOverrides": { "undefined-symbol": "hint" }  // code → error|warning|info|hint|none
     },
-    "includeRoots": ["/abs/path/to/ai-rms"]  // extra #include search dirs, e.g. the game folder
+    // extra #include search dirs, e.g. the game's resource folders:
+    "includeRoots": [
+      "/abs/path/to/AoE2DE/resources_common/random-map-scripts",
+      "/abs/path/to/AoE2DE/resources_common/xs"
+    ]
   }
 }
 ```
@@ -210,7 +214,10 @@ if not configs.aoe2 then
       end,
       settings = {
         aoe2lsp = {
-          includeRoots = { '/path/to/ai-rms' },
+          includeRoots = {
+            '/path/to/AoE2DE/resources_common/random-map-scripts',
+            '/path/to/AoE2DE/resources_common/xs',
+          },
         },
       },
     },
