@@ -108,7 +108,7 @@
     "compile": "node build.mjs",
     "package": "npm run compile && vsce package --no-dependencies",
     "check": "tsc --noEmit",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.ts"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"
