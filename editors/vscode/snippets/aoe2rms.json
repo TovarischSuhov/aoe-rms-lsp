@@ -1,0 +1,242 @@
+{
+	"New map skeleton": {
+		"prefix": "rms",
+		"body": [
+			"/* ${1:Map name} */",
+			"<PLAYER_SETUP>",
+			"random_placement",
+			"",
+			"<LAND_GENERATION>",
+			"base_terrain ${2:GRASS}",
+			"create_player_lands {",
+			"\tterrain_type ${3:GRASS}",
+			"\tland_percent ${4:60}",
+			"\tbase_size 5",
+			"}",
+			"",
+			"<TERRAIN_GENERATION>",
+			"create_terrain ${5:FOREST}",
+			"{",
+			"\tland_percent ${6:12}",
+			"\tnumber_of_clumps ${7:18}",
+			"\tset_scale_by_size",
+			"\tspacing_to_other_terrain_types 2",
+			"}",
+			"",
+			"<OBJECTS_GENERATION>",
+			"create_object TOWN_CENTER",
+			"{",
+			"\tnumber_of_objects 1",
+			"\tset_place_for_every_player",
+			"\tmax_distance_to_players 0",
+			"}",
+			"",
+			"create_object VILLAGER",
+			"{",
+			"\tset_place_for_every_player",
+			"\tmin_distance_to_players 6",
+			"}",
+			"",
+			"create_object SCOUT",
+			"{",
+			"\tnumber_of_objects 1",
+			"\tset_place_for_every_player",
+			"}",
+			"",
+			"create_object FORAGE",
+			"{",
+			"\tnumber_of_objects 6",
+			"\tgroup_placement_radius 2",
+			"\tset_tight_grouping",
+			"\tset_place_for_every_player",
+			"\tmin_distance_to_players 10",
+			"}",
+			"",
+			"create_object GOLD",
+			"{",
+			"\tnumber_of_objects 7",
+			"\tgroup_placement_radius 2",
+			"\tset_tight_grouping",
+			"\tset_place_for_every_player",
+			"\tmin_distance_to_players 10",
+			"}",
+			"",
+			"create_object GOLD",
+			"{",
+			"\tnumber_of_objects 4",
+			"\tgroup_placement_radius 2",
+			"\tset_tight_grouping",
+			"\tset_place_for_every_player",
+			"\tmin_distance_to_players 18",
+			"}",
+			"",
+			"create_object STONE",
+			"{",
+			"\tnumber_of_objects 5",
+			"\tgroup_placement_radius 2",
+			"\tset_tight_grouping",
+			"\tset_place_for_every_player",
+			"\tmin_distance_to_players 12",
+			"}",
+			"",
+			"create_object STONE",
+			"{",
+			"\tnumber_of_objects 4",
+			"\tgroup_placement_radius 2",
+			"\tset_tight_grouping",
+			"\tset_place_for_every_player",
+			"\tmin_distance_to_players 16",
+			"}",
+			"",
+			"create_object SHEEP",
+			"{",
+			"\tnumber_of_objects 4",
+			"\tgroup_placement_radius 1",
+			"\tset_tight_grouping",
+			"\tset_place_for_every_player",
+			"\tmin_distance_to_players 7",
+			"}",
+			"",
+			"create_object BOAR",
+			"{",
+			"\tnumber_of_objects 2",
+			"\tmin_distance_to_players 16",
+			"}",
+			"",
+			"create_object DEER",
+			"{",
+			"\tnumber_of_objects 4",
+			"\tgroup_placement_radius 3",
+			"\tset_tight_grouping",
+			"\tmin_distance_to_players 14",
+			"}",
+			"",
+			"create_object WOLF",
+			"{",
+			"\tnumber_of_objects 1",
+			"\tmin_distance_to_players 34",
+			"}",
+			"",
+			"create_object RELIC",
+			"{",
+			"\tnumber_of_objects 5",
+			"\tmin_distance_group_placement 20",
+			"}",
+			"$0"
+		],
+		"description": "New map skeleton: player setup, lands, terrain and the standard DE starting objects (Zetnus guide)"
+	},
+	"Section header": {
+		"prefix": "section",
+		"body": [
+			"<${1|PLAYER_SETUP,LAND_GENERATION,ELEVATION_GENERATION,CLIFF_GENERATION,TERRAIN_GENERATION,CONNECTION_GENERATION,OBJECTS_GENERATION|}>$0"
+		],
+		"description": "RMS section header"
+	},
+	"create_player_lands": {
+		"prefix": "player_lands",
+		"body": [
+			"create_player_lands {",
+			"\tterrain_type ${1:GRASS}",
+			"\tland_percent ${2:60}",
+			"\tbase_size ${3:5}",
+			"}$0"
+		],
+		"description": "Player lands block"
+	},
+	"create_land": {
+		"prefix": "land",
+		"body": [
+			"create_land {",
+			"\tterrain_type ${1:GRASS}",
+			"\tland_percent ${2:10}",
+			"\tleft_border ${3:10}",
+			"\tright_border ${4:10}",
+			"\ttop_border ${5:10}",
+			"\tbottom_border ${6:10}",
+			"\tborder_fuzziness ${7:10}",
+			"\tclumping_factor ${8:70}",
+			"}$0"
+		],
+		"description": "Neutral land block"
+	},
+	"create_terrain": {
+		"prefix": "terrain",
+		"body": [
+			"create_terrain ${1:FOREST}",
+			"{",
+			"\tland_percent ${2:12}",
+			"\tnumber_of_clumps ${3:18}",
+			"\tset_scale_by_size",
+			"\tspacing_to_other_terrain_types ${4:2}",
+			"}$0"
+		],
+		"description": "Terrain patch block"
+	},
+	"create_object": {
+		"prefix": "object",
+		"body": [
+			"create_object ${1:GOLD}",
+			"{",
+			"\tnumber_of_objects ${2:7}",
+			"\tnumber_of_groups ${3:1}",
+			"\tgroup_placement_radius 2",
+			"\tset_tight_grouping",
+			"\tset_place_for_every_player",
+			"\tmin_distance_to_players ${4:10}",
+			"}$0"
+		],
+		"description": "Object placement block"
+	},
+	"create_elevation": {
+		"prefix": "elevation",
+		"body": [
+			"create_elevation ${1:7}",
+			"{",
+			"\tbase_terrain ${2:GRASS}",
+			"\tnumber_of_clumps ${3:14}",
+			"\tnumber_of_tiles ${4:2500}",
+			"\tset_scale_by_size",
+			"}$0"
+		],
+		"description": "Elevation block"
+	},
+	"Land connection": {
+		"prefix": "connection",
+		"body": [
+			"create_connect_all_players_land",
+			"{",
+			"\treplace_terrain ${1:WATER} ${2:SHALLOW}",
+			"\tterrain_cost ${3:WATER} ${4:1}",
+			"\tterrain_size ${5:WATER} ${6:2} ${7:1}",
+			"}$0"
+		],
+		"description": "Connect players' lands over terrain"
+	},
+	"start_random block": {
+		"prefix": "start_random",
+		"body": [
+			"start_random",
+			"\tpercent_chance ${1:50}",
+			"\t\t${2:create_object SHEEP}",
+			"\tpercent_chance ${3:50}",
+			"\t\t${4:create_object DEER}",
+			"end_random$0"
+		],
+		"description": "Random choice between branches (percentages sum to 100)"
+	},
+	"base_terrain": {
+		"prefix": "base_terrain",
+		"body": [
+			"base_terrain ${1:GRASS}$0"
+		],
+		"description": "Map base terrain"
+	},
+	"#const": {
+		"prefix": "const",
+		"body": [
+			"#const ${1:ROCKS} ${2:40}$0"
+		],
+		"description": "Named constant in the header (keep all #const together)"
+	}
+}
