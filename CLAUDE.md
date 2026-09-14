@@ -58,16 +58,19 @@ Race-прогон — в CI (`go test -race ./...`).
 
 ## Structure
 
-- `cmd/` — тонкие entrypoints (`aoe2-lsp`, `kbgen`)
+- `cmd/` — тонкие entrypoints (`aoe2-lsp`, `kbgen`, `corpus`, `tmgen`)
 - ячейки-пакеты под `internal/`: `common`, `kb`, `rms`, `xs`, `analysis`,
-  `hints`, `complete`, `include`, `server` — контракт каждой в её
-  `CODEMANIFEST`, потребительские практики в `<cell>/.usages/`
-  (по шаблону new-go-project: `internal/` — вся логика; ячейка =
-  `internal/<pkg>`)
+  `hints`, `complete`, `include`, `server`, `corpus`, `highlight` —
+  контракт каждой в её `CODEMANIFEST`, потребительские практики в
+  `<cell>/.usages/` (по шаблону new-go-project: `internal/` — вся
+  логика; ячейка = `internal/<pkg>`)
 - `scripts/` — релизный скрипт (`release.sh`: версия + CHANGELOG.md + тег)
 - `openapi/` — спецификации; HTTP-код — openapi → oapi-codegen
   (заводится, когда появится HTTP-поверхность; сейчас её нет)
 - `docs/` — планы, дизайн, задачи, ревью, справочники
+- `editors/` — расширение VS Code (extension.ts, TextMate-грамматики
+  RMS/XS, языковые конфигурации; RMS-грамматика регенерируется
+  `cmd/tmgen`)
 - `<cell>/testdata/` — фикстуры ячеек (сейчас `internal/rms/testdata`,
   `internal/xs/testdata`; корневого `testdata/` нет)
 

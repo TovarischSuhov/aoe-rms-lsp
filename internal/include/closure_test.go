@@ -12,6 +12,8 @@ import (
 // TestClosure_TypesConstruct checks the contract shape: every closure data
 // type constructs with its declared fields.
 func TestClosure_TypesConstruct(t *testing.T) {
+	t.Parallel()
+
 	c := Closure{Root: "file:///main.rms"}
 	assert.Equal(t, "file:///main.rms", c.Root)
 
@@ -33,6 +35,8 @@ func TestClosure_TypesConstruct(t *testing.T) {
 
 // TestClosure_ExternalDecls checks declaration collection with exclusion.
 func TestClosure_ExternalDecls(t *testing.T) {
+	t.Parallel()
+
 	decl := func(name string) xs.Decl { return xs.Decl{Kind: xs.DeclFunction, Name: name} }
 
 	c := Closure{

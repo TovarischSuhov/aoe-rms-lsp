@@ -239,10 +239,6 @@ func (f XsFile) References(name string) []common.Range {
 	return out
 }
 
-// Symbols returns the flat outline of the top-level declarations (LSP
-// documentSymbol) in source order; include declarations are skipped —
-// the kind vocabulary has no entry for them, and their names are string
-// paths, not identifiers.
 // EnclosingRanges returns the chain of AST nodes containing pos,
 // innermost first (LSP textDocument/selectionRange): an expression
 // subtree, its statement, blocks nesting outward, the declaration.
@@ -333,6 +329,13 @@ func dedupChain(chain []common.Range) []common.Range {
 	return out
 }
 
+// Symbols returns the flat outline of the file's top-level
+// declarations (LSP textDocument/documentSymbol); Selection is the
+// name-token range (declNameRange), with the whole span as the
+// fallback for recovered declarations. XS include directives
+// (`include "file.xs";`, DeclInclude) are skipped: the kind
+// vocabulary has no entry for them, and their names are string
+// paths, not identifiers.
 func (f XsFile) Symbols() []common.Symbol {
 	out := make([]common.Symbol, 0, len(f.Decls))
 
