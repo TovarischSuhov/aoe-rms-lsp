@@ -27,7 +27,8 @@ Preconditions:
 Initialize advertises: diagnostics (Full sync + OpenClose), hover,
 completion, navigation — definition, references, documentSymbol,
 documentHighlight, workspace symbol search, document links, selection
-ranges — semantic tokens (full document), folding ranges, quick fixes
+ranges, rename (prepareProvider) — semantic tokens (full document),
+folding ranges, quick fixes
 (did-you-mean renames, effect_percent replacement, missing-include
 file creation), and signature help (TriggerCharacters "(" and ",").
 Editor configs need no extra flags; positionEncoding is negotiated
@@ -146,6 +147,25 @@ Preconditions:
 - The response has exactly one entry per position, in request order.
 - Selection expansion is AST containment only — no word or quote
   heuristics; the editor's own word-level select comes first.
+
+## Rename
+
+prepareRename + rename rename a symbol across the include closure. The
+placeholder pre-fills with the current name of the site under the
+cursor; the edit rewrites every site of the binding — declaration and
+uses — including files that are not open in the editor (the client
+applies the edits on demand). XS params and locals stay file-local;
+same-name top-level bindings merge by name across the closure, while
+occurrences shadowed by a param/local of the same name in another file
+are never touched.
+
+Preconditions:
+- Not-renameable positions (builtins, keywords, commands, attributes,
+  sections, strings, comments) answer prepareRename with null — the
+  editor refuses to open the rename box.
+- An invalid new name (not a plain identifier) is a request error, not
+  an empty edit; collisions with the language dictionary (keyword or
+  builtin namesakes) are not checked.
 
 ## In-file highlights
 

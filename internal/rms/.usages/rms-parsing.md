@@ -87,6 +87,21 @@ Preconditions:
   parser over XsBlock.Code and shift the returned ranges by the block's
   Range.Start, as the server already does for semantic tokens.
 
+RenameSites is positional: the per-file declaration index must contain
+the name (ok=false on uses of a constant declared elsewhere). For
+cross-file stitching over the include closure use the by-name form —
+ident-position occurrences of the name regardless of a local
+declaration:
+
+```go
+// one TextEdit per range; the local #const/#define declaration range
+// is included when this file declares the name itself
+for _, r := range file.RenameRefs(name) { ... }
+```
+
+Precondition: with the name declared in this file, RenameRefs(name)
+returns the same ranges as RenameSites on any site of that name here.
+
 ## Argument lookup (signature help)
 
 ArgAt answers "which command owns the cursor, and which argument or

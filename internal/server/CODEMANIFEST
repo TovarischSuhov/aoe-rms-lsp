@@ -122,6 +122,11 @@ Annotations: |
   Imports rms/xs; inline-XS — цепочка XS в координатах блока + сам блок +
   RMS-цепочка), пустая цепочка — диапазон строки позиции; длина ответа
   равна числу позиций.
+  Rename/PrepareRename следует секции Rename `lsp-protocol`: prepareProvider
+  заявлен; непереименовываемая позиция — nil, nil (молчание); Rename —
+  plain WorkspaceEdit{Changes} по rename-сайтам замыкания (склейка —
+  RenameSites `Resolver` по `closure`), включая неоткрытые файлы;
+  невалидный NewName — ResponseError.
 
 ---
 
@@ -148,6 +153,7 @@ Annotations: |
       Boolean(true); DocumentLinkProvider — DocumentLinkOptions{}
       (в go.lsp.dev поле типизировано опциями, не Boolean);
       SelectionRangeProvider — Boolean(true);
+      RenameProvider — RenameOptions с PrepareProvider;
       SemanticTokensProvider — SemanticTokensOptions{
       Legend: TokenTypes=[known, unknown, deprecated, section, kind],
       TokenModifiers=[]};
@@ -481,6 +487,56 @@ Annotations: |
       Constraints:
       - эвристики «умного выделения» (слова, кавычки) не строятся —
         только AST-узлы и строка позиции
+    "PrepareRename(ctx: Context, params: PrepareRenameParams) -> result: PrepareRenameResult, err: error": |
+      Диапазон и placeholder переименования для позиции (stateless,
+      read-only); имя метода — по интерфейсу go.lsp.dev (PrepareRename).
+
+      `params`: документ и позиция; `result`: arm PrepareRenamePlaceholder
+      или nil; `err`: только протокольные сбои
+
+      Algorithm:
+      1. RenameSites у `Resolver` по `closure` для (uri, pos);
+         found=false → nil, nil (молчание — конвенция Hover; клиент не
+         открывает rename-box)
+      2. Сайт под pos: Target с URI запрошенного документа и Range,
+         содержащим pos; имя — текст сайта из editor-state (DocStore)
+      3. → PrepareRenamePlaceholder{Range, Placeholder: имя} с
+         конвертацией positionEncoding
+
+      Requirements:
+      - stateless/read-only: состояние сервера не меняется
+      - placeholder непуст (имя сайта)
+      - детерминированность
+
+      Constraints:
+      - arm PrepareRenameDefaultBehavior не используется
+    "Rename(ctx: Context, params: RenameParams) -> edit: WorkspaceEdit, err: error": |
+      Мультифайловое переименование по замыканию (stateless, read-only);
+      имя метода — по интерфейсу go.lsp.dev (Rename).
+
+      `params`: документ, позиция и NewName; `edit`: правки по всем
+      сайтам биндинга; `err`: ResponseError при невалидном NewName или
+      непереименовываемой позиции
+
+      Algorithm:
+      1. Валидация NewName: непустой, [A-Za-z_][A-Za-z0-9_]* — иначе
+         ResponseError с сообщением (требование спецификации)
+      2. RenameSites у `Resolver` по `closure`; found=false →
+         ResponseError «позиция не переименовываема» (при заявленном
+         prepareProvider нормальный клиент сюда не попадает)
+      3. Каждый Target → TextEdit{Range (positionEncoding), NewText};
+         группировка Changes[URI] — включая неоткрытые файлы
+      4. → WorkspaceEdit{Changes} (plain-правки, прецедент CodeAction)
+
+      Requirements:
+      - stateless/read-only: сервер правки не применяет
+      - все сайты замыкания входят в edit
+      - детерминированность
+
+      Constraints:
+      - без DocumentChanges/resource-операций и ChangeAnnotations
+      - словарные конфликты NewName (keyword/builtin-тёзка) не
+        проверяются — лексическая валидация только
     "Shutdown(ctx: Context) -> err: error": |
       Вернуть nil (default Unimplemented возвращает not-implemented).
     "Exit(ctx: Context) -> err: error": |

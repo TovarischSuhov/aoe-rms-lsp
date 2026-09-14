@@ -290,6 +290,51 @@ link with Parent; equal adjacent ranges collapse (an empty parent step
 is noise). Give every position at least one range (a whole-line
 fallback is typical) — the response length must match the positions.
 
+### Rename and Prepare Rename
+
+`textDocument/prepareRename` + `textDocument/rename` rename a symbol
+across the include closure. Advertise
+`RenameProvider: &protocol.RenameOptions{PrepareProvider: &[]bool{true}[0]}}`
+in Initialize; the server-interface methods are `PrepareRename` and
+`Rename`, both named after their requests (match the interface or
+UnimplementedServer answers for you).
+
+```go
+func (s *Server) PrepareRename(ctx context.Context, params *protocol.PrepareRenameParams) (protocol.PrepareRenameResult, error) {
+	site, ok := s.renameSiteAt(params.TextDocument.URI, params.Position)
+	if !ok {
+		return nil, nil // not renameable here — the client refuses to open the rename box
+	}
+
+	return &protocol.PrepareRenamePlaceholder{Range: site.Range, Placeholder: site.Name}, nil
+}
+
+func (s *Server) Rename(ctx context.Context, params *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
+	edits := s.renameEdits(params.TextDocument.URI, params.Position, params.NewName)
+
+	return &protocol.WorkspaceEdit{Changes: edits}, nil
+}
+```
+
+Rules:
+- **`PrepareRenameResult` is a sealed interface** — return the arm
+  `&protocol.PrepareRenamePlaceholder{Range, Placeholder}` (3.18; the
+  placeholder pre-fills the rename box with the current name). A
+  `nil, nil` answer means "not renameable here" (builtin, keyword,
+  string, comment) — never a guessed range; the same silence convention
+  as `Hover`.
+- **`Rename` returns `*WorkspaceEdit` with `Changes:
+  map[uri.URI][]protocol.TextEdit`** — plain edits (precedent: Code
+  Actions); keys may target files that are NOT open documents
+  (Cross-file Navigation Results) — the client applies the edits on
+  demand.
+- **An invalid `params.NewName`** (per the language's identifier rules)
+  must return a `ResponseError` with an appropriate message — the spec
+  requires an error, not an empty edit.
+- A rename position that is not renameable (the client skipped
+  prepare) answers with a `ResponseError` as well — an empty edit would
+  read as success.
+
 ### Workspace Symbols
 
 `workspace/symbol` lists symbols matching a query across the server's
