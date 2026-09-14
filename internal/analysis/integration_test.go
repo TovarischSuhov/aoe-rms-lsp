@@ -17,6 +17,8 @@ import (
 // the 5k-line prelude.xs fixture (882 externs) must yield zero analyzer
 // diagnostics — in particular no bad-type from the type inference.
 func TestAnalyzeXs_PreludeNoFalsePositives(t *testing.T) {
+	t.Parallel()
+
 	raw, err := os.ReadFile("../../docs/ref/ugc-guide/xs/prelude.xs")
 	require.NoError(t, err)
 
@@ -34,6 +36,8 @@ func TestAnalyzeXs_PreludeNoFalsePositives(t *testing.T) {
 // analyzer baseline: the value checks add no diagnostics to real-world
 // scripts (no bad-argument-value anywhere).
 func TestAnalyzeRms_FixturesRegression(t *testing.T) {
+	t.Parallel()
+
 	// baseline observed before the value checks landed
 	want := map[string][]string{
 		"broken.rms":       {CodeUnknownCommand},
@@ -73,6 +77,8 @@ func TestAnalyzeRms_FixturesRegression(t *testing.T) {
 // every inline XS block, shifted to document coordinates — one batch,
 // sorted before publishing.
 func TestPipeline_MergedDiagnostics(t *testing.T) {
+	t.Parallel()
+
 	src := `<LAND_GENERATION>
 create_land_bogus
 create_land
