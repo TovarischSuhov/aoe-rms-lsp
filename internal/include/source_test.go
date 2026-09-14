@@ -34,6 +34,8 @@ var _ Source = fakeSource{}
 // TestSource_FakeSatisfiesInterface checks the contract shape through the
 // fake used by the resolver tests.
 func TestSource_FakeSatisfiesInterface(t *testing.T) {
+	t.Parallel()
+
 	src := fakeSource{"file:///a": "text-a", "file:///b": "text-b"}
 
 	text, found := src.Text("file:///a")
