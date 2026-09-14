@@ -341,6 +341,117 @@ func TestAnalyze_MissingIncludeDiagnostic(t *testing.T) {
 	require.Equal(t, uint32(0), diags[0].Range.Start.Line)
 }
 
+// TestAnalyze_DuplicateIncludeDiagnostic checks that a repeated include
+// of one target warns on the repeated directives only: the earliest
+// directive of each target stays clean whatever the directive kind,
+// path spellings resolving to one file count as repeats, and repeats
+// owned by dependency files stay out of the root document's batch.
+func TestAnalyze_DuplicateIncludeDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	write := func(name string, text string) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(dir+"/"+name, []byte(text), 0o644))
+	}
+
+	write("lands.rms", "<PLAYER_SETUP>\n")
+	write("lib.xs", "void f() {}\n")
+	write("a.rms", "#include \"lands.rms\"\n")
+	write("b.rms", "#include \"lands.rms\"\n")
+
+	cases := []struct {
+		name string
+		doc  string
+		want []string
+	}{
+		{
+			name: "double include",
+			doc:  "#include \"lands.rms\"\n#include \"lands.rms\"\n",
+			want: []string{"2 duplicate-include@1: duplicate include: lands.rms is already included"},
+		},
+		{
+			name: "repeated includeXS",
+			doc:  "#includeXS lib.xs\n#includeXS lib.xs\n",
+			want: []string{"2 duplicate-include@1: duplicate include: lib.xs is already included"},
+		},
+		{
+			name: "mixed kinds one target",
+			doc:  "#includeXS lib.xs\n#include \"lib.xs\"\n",
+			want: []string{"2 duplicate-include@1: duplicate include: lib.xs is already included"},
+		},
+		{
+			name: "spelling variants of one target",
+			doc:  "#include \"lands.rms\"\n#include \"./lands.rms\"\n",
+			want: []string{"2 duplicate-include@1: duplicate include: ./lands.rms is already included"},
+		},
+		{
+			name: "different targets once each",
+			doc:  "#include \"lands.rms\"\n#includeXS lib.xs\n",
+			want: []string{},
+		},
+		{
+			name: "transitive repeat in dependencies",
+			doc:  "#include \"a.rms\"\n#include \"b.rms\"\n",
+			want: []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mainURI := uri.File(dir + "/" + strings.ReplaceAll(tc.name, " ", "_") + ".rms").String()
+
+			s.docs.Put(mainURI, tc.doc, 1)
+			closure := s.resolver.Closure(context.Background(), mainURI)
+			diags := s.analyze(mainURI, tc.doc, closure)
+
+			got := make([]string, 0, len(diags))
+			for _, d := range diags {
+				if fmt.Sprint(d.Code) != "duplicate-include" {
+					continue
+				}
+
+				got = append(got, fmt.Sprintf("%d %s@%d: %s",
+					d.Severity, d.Code, d.Range.Start.Line, d.Message))
+			}
+
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// TestAnalyze_DuplicateIncludeSuppressedByOverride checks that the
+// severity override mechanism treats duplicate-include like any other
+// code: "none" drops it from the batch.
+func TestAnalyze_DuplicateIncludeSuppressedByOverride(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(dir+"/lands.rms", []byte("<PLAYER_SETUP>\n"), 0o644))
+
+	require.NoError(t, s.DidChangeConfiguration(context.Background(), &protocol.DidChangeConfigurationParams{
+		Settings: mustJSON(t, `{"diagnostics":{"severityOverrides":{"duplicate-include":"none"}}}`),
+	}))
+
+	mainURI := uri.File(dir + "/main.rms").String()
+	doc := "#include \"lands.rms\"\n#include \"lands.rms\"\n"
+
+	s.docs.Put(mainURI, doc, 1)
+	closure := s.resolver.Closure(context.Background(), mainURI)
+	diags := s.analyze(mainURI, doc, closure)
+
+	codes := make([]string, 0, len(diags))
+	for _, d := range diags {
+		codes = append(codes, fmt.Sprint(d.Code))
+	}
+
+	require.NotContains(t, codes, "duplicate-include")
+}
+
 // TestAnalyze_InlineSeesClosureDeclarations checks that an inline XS call
 // resolves through the closure: no undefined-symbol for sharedFn.
 func TestAnalyze_InlineSeesClosureDeclarations(t *testing.T) {
