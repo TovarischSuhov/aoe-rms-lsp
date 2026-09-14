@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -318,6 +319,7 @@ func (s *Server) Initialize(
 		WorkspaceSymbolProvider:   protocol.Boolean(true),
 		DocumentLinkProvider:      &protocol.DocumentLinkOptions{},
 		SelectionRangeProvider:    protocol.Boolean(true),
+		RenameProvider:            &protocol.RenameOptions{PrepareProvider: &[]bool{true}[0]},
 		SemanticTokensProvider: &protocol.SemanticTokensOptions{
 			Legend: protocol.SemanticTokensLegend{
 				TokenTypes:     semanticTokenTypes,
@@ -867,6 +869,118 @@ func (s *Server) excludeLocalDeclaration(
 	}
 
 	return out
+}
+
+// validNewName is the lexical gate of the rename request: identifiers
+// only. Dictionary conflicts (a keyword or a builtin twin) are
+// deliberately not checked — that is a semantic question the edit
+// itself does not answer.
+var validNewName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// PrepareRename answers textDocument/prepareRename: the range and
+// placeholder of the renameable site under the cursor. Silence — nil,
+// nil — for unopened documents and positions that are not renameable
+// (the Hover convention): the client then never opens its rename box,
+// and the server never guesses a range.
+func (s *Server) PrepareRename(
+	ctx context.Context,
+	params *protocol.PrepareRenameParams,
+) (protocol.PrepareRenameResult, error) {
+	text, name, ok := s.openDocument(params.TextDocument.URI)
+	if !ok {
+		return nil, nil
+	}
+
+	docURI := string(params.TextDocument.URI)
+	pos := s.fromProtocolPos(text, params.Position)
+
+	// found=false arrives as an empty sites slice: both gates converge
+	// on the same silence below.
+	sites, _ := s.resolver.RenameSites(ctx, docURI, pos)
+
+	var placeholder *protocol.PrepareRenamePlaceholder
+
+	// The placeholder anchors on the queried document's own site under
+	// pos — the exact span the client preselects in its rename box.
+	for _, t := range sites {
+		if t.URI != docURI || !t.Range.Contains(pos) {
+			continue
+		}
+
+		placeholder = &protocol.PrepareRenamePlaceholder{
+			Range:       s.toProtocolRange(text, t.Range),
+			Placeholder: siteText(text, name, t.Range),
+		}
+
+		break
+	}
+
+	if placeholder == nil {
+		slog.DebugContext(ctx, "prepare_rename", "uri", params.TextDocument.URI,
+			"line", params.Position.Line, "col", params.Position.Character, "hit", false)
+
+		return nil, nil
+	}
+
+	slog.DebugContext(ctx, "prepare_rename", "uri", params.TextDocument.URI,
+		"line", params.Position.Line, "col", params.Position.Character,
+		"placeholder", placeholder.Placeholder)
+
+	return placeholder, nil
+}
+
+// Rename answers textDocument/rename with a plain multi-file
+// WorkspaceEdit: one TextEdit per rename site of the closure, grouped
+// by document — including files that are not open (the client reads
+// them to apply the edit). An invalid NewName and a non-renameable
+// position are request errors, not empty edits — the specification
+// requires the error so the client can surface it in the rename box.
+func (s *Server) Rename(
+	ctx context.Context,
+	params *protocol.RenameParams,
+) (*protocol.WorkspaceEdit, error) {
+	if !validNewName.MatchString(params.NewName) {
+		return nil, fmt.Errorf("invalid new name %q: must match [A-Za-z_][A-Za-z0-9_]*", params.NewName)
+	}
+
+	docURI := string(params.TextDocument.URI)
+	text, _, _ := s.openDocument(params.TextDocument.URI)
+	pos := s.fromProtocolPos(text, params.Position)
+
+	sites, found := s.resolver.RenameSites(ctx, docURI, pos)
+	if !found {
+		return nil, fmt.Errorf("position %d:%d is not renameable",
+			params.Position.Line, params.Position.Character)
+	}
+
+	changes := make(map[uri.URI][]protocol.TextEdit, 1)
+
+	for _, t := range sites {
+		edits := changes[uri.URI(t.URI)]
+		changes[uri.URI(t.URI)] = append(edits, protocol.TextEdit{
+			Range:   s.targetRange(t.URI, t.Range),
+			NewText: params.NewName,
+		})
+	}
+
+	slog.DebugContext(ctx, "rename", "uri", params.TextDocument.URI,
+		"line", params.Position.Line, "col", params.Position.Character,
+		"new_name", params.NewName, "edits", len(sites))
+
+	return &protocol.WorkspaceEdit{Changes: changes}, nil
+}
+
+// siteText extracts the name text of a rename site from the document
+// text: the RMS parser (and its inline blocks) counts offsets after CRLF
+// normalization, XS files on the raw bytes — the site is sliced against
+// the text its offsets were counted on, never against the raw editor
+// state alone.
+func siteText(text string, name string, rr common.Range) string {
+	if strings.HasSuffix(name, ".rms") {
+		text = strings.ReplaceAll(text, "\r\n", "\n")
+	}
+
+	return text[rr.Start.Offset:rr.End.Offset]
 }
 
 // DocumentHighlight answers textDocument/documentHighlight: every
