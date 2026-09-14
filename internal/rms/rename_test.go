@@ -147,3 +147,86 @@ func TestRenameSites_RegressionReferencesUntouched(t *testing.T) {
 	ranges := file.ReferencesAt(posAtN(renameSrc, "players", 1))
 	assert.Len(t, ranges, 3) // declaration + value use + command word
 }
+
+// TestRenameRefs_EquivalentToRenameSites pins the equivalence contract:
+// for a name this file declares, RenameRefs(name) answers exactly what
+// RenameSites answers from any site of that name — the cross-file merge
+// may substitute the by-name call for the positional one.
+func TestRenameRefs_EquivalentToRenameSites(t *testing.T) {
+	t.Parallel()
+
+	file, _ := Parse(renameSrc, "rename.rms")
+
+	tests := []struct {
+		name string
+		nth  int
+	}{
+		{"FOO", 1},
+		{"BAR", 0},
+		{"players", 1},
+	}
+
+	for _, tt := range tests {
+		fromSites, found := file.RenameSites(posAtN(renameSrc, tt.name, tt.nth))
+		require.True(t, found, "name=%s", tt.name)
+		assert.Equal(t, fromSites, file.RenameRefs(tt.name), "name=%s", tt.name)
+	}
+}
+
+// TestRenameRefs_Table pins the by-name answer: declaration plus every
+// value-position occurrence for declared names; the command position of
+// a name twin is not a site; names absent from the file — unknown
+// identifiers and the command vocabulary — answer empty.
+func TestRenameRefs_Table(t *testing.T) {
+	t.Parallel()
+
+	file, _ := Parse(renameSrc, "rename.rms")
+
+	tests := []struct {
+		name string
+		want []common.Range
+	}{
+		{"FOO", []common.Range{
+			rangeAtN(renameSrc, "FOO", 0),
+			rangeAtN(renameSrc, "FOO", 1),
+			rangeAtN(renameSrc, "FOO", 2),
+		}},
+		{"BAR", []common.Range{
+			rangeAtN(renameSrc, "BAR", 0),
+			rangeAtN(renameSrc, "BAR", 1),
+		}},
+		{"players", []common.Range{ // the command position (occurrence 2) never enters
+			rangeAtN(renameSrc, "players", 0),
+			rangeAtN(renameSrc, "players", 1),
+		}},
+		{"NOPE", nil},
+		{"create_land", nil},
+	}
+
+	for _, tt := range tests {
+		if tt.want == nil {
+			assert.Empty(t, file.RenameRefs(tt.name), "name=%s", tt.name)
+
+			continue
+		}
+
+		assert.Equal(t, tt.want, file.RenameRefs(tt.name), "name=%s", tt.name)
+	}
+}
+
+// TestRenameRefs_UndeclaredValueUse pins the merge half of the by-name
+// contract: value occurrences of a name this file does NOT declare are
+// still returned (RenameSites answers found=false there) — a foreign
+// file of the closure has no declaration to anchor on, so the merge
+// keys on the name alone.
+func TestRenameRefs_UndeclaredValueUse(t *testing.T) {
+	t.Parallel()
+
+	src := "<LAND_GENERATION>\ncreate_land\nland_percent UNDECL\nbase_terrain UNDECL\n</LAND_GENERATION>\n"
+	file, _ := Parse(src, "undecl.rms")
+
+	assert.Equal(t, []common.Range{
+		rangeAtN(src, "UNDECL", 0),
+		rangeAtN(src, "UNDECL", 1),
+	}, file.RenameRefs("UNDECL"))
+}

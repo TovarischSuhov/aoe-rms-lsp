@@ -56,6 +56,31 @@ Preconditions:
 - Target.URI spells the path as resolved for the current query; the
   canonical path is only the cache key.
 
+## Rename sites (rename, prepareRename)
+
+```go
+sites, ok := resolver.RenameSites(ctx, uri, pos)
+if !ok {
+    // prepareRename answers nil, nil — the client refuses to open the
+    // rename box (builtin, keyword, command/attribute/section, string)
+}
+// one protocol.TextEdit per Target — group into WorkspaceEdit.Changes[URI];
+// the site under pos is the PrepareRenamePlaceholder range, its text the
+// placeholder
+```
+
+Preconditions:
+- Scoped bindings (XS param/local) are file-local: their sites never leave
+  the declaring file. Top-level bindings merge by name across the closure
+  roots (same roots as References): a same-name top-level declaration in
+  another file joins the merge, occurrences shadowed by a param/local of
+  the same name in that file are excluded.
+- Changes keys may target files that are not open documents — the client
+  applies edits on demand; Target.URI spells the path as resolved for
+  this query.
+- Sites are deduplicated by (URI, Range) and sorted (URI, position) — the
+  edit order is stable across identical requests.
+
 ## External declarations for analysis
 
 ```go

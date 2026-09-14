@@ -17,6 +17,7 @@ Imports:
       - XsParse
       - XsFile
       - Decl
+      - RenameSite
     Usages:
       - xs-parsing
     From: internal/xs
@@ -162,6 +163,51 @@ Annotations: |
 
       Requirements:
       - запрошенный файл входит в результат
+
+    "RenameSites(ctx: Context, uriArg: string, pos: Pos) -> sites: []Target, found: bool": |
+      Сайты переименования биндинга под позицией по всему замыканию
+      (LSP prepareRename/rename: сервер строит WorkspaceEdit по сайтам).
+
+      `uriArg`: документ; `pos`: позиция; `sites`: сайты биндинга
+      (декларации и ссылки, включая чужие файлы); `found`: false —
+      позиция не переименовываема (не-идентификатор, builtin, словарь
+      языка)
+
+      Algorithm:
+      1. Локальные сайты запрошенного файла: .rms — Parse по
+         `rms-parsing`, позиция в inline XsBlock — координаты блока,
+         XsParse + RenameSites по `xs-parsing`, трансляция назад;
+         иначе RenameSites по `rms-parsing`; .xs — XsParse +
+         RenameSites по `xs-parsing`. found=false → found=false
+      2. Имя биндинга — текст сайта под `pos` (editor-state); Kind — из
+         xs-результата (`RenameSite`.Kind; rms-символы — топ-левел)
+      3. Kind=param/local — вернуть только локальные сайты (замыкание
+         не строится: скоупированные биндинги файл-локальны)
+      4. Топ-левел — корни как References: Closure(uriArg) плюс каждый
+         открытый uri из URIs() Source, чьё замыкание содержит
+         запрошенный файл
+      5. Чужие .rms-файлы корней: RenameRefs(name) по `rms-parsing` →
+         Target; inline XsBlock каждого — как шаг 6 с трансляцией
+         координат блока
+      6. Чужие .xs-файлы корней: References(name), на каждое вхождение
+         RenameSites(Start): found=false — внешняя ссылка, включить
+         вхождение; Kind топ-левел — включить все сайты (name-based
+         merge одноимённых топ-левел биндингов); Kind param/local —
+         пропустить (затенение)
+      7. Дедуп (URI, Range); сортировка: URI, затем позиция
+
+      Requirements:
+      - запрошенный файл и сайт под `pos` входят в результат
+      - согласованность с Definition: сайты вхождения — сайты биндинга
+        декларации Definition того же вхождения
+      - Target.URI — написание цели из резолва данного запроса
+      - детерминированность
+
+      Constraints:
+      - inline XsBlocks в Closure не входят (обрабатываются через
+        owner-файл, как References)
+      - builtin-тёзка объявленного имени: вхождения без локального
+        биндинга включаются (name-based merge)
 
 "Closure(root: string)":
   location: closure.go

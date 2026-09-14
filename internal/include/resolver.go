@@ -460,6 +460,283 @@ func (r *Resolver) References(ctx context.Context, uriArg string, pos common.Pos
 	return out
 }
 
+// RenameSites answers the rename sites of the binding under pos across
+// the closure of the queried document plus the closures of open
+// documents that include it (the reverse direction) — the merge the
+// rename request needs. Scoped bindings (XS params/locals) are
+// file-local: their answer stays inside the queried file. found is
+// false when the position is not renameable at all (not an identifier,
+// a builtin, the RMS vocabulary); there is no fallback guess. The
+// result is deduplicated and sorted by (URI, position).
+func (r *Resolver) RenameSites(ctx context.Context, uriArg string, pos common.Pos) ([]Target, bool) {
+	if ctx.Err() != nil {
+		return nil, false
+	}
+
+	path := canonicalPath(uriArg)
+	if path == "" {
+		return nil, false
+	}
+
+	f, ok := r.load(uriArg, path)
+	if !ok {
+		return nil, false
+	}
+
+	local, found := r.localRenameSites(f, pos)
+	if !found {
+		return nil, false
+	}
+
+	// The binding name is the site text under pos — every foreign file
+	// of the merge is keyed on it alone.
+	name := ""
+	for _, rr := range local.sites {
+		if rr.Contains(pos) {
+			name = siteText(f, rr)
+			break
+		}
+	}
+
+	if name == "" {
+		return nil, false
+	}
+
+	seen := make(map[targetKey]bool, len(local.sites))
+	out := make([]Target, 0, len(local.sites))
+
+	for _, rr := range local.sites {
+		key := targetKey{uri: uriArg, r: rr}
+		if seen[key] {
+			continue
+		}
+
+		seen[key] = true
+		out = append(out, Target{URI: uriArg, Range: rr})
+	}
+
+	// Scoped bindings never leave their file — the cross-file merge is
+	// top-level only.
+	scoped := local.kind == xs.KindParam || local.kind == xs.KindLocal
+
+	// A top-level variable with an initializer answers with the
+	// file-local kind when queried at its own declaration token (the
+	// per-file resolver treats the initializer statement as a nested
+	// scope); the binding itself is top-level — its declaration site
+	// anchoring on the answering file's top-level symbols sees through
+	// that per-file quirk.
+	if scoped && xsDeclTopLevel(local.xsFile, name, local.xsSites) {
+		scoped = false
+	}
+
+	if !scoped {
+		for _, c := range r.renameRoots(ctx, uriArg) {
+			for _, e := range c.Rms {
+				r.addReferences(seen, &out, e.URI, e.File.RenameRefs(name))
+
+				for _, block := range e.File.XsBlocks {
+					xsFile, _ := xs.XsParse(block.Code, e.URI)
+
+					r.addShifted(seen, &out, e.URI, xsRenameRefs(xsFile, name), block.Range.Start)
+				}
+			}
+
+			for _, e := range c.Xs {
+				r.addReferences(seen, &out, e.URI, xsRenameRefs(e.File, name))
+			}
+		}
+	}
+
+	slices.SortFunc(out, func(a, b Target) int {
+		switch {
+		case a.URI != b.URI:
+			return strings.Compare(a.URI, b.URI)
+		case a.Range.Start.Before(b.Range.Start):
+			return -1
+		case b.Range.Start.Before(a.Range.Start):
+			return 1
+		default:
+			return 0
+		}
+	})
+
+	return out, true
+}
+
+// localRename is the queried file's own half of the rename answer.
+type localRename struct {
+	// sites are the binding's sites in file coordinates — the local
+	// part of the merged answer.
+	sites []common.Range
+	// kind is the binding's scope kind; "" for plain RMS positions (the
+	// RMS vocabulary has no scoped bindings, every renameable RMS name
+	// is top-level).
+	kind string
+	// xsFile is the XS file the binding answered from — the .xs document
+	// itself or the parsed inline block; nil for plain RMS positions.
+	xsFile *xs.XsFile
+	// xsSites are the binding's sites in xsFile's own coordinates
+	// (block-relative for inline blocks) — the anchor input of the
+	// top-level guard.
+	xsSites []common.Range
+}
+
+// localRenameSites resolves the binding under pos in the queried file
+// itself. Inline XS blocks answer through the XS parser in block
+// coordinates, translated back into file coordinates.
+func (r *Resolver) localRenameSites(f file, pos common.Pos) (local localRename, found bool) {
+	if f.rms != nil {
+		for _, block := range f.rms.XsBlocks {
+			if !block.Range.Contains(pos) {
+				continue
+			}
+
+			xsFile, _ := xs.XsParse(block.Code, f.uri)
+			blockSites, ok := xsFile.RenameSites(unshiftPos(pos, block.Range.Start))
+			if !ok {
+				return localRename{}, false
+			}
+
+			return localRename{
+				sites:   shiftedSites(blockSites, block.Range.Start),
+				kind:    blockSites[0].Kind,
+				xsFile:  &xsFile,
+				xsSites: siteRanges(blockSites),
+			}, true
+		}
+
+		rmsSites, ok := f.rms.RenameSites(pos)
+		if !ok {
+			return localRename{}, false
+		}
+
+		return localRename{sites: rmsSites}, true
+	}
+
+	xsSites, ok := f.xs.RenameSites(pos)
+	if !ok {
+		return localRename{}, false
+	}
+
+	return localRename{
+		sites:   siteRanges(xsSites),
+		kind:    xsSites[0].Kind,
+		xsFile:  f.xs,
+		xsSites: siteRanges(xsSites),
+	}, true
+}
+
+// siteText returns the name text of the site at rr in f. The RMS parser
+// (and every inline block inside it) counts offsets after CRLF
+// normalization, while XS files are parsed on the raw bytes and the
+// editor state is raw — each answer is sliced against the text its own
+// offsets were counted on.
+func siteText(f file, rr common.Range) string {
+	text := f.text
+	if f.rms != nil {
+		text = strings.ReplaceAll(text, "\r\n", "\n")
+	}
+
+	return text[rr.Start.Offset:rr.End.Offset]
+}
+
+// renameRoots collects the search roots exactly like References: the
+// queried file's own closure plus the closures of open documents that
+// include it (the reverse direction — "who includes me").
+func (r *Resolver) renameRoots(ctx context.Context, uriArg string) []Closure {
+	closures := []Closure{r.Closure(ctx, uriArg)}
+
+	for _, u := range r.source.URIs() {
+		if u == uriArg {
+			continue
+		}
+
+		cl := r.Closure(ctx, u)
+
+		if closureHas(cl, uriArg) {
+			closures = append(closures, cl)
+		}
+	}
+
+	return closures
+}
+
+// xsDeclTopLevel reports whether one of the binding's sites is the
+// selection of a same-named top-level symbol of the file — the anchor
+// test separating a genuinely scoped binding (a param or a block local
+// is never a top-level symbol) from the initializer quirk of the
+// per-file rename resolver.
+func xsDeclTopLevel(xf *xs.XsFile, name string, sites []common.Range) bool {
+	if xf == nil {
+		return false
+	}
+
+	for _, sym := range xf.Symbols() {
+		if sym.Name == name && slices.Contains(sites, sym.Selection) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// xsRenameRefs classifies the name occurrences of a foreign XS file for
+// a top-level rename: an occurrence without a local binding is an
+// external reference to the closure's binding — the occurrence itself
+// is included; an occurrence of a same-name top-level binding pulls in
+// all of that binding's sites (name-based merge); occurrences of scoped
+// bindings are skipped (they shadow the name in their scope only).
+func xsRenameRefs(xf xs.XsFile, name string) []common.Range {
+	var out []common.Range
+
+	for _, occ := range xf.References(name) {
+		sites, found := xf.RenameSites(occ.Start)
+		if !found {
+			out = append(out, occ)
+
+			continue
+		}
+
+		if sites[0].Kind == xs.KindParam || sites[0].Kind == xs.KindLocal {
+			// The initializer quirk reaches foreign files too: a
+			// top-level declaration token answers with the file-local
+			// kind when it is the queried occurrence. The same anchor
+			// test rescues the declaration — without it a same-name
+			// top-level binding without uses would silently drop out of
+			// the merge.
+			if !xsDeclTopLevel(&xf, name, siteRanges(sites)) {
+				continue
+			}
+		}
+
+		out = append(out, siteRanges(sites)...)
+	}
+
+	return out
+}
+
+// siteRanges projects rename sites onto their plain ranges.
+func siteRanges(sites []xs.RenameSite) []common.Range {
+	out := make([]common.Range, 0, len(sites))
+
+	for _, s := range sites {
+		out = append(out, s.Range)
+	}
+
+	return out
+}
+
+// shiftedSites maps block-relative rename sites into file coordinates.
+func shiftedSites(sites []xs.RenameSite, base common.Pos) []common.Range {
+	out := make([]common.Range, 0, len(sites))
+
+	for _, rr := range siteRanges(sites) {
+		out = append(out, shiftRange(rr, base))
+	}
+
+	return out
+}
+
 // targetKey deduplicates occurrences by (URI, Range).
 type targetKey struct {
 	uri string
