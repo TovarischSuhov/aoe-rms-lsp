@@ -186,7 +186,10 @@ Annotations: |
       1. Сохранить текст и версию документа в `DocStore`
       2. Пересчитать диагностики (общая функция с DidChange):
          вычислить `Closure` для uri; записи `MissingInclude` с Owner==uri →
-         Diagnostic (code="missing-include", range директивы); RMS:
+         Diagnostic (code="missing-include", range директивы); из
+         Resolved-записей замыкания директивы Owner==uri, чей target уже
+         включён более ранней директивой документа → Diagnostic
+         (code="duplicate-include", warning, range директивы); RMS:
          синтаксис + `Analyzer`; inline `XsBlock`: пропустить код через
          `XsParse` и передать в `Analyzer` с внешними декларациями
          замыкания (пустыми для inline-блока); .xs: `Analyzer` с внешними

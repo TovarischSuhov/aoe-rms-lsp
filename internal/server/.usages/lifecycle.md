@@ -76,7 +76,13 @@ Definition and references resolve across the document's include closure:
 targets may live in files that are not open in the editor — the server
 loads them from disk on demand (editor state always wins for open files).
 Missing #include / #includeXS targets surface as "missing-include"
-diagnostics on the directive's path range.
+diagnostics on the directive's path range. A repeated #include /
+#includeXS of a file the same document already includes surfaces as a
+"duplicate-include" warning on every repeated directive (the earliest
+directive of each target stays clean; repeats inside dependency files
+belong to those files and stay out of the root document's batch) — the
+engine has no include guard, so each repeat re-applies the file's
+effects.
 
 Preconditions:
 - Include paths resolve relative to the including file's directory;

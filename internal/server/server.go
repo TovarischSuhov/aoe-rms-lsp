@@ -1804,6 +1804,7 @@ func (s *Server) analyzeRms(uriArg string, text string, closure include.Closure)
 
 	diags := append(syntax, s.analyzer.AnalyzeRms(file)...)
 	diags = append(diags, missingDiags(uriArg, closure)...)
+	diags = append(diags, duplicateDiags(uriArg, closure)...)
 
 	for _, block := range file.XsBlocks {
 		xsFile, xsSyntax := xs.XsParse(block.Code, "inline:"+uriArg)
@@ -1839,6 +1840,44 @@ func missingDiags(uriArg string, closure include.Closure) []common.Diagnostic {
 			Severity: common.SeverityError,
 			Message:  "include not found: " + m.Path,
 			Code:     "missing-include",
+		})
+	}
+
+	return out
+}
+
+// duplicateDiags warns on the document's include directives that connect
+// a file already included by an earlier directive of the same document.
+// The engine has no include guard — every repeated directive re-applies
+// the file's effects — so only the first directive of each target stays
+// clean. The first pass finds each target's earliest directive because
+// Resolved lists all #include directives before the #includeXS ones,
+// not in source order.
+func duplicateDiags(uriArg string, closure include.Closure) []common.Diagnostic {
+	first := make(map[string]common.Pos)
+
+	for _, inc := range closure.Resolved {
+		if inc.Owner != uriArg {
+			continue
+		}
+
+		if pos, ok := first[inc.Target]; !ok || inc.Inc.Range.Start.Before(pos) {
+			first[inc.Target] = inc.Inc.Range.Start
+		}
+	}
+
+	var out []common.Diagnostic
+
+	for _, inc := range closure.Resolved {
+		if inc.Owner != uriArg || inc.Inc.Range.Start == first[inc.Target] {
+			continue
+		}
+
+		out = append(out, common.Diagnostic{
+			Range:    inc.Inc.Range,
+			Severity: common.SeverityWarning,
+			Message:  "duplicate include: " + inc.Inc.Path + " is already included",
+			Code:     "duplicate-include",
 		})
 	}
 
