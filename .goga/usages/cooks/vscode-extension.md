@@ -50,6 +50,26 @@ directives, not comments. `aoe2xs` (.xs): C-like (`//`, `/* */`,
 brace/paren/bracket pairs, indent rules). Keep the configs as JSON
 files referenced from `contributes.languages[].configuration`.
 
+## Snippets
+
+RMS snippets are a declarative contribution: `snippets/aoe2rms.json`
+referenced from `contributes.snippets` for language `aoe2rms`. No client
+code — VS Code resolves prefixes from the JSON alone.
+
+- Content sources: the new-map skeleton (Zetnus guide,
+  `docs/ref/zetnus-rms-guide.txt`) and frequent blocks from
+  `docs/ref/map-scripting-practices.md` (create_object with fields,
+  start_random, base_terrain, sections).
+- Bodies use placeholders (`${1:default}`, choice `${1|a,b|}`); `$0` is
+  the final cursor position.
+- The skeleton snippet is guarded by a Go test
+  (`editors/vscode/snippets_test.go`): expand placeholder defaults, feed
+  the result through `rms.Parse` — no parse errors allowed. Change the
+  snippet, the test keeps it valid.
+- `.vscodeignore` is exclusion-style — a new `snippets/` directory is
+  packaged automatically; the packaged-artifact contributes check (#69)
+  must list `snippets[].path` alongside grammars and languages.
+
 ## Static highlighting
 
 TextMate grammars color both languages without the server:

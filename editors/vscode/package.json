@@ -55,6 +55,12 @@
         "path": "./syntaxes/aoe2xs.tmLanguage.json"
       }
     ],
+    "snippets": [
+      {
+        "language": "aoe2rms",
+        "path": "./snippets/aoe2rms.json"
+      }
+    ],
     "configuration": {
       "title": "AoE2 LSP",
       "properties": {

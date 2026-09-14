@@ -37,7 +37,8 @@
    считается.
 4. **CI-проверка contributes-путей** (#68.3): в джобе `vscode` после
    `vsce package` — сверить каждый путь из `contributes`
-   (`grammars[].path`, `languages[].configuration`) с содержимым
+   (`grammars[].path`, `languages[].configuration`,
+   `snippets[].path`) с содержимым
    собранного архива; отсутствие файла = fail.
 5. **Точечные метаданные** (#68.4): копия `LICENSE` в `editors/vscode/`
    и `license: "SEE LICENSE IN LICENSE"` (убирает warning vsce; корень
