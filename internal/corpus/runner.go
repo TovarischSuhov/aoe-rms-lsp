@@ -235,8 +235,7 @@ func startSession(ctx context.Context, bin string, root string) (*session, error
 
 	client := &diagClient{notify: make(chan struct{}, 4)}
 
-	connCtx, conn, disp := protocol.NewClient(ctx, client, jsonrpc2.NewStream(&procTransport{s: s}))
-	_ = connCtx
+	_, conn, disp := protocol.NewClient(ctx, client, jsonrpc2.NewStream(&procTransport{s: s}))
 
 	s.conn = conn
 	s.disp = disp
