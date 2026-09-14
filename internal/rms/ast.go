@@ -573,6 +573,19 @@ func (f RmsFile) RenameSites(pos common.Pos) ([]common.Range, bool) {
 		return nil, false
 	}
 
+	// renameableAt only answers declared names, so the by-name answer
+	// is exactly this file's sites of the binding.
+	return f.RenameRefs(name), true
+}
+
+// RenameRefs returns the by-name rename sites of a user symbol — the
+// local declaration (when this file declares it) plus every
+// value-position occurrence of name, sorted by position — without
+// requiring a local declaration (cross-file closure merge: the caller
+// has no position in a foreign file, and the constant may be declared
+// by another file of the closure). Names absent from the file answer an
+// empty list.
+func (f RmsFile) RenameRefs(name string) []common.Range {
 	out := make([]common.Range, 0, 2)
 
 	for _, d := range f.userDecls {
@@ -602,7 +615,7 @@ func (f RmsFile) RenameSites(pos common.Pos) ([]common.Range, bool) {
 	// one site per range.
 	out = slices.Compact(out)
 
-	return out, true
+	return out
 }
 
 // renameableAt resolves the user-declared symbol at pos: an index
