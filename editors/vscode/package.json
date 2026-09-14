@@ -67,7 +67,16 @@
         "aoe2lsp.serverPath": {
           "type": "string",
           "default": "aoe2-lsp",
-          "markdownDescription": "Path to the `aoe2-lsp` binary. A bare name resolves through PATH; an absolute path works too. Build it from the aoe-rms-lsp repository (`go build ./cmd/aoe2-lsp`) or install a release binary."
+          "markdownDescription": "Optional override: explicit path to an `aoe2-lsp` binary. An explicitly set value wins over auto-resolution and disables network downloads. The default (`aoe2-lsp`) is not an override — it falls through to the version cache, then PATH, then (with `#aoe2lsp.download.mode#` `auto`) a GitHub Releases download. Build it from the aoe-rms-lsp repository (`go build ./cmd/aoe2-lsp`) or install a release binary."
+        },
+        "aoe2lsp.download.mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "off"
+          ],
+          "default": "auto",
+          "markdownDescription": "`auto`: resolve the server as explicit `#aoe2lsp.serverPath#` → cached version in the extension's global storage → PATH → download from GitHub Releases (latest release, SHA256-verified against `SHA256SUMS`, extracted with the system `tar`). `off`: no network access at all — cache → PATH only."
         },
         "aoe2lsp.diagnostics.severityOverrides": {
           "type": "object",
@@ -98,7 +107,8 @@
   "scripts": {
     "compile": "node build.mjs",
     "package": "npm run compile && vsce package --no-dependencies",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "node --test test/"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"
