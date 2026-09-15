@@ -29,6 +29,19 @@ Preconditions:
 - Duplicate names within one file are a build error — resolve, do not skip.
 - NewStore() must pass after regeneration (run kb tests).
 
+## Refresh on game patches
+
+The patch-day process — source checklist, since_update maintenance,
+verification — lives in docs/kb-refresh.md. Its semi-automatic "what's new"
+step:
+
+```sh
+go run ./cmd/kbgen -diff
+```
+
+regenerates into a temp dir and prints the aggregated old→new report
+(kb.DiffKB) without touching internal/kb/data.
+
 ## Mining on regeneration (signature help)
 
 Extraction mines structured kind/range from Desc prose via kb.MineKindRange:
