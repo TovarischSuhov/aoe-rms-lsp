@@ -143,6 +143,9 @@ func (h *lspHarness) awaitExit() error {
 
 // startHarness swaps os.Stdin/os.Stdout for pipes, starts Serve and connects
 // a protocol client to the other pipe ends.
+// harnessVersion is the test version asserted in ServerInfo checks.
+const harnessVersion = "test-v"
+
 func startHarness(t *testing.T) *lspHarness {
 	t.Helper()
 
@@ -161,7 +164,7 @@ func startHarness(t *testing.T) *lspHarness {
 		client: &recordingClient{notify: make(chan struct{}, 16)},
 	}
 
-	go func() { h.done <- Serve(context.Background()) }()
+	go func() { h.done <- Serve(context.Background(), harnessVersion) }()
 
 	_, _, disp := protocol.NewClient(
 		context.Background(),
@@ -259,6 +262,11 @@ func TestServe_InitializeNegotiatesUTF8(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "aoe2-lsp", res.ServerInfo.Name)
+
+	version, ok := res.ServerInfo.Version.Get()
+	require.True(t, ok, "server version must be present")
+	assert.Equal(t, harnessVersion, version)
+
 	assert.Equal(t, protocol.PositionEncodingKindUTF8, res.Capabilities.PositionEncoding)
 
 	sync, ok := res.Capabilities.TextDocumentSync.(*protocol.TextDocumentSyncOptions)
@@ -692,6 +700,7 @@ func TestServe_SignatureHelpAPIShape(t *testing.T) {
 		analysis.NewAnalyzer(store),
 		hints.NewComputer(store),
 		complete.NewCompleter(store),
+		"",
 	)
 
 	require.NotNil(t, srv)
@@ -992,6 +1001,7 @@ func TestServe_CompletionAPIShape(t *testing.T) {
 		analysis.NewAnalyzer(store),
 		hints.NewComputer(store),
 		complete.NewCompleter(store),
+		"",
 	)
 
 	require.NotNil(t, srv)
@@ -1300,6 +1310,7 @@ func utf16ServerFixture(t *testing.T, text string) (*Server, uri.URI) {
 		analysis.NewAnalyzer(store),
 		hints.NewComputer(store),
 		complete.NewCompleter(store),
+		"",
 	)
 
 	docURI := uri.URI("file:///work/ru.rms")

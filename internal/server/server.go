@@ -40,6 +40,7 @@ type Server struct {
 	completer *complete.Completer
 	docs      *DocStore
 	resolver  *include.Resolver
+	version   string
 	exit      chan struct{}
 	exitOnce  sync.Once
 
@@ -271,14 +272,15 @@ func (s *Server) republishAll(ctx context.Context) {
 }
 
 // NewServer builds the server from its knowledge base, analyzer, hint
-// computer and completion completer (DI); the document cache and the
-// include resolver over it are created internally (DocStore
-// structurally satisfies include.Source).
+// computer, completion completer and version string (DI); the document
+// cache and the include resolver over it are created internally
+// (DocStore structurally satisfies include.Source).
 func NewServer(
 	store *kb.Store,
 	analyzer *analysis.Analyzer,
 	computer *hints.Computer,
 	completer *complete.Completer,
+	version string,
 ) *Server {
 	docs := NewDocStore()
 
@@ -289,6 +291,7 @@ func NewServer(
 		completer: completer,
 		docs:      docs,
 		resolver:  include.NewResolver(docs),
+		version:   version,
 		exit:      make(chan struct{}),
 	}
 
@@ -355,7 +358,9 @@ func (s *Server) Initialize(
 
 	return &protocol.InitializeResult{
 		Capabilities: caps,
-		ServerInfo:   protocol.ServerInfo{Name: serverName},
+		// The version travels to clients (status bar of the extension)
+		// via ServerInfo; "dev" marks a local build without ldflags.
+		ServerInfo: protocol.ServerInfo{Name: serverName, Version: protocol.NewOptional(s.version)},
 	}, nil
 }
 

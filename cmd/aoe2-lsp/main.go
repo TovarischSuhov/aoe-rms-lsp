@@ -47,7 +47,7 @@ func main() {
 		slog.Error("ignoring flag parse error", "err", parseErr)
 	}
 
-	if err := server.Serve(context.Background()); err != nil {
+	if err := server.Serve(context.Background(), version); err != nil {
 		slog.Error("server exited", "err", err)
 		os.Exit(1)
 	}

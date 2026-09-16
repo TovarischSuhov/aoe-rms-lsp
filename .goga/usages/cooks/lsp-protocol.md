@@ -50,6 +50,12 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 }
 ```
 
+`ServerInfo.Version` is `protocol.Optional[string]` — wrap with
+`protocol.NewOptional(s.version)` (plain string assignment does not
+compile). The version reaches clients (the extension's status bar reads
+`initializeResult.serverInfo.version`) and is `"dev"` on local builds
+without ldflags.
+
 Override `Shutdown` to return `nil` (default returns not-implemented) and terminate on `Exit`.
 
 ## Document Sync (Full)

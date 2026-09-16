@@ -130,21 +130,24 @@ Annotations: |
 
 ---
 
-"Server(store: Store, analyzer: Analyzer, computer: Computer, completer: Completer)":
+"Server(store: Store, analyzer: Analyzer, computer: Computer, completer: Completer, version: string)":
   location: server.go
   annotations: |
     LSP-сервер: протокол поверх kb/rms/xs/analysis/hints/complete.
 
     `store`: база знаний; `analyzer`: семантические проверки;
     `computer`: вычислитель хинтов; `completer`: вычислитель
-    кандидатов completion (DI)
+    кандидатов completion; `version`: версия сервера из
+    cmd/aoe2-lsp (ldflags), попадает в ServerInfo Initialize (DI)
 
     Requirements:
     - паттерны протокола строго по `lsp-protocol` (UnimplementedServer, Full sync)
     - Resolver над собственным DocStore (по `closure`)
   methods:
     "Initialize(ctx: Context, params: InitializeParams) -> result: InitializeResult, err: error": |
-      Заявить возможности: TextDocumentSync Full+OpenClose, HoverProvider
+      Заявить возможности и ServerInfo: Name + Version (версия
+      сервера для клиентов — статус-бар расширения);
+      TextDocumentSync Full+OpenClose, HoverProvider
       Boolean(true), CompletionProvider с триггерами; DefinitionProvider,
       ReferencesProvider, DocumentSymbolProvider,
       DocumentHighlightProvider, FoldingRangeProvider — Boolean(true);
@@ -567,7 +570,7 @@ Annotations: |
     "Remove(uri: string)": |
       Удалить документ из кэша.
 
-"Serve(ctx: Context) -> err: error":
+"Serve(ctx: Context, version: string) -> err: error":
   location: serve.go
   annotations: |
     stdio-бутстрап по `lsp-protocol`.
@@ -577,7 +580,7 @@ Annotations: |
     Algorithm:
     1. Собрать зависимости: NewStore, NewAnalyzer, NewComputer(store)
        из hints, NewCompleter(store) из complete,
-       Server(store, analyzer, computer, completer), DocStore
+       Server(store, analyzer, computer, completer, version), DocStore
     2. Поднять сервер протокола по `lsp-protocol` и дождаться
        завершения соединения
 
