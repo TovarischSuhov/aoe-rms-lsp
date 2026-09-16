@@ -30,7 +30,10 @@ contrib_paths="$(jq -r '
 # vacuously green — treat an empty path list as a broken setup.
 [ -n "$contrib_paths" ] || { printf 'check-vsix: no contributes paths in %s/package.json — check the jq filter\n' "$ext_dir" >&2; exit 2; }
 
-unzip -Z1 "$vsix" >"$vsix.list"
+# vsce packs the extension payload under an "extension/" directory inside
+# the .vsix (alongside [Content_Types].xml and the manifest) — compare
+# against the payload-relative names.
+unzip -Z1 "$vsix" | sed 's|^extension/||' >"$vsix.list"
 
 missing=0
 while IFS= read -r p; do
