@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Cut a release: compute the next version, generate a changelog section from
-# conventional commits since the last tag, prepend it to CHANGELOG.md, commit,
+# conventional commits since the last tag, prepend it to CHANGELOG.md, bump
+# the extension version in editors/vscode/package.json into the same commit,
 # tag and push. The pushed v* tag triggers .github/workflows/release.yml,
-# which builds the binaries and creates the GitHub Release.
+# which builds the binaries, the .vsix and the GitHub Release.
 #
 # Usage: scripts/release.sh <major|minor|patch|vX.Y.Z> [--dry-run]
 #   major|minor|patch — bump the last tag (prerelease suffix is dropped first:
@@ -144,7 +145,21 @@ if cmp -s CHANGELOG.md "$tmp"; then
 fi
 mv "$tmp" CHANGELOG.md
 
-git add CHANGELOG.md
+# Keep the extension version in lockstep with the tag: the release commit
+# carries the bump, so the version in git always equals the last tag and
+# release.yml builds an aoe2-lsp-X.Y.Z.vsix named after the release.
+python3 - "$version" editors/vscode/package.json <<'PY'
+import pathlib, re, sys
+
+version, pkg = sys.argv[1], pathlib.Path(sys.argv[2])
+text = pkg.read_text()
+new, n = re.subn(r'("version"\s*:\s*")[^"]*(")', rf"\g<1>{version}\g<2>", text, count=1)
+if n != 1:
+    sys.exit(f'release: {pkg}: no top-level "version" key')
+pkg.write_text(new)
+PY
+
+git add CHANGELOG.md editors/vscode/package.json
 git commit -q -m "docs: changelog $tag"
 git tag -a "$tag" -m "Release $tag"
 git push origin master "$tag"
