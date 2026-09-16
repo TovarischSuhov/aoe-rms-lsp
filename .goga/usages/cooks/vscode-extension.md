@@ -104,6 +104,21 @@ Contracts and failure policy:
   tests (`test/install.test.ts`, node:test) run the module under plain
   Node type stripping without an extension host. Keep it that way.
 
+## Server status bar
+
+`src/extension.ts` owns a `createStatusBarItem` driven by
+`client.onDidChangeState` (Starting/Running/Stopped) with codicons:
+`$(sync~spin)` while starting, `$(zap) AoE2 LSP <version>` running,
+`$(circle-slash)` stopped. The version comes from
+`client.initializeResult?.serverInfo?.version` (the server ships it in
+`Initialize`; `"dev"` on local builds) — never from spawning
+`aoe2-lsp --version`. The click command reveals the shared output
+channel (one channel for install and protocol logs — pass
+`outputChannel` to `LanguageClientOptions`, drop `outputChannelName`).
+The state→label mapping lives in `src/statusbar.ts` as a pure function
+without a vscode import, unit-tested by `node --test` outside the
+extension host (the src/install.ts pattern).
+
 ## Settings pass-through
 
 VS Code answers the server's `workspace/configuration` pull from

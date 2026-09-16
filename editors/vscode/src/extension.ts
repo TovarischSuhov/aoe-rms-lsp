@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
-import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, ErrorAction, CloseAction } from "vscode-languageclient/node";
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, ErrorAction, CloseAction, State } from "vscode-languageclient/node";
 import { resolveServer, wireEnv, type DownloadMode, type ServerResolution } from "./install.ts";
+import { statusView, type ServerPhase } from "./statusbar.ts";
 
 let client: LanguageClient | undefined;
 
@@ -77,7 +78,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: [{ language: "aoe2rms" }, { language: "aoe2xs" }],
-		outputChannelName: "aoe2-lsp",
+		// One channel for install logs and protocol logs: the status bar
+		// click target is unambiguous.
+		outputChannel: output,
 		// A missing binary is a setup problem, not a crash loop: stop
 		// cleanly and tell the user where to fix the path.
 		errorHandler: {
@@ -87,6 +90,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	};
 
 	client = new LanguageClient("aoe2lsp", "AoE2 RMS/XS Language Server", serverOptions, clientOptions);
+
+	// Server indicator: the client state machine drives it, the version
+	// arrives with initializeResult once running ("dev" for local builds).
+	const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+	const showOutput = vscode.commands.registerCommand("aoe2lsp.showOutput", () => output.show());
+	context.subscriptions.push(status, showOutput);
+	status.command = "aoe2lsp.showOutput";
+
+	const renderStatus = (phase: ServerPhase): void => {
+		const view = statusView(phase, client?.initializeResult?.serverInfo?.version);
+		status.text = view.text;
+		status.tooltip = view.tooltip;
+	};
+
+	client.onDidChangeState(({ newState }) => {
+		renderStatus(newState === State.Running ? "running" : newState === State.Stopped ? "stopped" : "starting");
+	});
+
+	renderStatus("starting");
+	status.show();
 
 	void client.start().catch((err: unknown) => {
 		void vscode.window.showErrorMessage(

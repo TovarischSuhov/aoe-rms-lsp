@@ -17,13 +17,13 @@ import (
 
 // Serve wires the dependencies and serves LSP over stdio until the editor
 // disconnects or calls exit. The returned error is the shutdown reason.
-func Serve(ctx context.Context) error {
-	return serve(ctx, stdio{})
+func Serve(ctx context.Context, version string) error {
+	return serve(ctx, stdio{}, version)
 }
 
 // serve runs the bootstrap over an arbitrary transport: stdio in
 // production, pipes in tests.
-func serve(ctx context.Context, rwc io.ReadWriteCloser) error {
+func serve(ctx context.Context, rwc io.ReadWriteCloser, version string) error {
 	store, err := kb.NewStore()
 	if err != nil {
 		return fmt.Errorf("load knowledge base: %w", err)
@@ -34,6 +34,7 @@ func serve(ctx context.Context, rwc io.ReadWriteCloser) error {
 		analysis.NewAnalyzer(store),
 		hints.NewComputer(store),
 		complete.NewCompleter(store),
+		version,
 	)
 
 	// The client dispatcher reaches handlers via the request context

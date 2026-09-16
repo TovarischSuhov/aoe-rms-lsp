@@ -28,6 +28,7 @@ func newNavigationServer(t *testing.T) *Server {
 		analysis.NewAnalyzer(store),
 		hints.NewComputer(store),
 		complete.NewCompleter(store),
+		"",
 	)
 }
 
