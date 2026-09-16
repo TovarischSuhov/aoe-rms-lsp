@@ -121,7 +121,8 @@ a release forever, and do not treat transient non-200s as success.
 ## Pattern: packaged-artifact contributes check
 
 `vsce package` does not validate that paths referenced from the
-extension's `contributes` (`grammars[].path`, `languages[].configuration`)
+extension's `contributes` (`grammars[].path`,
+`languages[].configuration`, `snippets[].path`)
 exist inside the archive, and VS Code silently ignores broken paths —
 the extension installs fine with dead references (issue #68 §3).
 

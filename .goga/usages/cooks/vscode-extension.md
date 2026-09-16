@@ -172,7 +172,8 @@ semantic tokens, not by the grammar.
   always equals the last tag, and the packaged `.vsix` carries the
   release version. Never bump it by hand.
 - The package must be self-contained: every path referenced from
-  `contributes` (`grammars[].path`, `languages[].configuration`) has to
+  `contributes` (`grammars[].path`, `languages[].configuration`,
+  `snippets[].path`) has to
   exist inside the built `.vsix` — VS Code silently ignores dead
   references, so CI verifies them against the archive listing
   (see `github-actions.md`, "packaged-artifact contributes check").
@@ -191,10 +192,13 @@ semantic tokens, not by the grammar.
   `aoe2-lsp-<version>.vsix`; `--no-dependencies` is correct because
   esbuild already inlined `vscode-languageclient` into the bundle.
 - CI builds the .vsix and uploads it as a workflow artifact
-  (`aoe2-lsp-vsix`) on every push/PR. The Release workflow uploads
-  only `dist/*` — the four platform archives plus `SHA256SUMS`; the
-  `.vsix` is not a release asset and never lands in `SHA256SUMS`.
-  Marketplace publishing stays out of scope.
+  (`aoe2-lsp-vsix`) on every push/PR. The Release workflow builds the
+  extension too (node 22, `npm install` → `npm run check` →
+  `npm run package`) and drops the `.vsix` into `dist/` next to the
+  platform archives, so it ships as a release asset covered by
+  `SHA256SUMS`. The built name must equal `aoe2-lsp-<tag version>.vsix`
+  — a mismatch fails the job (the tag was cut without `release.sh`).
+  Marketplace publishing stays out of scope (#47).
 
 ### npm install hygiene
 

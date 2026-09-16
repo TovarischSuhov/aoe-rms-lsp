@@ -87,6 +87,14 @@ jobs:
       - name: Package .vsix
         run: npm run package
 
+      # #68.3: VS Code silently drops contributes entries whose files are
+      # missing from the .vsix, so verify every path against the archive.
+      - name: Verify contributes paths in .vsix
+        run: |
+          vsix="$(ls ./*.vsix 2>/dev/null | head -1)"
+          [ -n "$vsix" ] || { echo "::error::no .vsix produced"; exit 1; }
+          ../../scripts/check-vsix.sh . "$vsix"
+
       - name: Upload .vsix
         uses: actions/upload-artifact@v4
         with:

@@ -3,11 +3,18 @@
   "displayName": "AoE2 RMS/XS Language Server",
   "description": "Language server support for Age of Empires II random map scripts (.rms) and XS (.xs), powered by the aoe2-lsp binary.",
   "publisher": "tovarischsuhov",
-  "license": "SEE LICENSE IN ../../LICENSE",
+  "license": "SEE LICENSE IN LICENSE",
   "version": "0.1.0",
   "private": true,
   "engines": {
     "vscode": "^1.90.0"
+  },
+  "capabilities": {
+    "virtualWorkspaces": false,
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "The language server only parses workspace files and never executes them; extension settings stay honored in untrusted workspaces."
+    }
   },
   "categories": [
     "Programming Languages"

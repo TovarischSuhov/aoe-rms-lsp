@@ -21,10 +21,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       # Single job instead of a matrix: sequential builds of a small module
       # cost less than wiring artifact passing between parallel jobs, and
       # one SHA256SUMS falls out naturally.
-      - name: Build & package
+      - name: Build binaries
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -50,6 +55,27 @@ jobs:
           build darwin  amd64 ""   tar
           build darwin  arm64 ""   tar
 
+      # The tag commit already carries the extension version bump
+      # (scripts/release.sh), so the .vsix is named after the release —
+      # a mismatch here means the tag was cut without release.sh.
+      - name: Build extension (.vsix)
+        working-directory: editors/vscode
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run check
+          npm run package
+
+          expected="aoe2-lsp-${GITHUB_REF_NAME#v}.vsix"
+          if [ ! -f "$expected" ]; then
+            echo "::error::expected $expected — is editors/vscode/package.json version in sync with the tag?"
+            ls -1 ./*.vsix 2>/dev/null || true
+            exit 1
+          fi
+          cp "$expected" ../../dist/
+
+      - name: Checksums
+        run: |
           (cd dist && sha256sum * > SHA256SUMS)
           ls -l dist
 
@@ -60,3 +86,32 @@ jobs:
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
+
+      # #68.1: assets must be downloadable anonymously right after the
+      # release exists — a silently 404ing asset is a broken release. No
+      # GH_TOKEN in this step on purpose: the request must be anonymous.
+      # CDN propagation can lag, hence the retries.
+      - name: Verify assets are anonymously reachable
+        run: |
+          set -euo pipefail
+          attempts="${ASSET_CHECK_ATTEMPTS:-6}"
+
+          verify() {
+            local name="$1" code="" i
+            local url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${name}"
+            for i in $(seq 1 "$attempts"); do
+              code="$(curl -sS -o /dev/null -w '%{http_code}' -I -L --max-time 15 "$url" || true)"
+              if [ "$code" = "200" ]; then
+                printf 'asset ok: %s\n' "$name"
+                return 0
+              fi
+              printf 'asset %s: HTTP %s (attempt %s/%s)\n' "$name" "$code" "$i" "$attempts"
+              sleep 10
+            done
+            printf '::error::asset %s is not anonymously reachable (last HTTP %s)\n' "$name" "$code"
+            return 1
+          }
+
+          for f in dist/*; do
+            verify "$(basename "$f")"
+          done
