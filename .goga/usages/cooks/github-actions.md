@@ -132,6 +132,28 @@ Read the paths from `package.json` at check time — never duplicate them
 as a hardcoded list in the step, or the check drifts away from the thing
 it verifies. A missing file fails the job.
 
+## Pattern: scheduled monitor (kb-monitor.yml)
+
+The KB monitor is the freshness trigger for the kb-refresh process: a
+daily `schedule` run (plus `workflow_dispatch` for manual acceptance)
+executes `cmd/newscheck` against the live RSS feed. Rules that keep it
+honest:
+
+- `permissions`: `contents: write` (commit the state anchor back) +
+  `issues: write` (create the batch issue) — nothing else.
+- The detector exits non-zero on any source failure and the workflow
+  must not catch it: a broken feed reddens the run instead of silently
+  skipping patches.
+- Step order is load-bearing: check → create ONE issue for the whole
+  batch (label `kb-refresh`) → only then persist the anchor
+  (`newscheck -save-from`) and commit it. A failed issue create leaves
+  the state untouched, so the next run re-detects the posts.
+- The state commit pushes to `master` with a single `pull --rebase`
+  retry on a race; a second failure must redden the job.
+- `concurrency` without `cancel-in-progress`: overlapping daily runs
+  queue instead of cancelling each other mid-commit.
+- cron triggers do not fire in forks — acceptable for the upstream repo.
+
 ## Local Verification
 
 - Workflows cannot run locally — the first push of a new workflow is

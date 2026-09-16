@@ -1,0 +1,89 @@
+name: KB monitor
+
+on:
+  schedule:
+    - cron: '23 6 * * *' # daily, off-round minute
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: kb-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: detect AoE2 DE patch posts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      # Loud by design: any source failure exits 1 and reddens the run —
+      # a broken feed must never silently skip patches.
+      - name: Check the news feed
+        run: |
+          set -euo pipefail
+          go run ./cmd/newscheck \
+            -state docs/ref/.newscheck-state.json \
+            -changelog docs/ref/aoe2de-xs-rms-changelog.md \
+            -out "$RUNNER_TEMP/newscheck.json"
+          cat "$RUNNER_TEMP/newscheck.json"
+
+      # One issue for the whole batch. The state is saved only after the
+      # issue exists (next step), so a failed create re-detects the
+      # posts on the next run.
+      - name: Create kb-refresh issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          count="$(jq '.new_posts | length' "$RUNNER_TEMP/newscheck.json")"
+          if [ "$count" = "0" ]; then
+            echo "no new AoE2 DE patch posts"
+            exit 0
+          fi
+
+          gh label create kb-refresh --color 0e8a16 2>/dev/null || true
+          {
+            echo 'New AoE2 DE patch posts detected by the KB monitor:'
+            echo
+            jq -r '.new_posts[] | "- [\(.Title)](\(.URL)) — \(.Published)"' "$RUNNER_TEMP/newscheck.json"
+            echo
+            echo 'Refresh process: `docs/kb-refresh.md` — update the changelog doc, `go run ./cmd/kbgen -diff`, regenerate, PR. This issue tracks the refresh.'
+          } >"$RUNNER_TEMP/issue-body.md"
+
+          gh issue create \
+            --title "kb-refresh: ${count} new AoE2 DE patch post(s)" \
+            --label kb-refresh \
+            --body-file "$RUNNER_TEMP/issue-body.md"
+
+      - name: Save the anchor state
+        run: |
+          set -euo pipefail
+          go run ./cmd/newscheck \
+            -state docs/ref/.newscheck-state.json \
+            -save-from "$RUNNER_TEMP/newscheck.json"
+
+      # Commit the anchor back to master; one pull --rebase retry on a
+      # push race, a second failure reddens the job (visible, fixable).
+      - name: Commit state
+        run: |
+          set -euo pipefail
+          if git status --porcelain -- docs/ref/.newscheck-state.json | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/ref/.newscheck-state.json
+            git commit -q -m "news: kb-monitor anchor updated"
+            git push || { git pull --rebase origin master && git push; }
+          else
+            echo "state unchanged — nothing to commit"
+          fi
