@@ -1,4 +1,4 @@
-# Пачка «UX волна 2»: 8 слотов редакторского опыта
+# Пачка «UX волна 2»: 7 слотов редакторского опыта
 
 ## Current State
 
@@ -9,10 +9,6 @@ PR #77 смержен). В работе: эпик v1.0.0 (#45–50, #69) и ос
 ux-and-data-quality (#53 nuance-rules, #55 map-structure,
 #59 kb-attribute-desc). При этом повседневный UX всё ещё дырявый:
 
-- hover на вложенном атрибуте (`number_of_objects` внутри
-  `create_object`) показывает справку внешней команды, а не поля —
-  осиротевшая формулировка `2026/task-hover-attribute/task.md`, в issues
-  не зеркалена;
 - XS не диагностирует unused/duplicate declarations (выпало из эпика
   v1.0.0 в out-of-scope и не было подхвачено);
 - символ из доступного, но не подключённого include-файла не
@@ -39,7 +35,6 @@ M — с коротким дизайн-проходом. Не блокирует
 
 | Слот | Issue | Что делаем | Ячейки/области | Размер |
 |---|---|---|---|---|
-| `hover-attribute` | #78 | Hover на атрибуте внутри блока команды показывает справку атрибута (kb lookup с владельцем), не справку внешней команды; детали — авторитетная формулировка `2026/task-hover-attribute/task.md` (StatementAt, hoverRms); полнота текстов зависит от #59, частично работает и без него | server (+kb lookups) | S–M |
 | `xs-unused` | #79 | Диагностика unused/duplicate declarations в XS: локальные переменные/функции без использований; правила severity-override работают как обычно | analysis, xs | S–M |
 | `auto-include` | #80 | Completion предлагает символы из доступных (не подключённых) include-файлов с пометкой источника; выбор вставляет `#include`/`#includeXS`; quickfix для unknown-symbol с однозначным кандидатом | complete, server, include | M |
 | `rename-file` | #81 | Хендлер `workspace/willRenameFiles`: переименование/перемещение .rms/.xs обновляет `#include` во всех ссылающихся файлах замыкания (WorkspaceEdit) | server (+include) | M |
@@ -68,8 +63,6 @@ M — с коротким дизайн-проходом. Не блокирует
 
 Слотовые критерии:
 
-- `hover-attribute`: hover на вложенном поле показывает имя атрибута и
-  desc; без desc — graceful fallback на владельца; корпус без регрессий
 - `xs-unused`: unused-переменная → диагностика с кодом; rules/events
   (вызываются движком) не помечаются unused; duplicates — warning
 - `auto-include`: completion предлагает символ из неподключённого
@@ -120,17 +113,15 @@ M — с коротким дизайн-проходом. Не блокирует
 
 ## Scope Estimate
 
-Мультизадача: 8 слотов (~2×S, 4×S–M, 2×M), каждый — отдельная ветка
+Мультизадача: 7 слотов (1×S, 3×S–M, 3×M), каждый — отдельная ветка
 `task/<name>` → PR. Примерно 3 волны:
 
-1. Быстрые победы: `status-bar`, `hover-attribute`, `xs-unused`
+1. Быстрые победы: `status-bar`, `xs-unused`
 2. Серверные M: `auto-include`, `rename-file`
 3. Клиентские: `game-detect`, `deploy-to-game`, `walkthrough`
 
 ## Existing Architecture
 
-- `hover-attribute` — `internal/server` hoverRms + `kb.Store` lookup
-  атрибута с владельцем (детали в `2026/task-hover-attribute/task.md`)
 - `xs-unused` — `analysis.Analyzer` (паттерн добавления проверок),
   `xs.XsFile` decls/refs
 - `auto-include` — `complete.Completer` (контекстная матрица),
@@ -142,12 +133,12 @@ M — с коротким дизайн-проходом. Не блокирует
 ## Notes
 
 - Пачка собрана 2026-09-16 полным sweep'ом (сервер + клиент + данные)
-  по решению пользователя; утверждены все 8 слотов
+  по решению пользователя; в слейт входили 8 кандидатов, после сверки
+  с кодом hover-attribute снят — реализован PR #40 (2026-09-09,
+  `ArgAt Kind=attr` + `Store.Attribute`); issue #78 закрыт как дубль,
+  остаточная боль (полнота desc) — в #59
 - settings-schema снят при разборе: описания настроек уже в package.json
 - InlayHint, webview-reference, incremental sync, nvim-lspconfig —
   остаются 1.x-кандидатами (решения 2026-09-09/10)
-- hover-attribute поглощает осиротевшую формулировку
-  `2026/task-hover-attribute/task.md`: её детали (StatementAt,
-  hoverRms, kb Attribute lookup) авторитетны для слота
 - cook `aoe2-game-paths.md` создаётся первым исполняемым слотом из
   `game-detect`/`deploy-to-game`, общая база для обоих
