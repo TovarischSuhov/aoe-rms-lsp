@@ -122,8 +122,9 @@ func TestMineKindRange_DefaultAndSeeFragmentsIgnored(t *testing.T) {
 	}
 }
 
-// TestMineKindRange_EmptyDesc covers flag attributes (34 corpus entries
-// carry empty Desc): empty result, no panic.
+// TestMineKindRange_EmptyDesc covers the empty-desc edge of the miner; the
+// shipped data has none left (the glossary fills every desc), so this stays
+// a synthetic boundary: empty result, no panic.
 func TestMineKindRange_EmptyDesc(t *testing.T) {
 	t.Parallel()
 	kind, r := MineKindRange("")
