@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -18,8 +19,9 @@ var sectionHeadingRe = regexp.MustCompile(`^<([A-Z_]+)>$`)
 // docMetadataRe matches the metadata lines that may precede a doc paragraph.
 var docMetadataRe = regexp.MustCompile(`^(External reference|Mutually exclusive with|Requires|See also):`)
 
-// argBulletRe matches one "   * Name - description" argument bullet.
-var argBulletRe = regexp.MustCompile(`^\*\s+([A-Za-z][A-Za-z0-9_]*|%)\s+-\s+(.*)$`)
+// argBulletRe matches one "   * Name - description" argument bullet. The
+// name is an identifier, a bare % or a %Placeholder (land_position's %X).
+var argBulletRe = regexp.MustCompile(`^\*\s+([A-Za-z][A-Za-z0-9_]*|%[A-Za-z][A-Za-z0-9_]*|%)\s+-\s+(.*)$`)
 
 // updateHeadingRe matches changelog update headings.
 var updateHeadingRe = regexp.MustCompile(`^## Update (\d+)`)
@@ -36,7 +38,9 @@ var wordRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
 
 // ExtractRmsCommands extracts RMS commands from the text export of the
 // Zetnus guide (docs/ref/zetnus-rms-guide.txt) into the rms-commands.json
-// shape described by the kbdata annotation.
+// shape described by the kbdata annotation. Attributes are enriched from
+// the guide's glossary blocks; when a name has several section-specific
+// variants, the block whose Example names the command's section is merged.
 //
 // It is a one-shot data-build utility; the server never calls it at runtime.
 // Ambiguous fragments are skipped with a WARN to log instead of aborting the
@@ -59,12 +63,21 @@ func ExtractRmsCommands(path string, log *slog.Logger) ([]Command, error) {
 		return nil, fmt.Errorf("parse syntax skeleton: %w", err)
 	}
 
+	// names stays command-only for the changelog pass; attribute names join
+	// the doc pass, where they have blocks of their own.
 	names := make(map[string]bool, len(skeleton))
+	known := make(map[string]bool, len(skeleton))
+
 	for _, sk := range skeleton {
 		names[sk.name] = true
+		known[sk.name] = true
+
+		for _, attr := range sk.attrs {
+			known[attr.tokens[0]] = true
+		}
 	}
 
-	docs := parseReferenceDocs(lines, names)
+	docs, gloss := parseReferenceDocs(lines, known)
 	since := parseChangelogSince(readChangelog(path, log), names)
 
 	commands := make([]Command, 0, len(skeleton))
@@ -76,7 +89,7 @@ func ExtractRmsCommands(path string, log *slog.Logger) ([]Command, error) {
 		}
 
 		seen[sk.name] = true
-		commands = append(commands, buildCommand(sk, docs[sk.name], since[sk.name], log))
+		commands = append(commands, buildCommand(sk, docs[sk.name], gloss, since[sk.name], log))
 	}
 
 	return commands, nil
@@ -261,12 +274,36 @@ type refArg struct {
 	required bool
 }
 
-// parseReferenceDocs scans the whole guide for command doc blocks: a
-// column-0 line starting with a known command name whose next non-blank
-// line is the "Game versions:" metadata. Paired commands documented in one
-// block (min_/max_ pairs) share the doc of the last signature line.
-func parseReferenceDocs(lines []string, known map[string]bool) map[string]refDoc {
+// docRecord is one accepted doc block: the names it documents (paired
+// min_/max_ signatures share one block), the first and the last of its
+// signature lines and the parsed doc.
+type docRecord struct {
+	names []string
+	start int
+	sig   int
+	doc   refDoc
+}
+
+// glossRecord is one glossary entry of a name: its doc block plus the RMS
+// sections named in the Example block that follows it.
+type glossRecord struct {
+	doc      refDoc
+	sections []string
+}
+
+// parseReferenceDocs scans the whole guide for doc blocks: a column-0 line
+// starting with a known name whose next non-blank line is the "Game
+// versions:" metadata. Paired commands documented in one block (min_/max_
+// pairs) share the doc of the last signature line.
+//
+// Command names keep the last-block-of-the-name semantics; alongside them
+// the glossary lists every doc block of every name in file order, so
+// attribute variants can be matched to the section of their command.
+func parseReferenceDocs(lines []string, known map[string]bool) (map[string]refDoc, map[string][]glossRecord) {
 	docs := make(map[string]refDoc, len(known))
+	gloss := make(map[string][]glossRecord, len(known))
+
+	var records []docRecord
 
 	for i := range lines {
 		if isIndented(lines[i]) {
@@ -274,7 +311,14 @@ func parseReferenceDocs(lines []string, known map[string]bool) map[string]refDoc
 		}
 
 		fields := strings.Fields(lines[i])
-		if len(fields) == 0 || !known[fields[0]] || !looksLikeSignature(fields[1:]) {
+		if len(fields) == 0 {
+			continue
+		}
+
+		// rnd(min,max) is documented under its functional form; the name
+		// is the part before the parenthesized arguments.
+		name, _, _ := strings.Cut(fields[0], "(")
+		if !known[name] || !looksLikeSignature(fields[1:]) {
 			continue
 		}
 
@@ -282,8 +326,7 @@ func parseReferenceDocs(lines []string, known map[string]bool) map[string]refDoc
 
 		for j := i + 1; j < len(lines) && len(group) < 4 && !isIndented(lines[j]); j++ {
 			next := strings.Fields(lines[j])
-			if len(next) == 0 || !snakeNameRe.MatchString(next[0]) ||
-				!looksLikeSignature(next[1:]) || hasColonToken(next[1:]) {
+			if len(next) == 0 || !snakeNameRe.MatchString(next[0]) || !looksLikeSignature(next[1:]) {
 				break
 			}
 
@@ -297,12 +340,60 @@ func parseReferenceDocs(lines []string, known map[string]bool) map[string]refDoc
 
 		doc := parseDocBlock(lines, group[len(group)-1])
 
+		rec := docRecord{start: group[0], sig: group[len(group)-1], doc: doc}
+
 		for _, idx := range group {
-			docs[strings.Fields(lines[idx])[0]] = doc
+			n, _, _ := strings.Cut(strings.Fields(lines[idx])[0], "(")
+			docs[n] = doc
+			rec.names = append(rec.names, n)
+		}
+
+		records = append(records, rec)
+	}
+
+	for i, rec := range records {
+		end := len(lines)
+		if i+1 < len(records) {
+			end = records[i+1].start
+		}
+
+		entry := glossRecord{doc: rec.doc, sections: exampleSections(lines, rec.sig+1, end)}
+
+		for _, name := range rec.names {
+			gloss[name] = append(gloss[name], entry)
 		}
 	}
 
-	return docs
+	return docs, gloss
+}
+
+// exampleSections collects the RMS sections named in one record's Example
+// block: the block runs from the "Example" line to the start of the next
+// record, the chapter separator or EOF. Variants of one attribute are told
+// apart by those sections, and a single block can name several of them.
+func exampleSections(lines []string, start, end int) []string {
+	i := start
+	for ; i < end && i < len(lines); i++ {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "Example") {
+			break
+		}
+	}
+
+	var sections []string
+
+	for ; i < end && i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+
+		if trimmed == "________________" {
+			break
+		}
+
+		if m := sectionHeadingRe.FindStringSubmatch(trimmed); m != nil {
+			sections = append(sections, strings.ToLower(m[1]))
+		}
+	}
+
+	return sections
 }
 
 // hasColonToken reports whether any token ends with a colon, marking a
@@ -319,16 +410,25 @@ func hasColonToken(tokens []string) bool {
 
 // looksLikeSignature reports whether the tokens after a command name are
 // argument placeholders, not example values. Placeholders are CamelCase
-// words, %, block braces, single letters (X, Y) and the skeleton macro
-// tokens; numeric literals and ALL-CAPS constants from code examples are
+// words, %, %Capital placeholders (land_position's %X), block braces,
+// single letters (X, Y) and the skeleton macro tokens; numeric literals,
+// ALL-CAPS constants from code examples and metadata fragments are
 // rejected.
 func looksLikeSignature(tokens []string) bool {
+	if hasColonToken(tokens) {
+		// Metadata lines and prose tails like "(default:" would pass
+		// through the lowercase branch otherwise.
+		return false
+	}
+
 	for _, tok := range tokens {
 		switch {
 		case tok == "%", tok == "{", tok == "}",
 			tok == "TYPE", tok == "CONDITION", tok == "FILENAME":
 			continue
 		case len(tok) == 1 && tok[0] >= 'A' && tok[0] <= 'Z':
+			continue
+		case len(tok) == 2 && tok[0] == '%' && tok[1] >= 'A' && tok[1] <= 'Z':
 			continue
 		case strings.ContainsFunc(tok, func(r rune) bool { return r >= 'a' && r <= 'z' }):
 			continue
@@ -458,8 +558,8 @@ func parseArgBullets(lines []string, start int) ([]refArg, int) {
 }
 
 // buildCommand assembles the final Command from skeleton structure,
-// reference documentation and changelog enrichment.
-func buildCommand(sk skelCmd, doc refDoc, since string, log *slog.Logger) Command {
+// reference documentation, glossary enrichment and changelog enrichment.
+func buildCommand(sk skelCmd, doc refDoc, gloss map[string][]glossRecord, since string, log *slog.Logger) Command {
 	cmd := Command{
 		Name:         sk.name,
 		Section:      sk.section,
@@ -496,12 +596,67 @@ func buildCommand(sk skelCmd, doc refDoc, since string, log *slog.Logger) Comman
 			Required: false,
 		}
 
+		mergeGloss(&arg, gloss[attr.tokens[0]], sk.section)
+
+		// Merge before mining, so the bounds hidden in the merged prose
+		// (clumping_factor's "Moderate values (11-40)") still reach the
+		// record; the structured skeleton kind wins over the mined word.
 		mineCommandArg(&arg)
 
 		cmd.Attributes = append(cmd.Attributes, arg)
 	}
 
 	return cmd
+}
+
+// mergeGloss fills the empty fields of an attribute arg from its glossary
+// records. The guide documents section-specific variants of one attribute
+// name in several blocks, so the record whose Example names the command's
+// section wins; with no section match the first record does. Skeleton
+// structure stays authoritative: only empty fields are filled, and the
+// bounds come from the first documented bullet that carries any.
+func mergeGloss(arg *CommandArg, records []glossRecord, section string) {
+	rec, ok := pickGloss(records, section)
+	if !ok {
+		return
+	}
+
+	if arg.Desc == "" {
+		arg.Desc = rec.doc.desc
+	}
+
+	for _, a := range rec.doc.args {
+		kind, r := MineKindRange(a.desc)
+		if r == (ValueRange{}) {
+			continue
+		}
+
+		if arg.Range == (ValueRange{}) {
+			arg.Range = r
+		}
+
+		if arg.Kind == "" {
+			arg.Kind = kind
+		}
+
+		break
+	}
+}
+
+// pickGloss returns the record documented for the given section, falling
+// back to the first one when no block names it.
+func pickGloss(records []glossRecord, section string) (glossRecord, bool) {
+	if len(records) == 0 {
+		return glossRecord{}, false
+	}
+
+	for _, rec := range records {
+		if slices.Contains(rec.sections, section) {
+			return rec, true
+		}
+	}
+
+	return records[0], true
 }
 
 // kindOf maps a skeleton placeholder token to the CommandArg kind.

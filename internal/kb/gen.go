@@ -2,6 +2,7 @@ package kb
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -82,6 +83,17 @@ type argJSON struct {
 	Desc     string     `json:"desc"`
 }
 
+// overlayFile is the optional manual-desc overlay next to the guide
+// sources: the descriptions the prose extraction cannot reach.
+const overlayFile = "attribute-descs.json"
+
+// overlaySource is the JSON shape of the overlay file: descriptions for
+// attributes (by name) and positional arguments (by command, positional).
+type overlaySource struct {
+	Attributes  map[string]string   `json:"attributes"`
+	CommandArgs map[string][]string `json:"command_args"`
+}
+
 // update is one parsed changelog update: its id and raw body lines.
 type update struct {
 	id    string
@@ -94,9 +106,10 @@ type update struct {
 // the layout of both sides.
 //
 // It is a one-shot data-build utility; the server never calls it at
-// runtime. log receives the skip-WARNs of the extraction pass and the
-// summary line; nil selects slog.Default(). Serialization is
-// deterministic: rerunning on unchanged sources yields identical files.
+// runtime. log receives the skip-WARNs of the extraction pass, the
+// desc-coverage report and the summary line; nil selects slog.Default().
+// Serialization is deterministic: rerunning on unchanged sources yields
+// identical files.
 func GenKB(refDir, dataDir string, log *slog.Logger) error {
 	if log == nil {
 		log = slog.Default()
@@ -122,6 +135,26 @@ func GenKB(refDir, dataDir string, log *slog.Logger) error {
 	commands, err := ExtractRmsCommands(filepath.Join(refDir, "zetnus-rms-guide.txt"), log)
 	if err != nil {
 		return fmt.Errorf("extract rms commands: %w", err)
+	}
+
+	overlay, err := readOverlay(refDir, log)
+	if err != nil {
+		return err
+	}
+
+	applyOverlay(commands, overlay)
+
+	cov := descCoverage(commands)
+
+	log.Info("desc coverage",
+		"attributes_filled", cov.attrsFilled,
+		"attributes_total", cov.attrsTotal,
+		"args_filled", cov.argsFilled,
+		"args_total", cov.argsTotal,
+	)
+
+	for _, name := range cov.emptyNames {
+		log.Warn("attribute without desc", "attribute", name)
 	}
 
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
@@ -161,6 +194,111 @@ func GenKB(refDir, dataDir string, log *slog.Logger) error {
 	)
 
 	return nil
+}
+
+// coverageReport is the desc coverage of one generated kb pass. Attributes
+// additionally carry the names still without a desc — those are the gaps an
+// overlay entry can close by name, unlike the positional argument slots.
+type coverageReport struct {
+	attrsTotal  int
+	attrsFilled int
+	argsTotal   int
+	argsFilled  int
+	emptyNames  []string
+}
+
+// readOverlay reads the optional desc overlay of refDir. A missing file is
+// a normal setup (guide-only descs), so it yields an empty overlay with a
+// single WARN; a broken one aborts the build — silently dropping manual
+// descriptions would look like an extraction regression.
+func readOverlay(refDir string, log *slog.Logger) (overlaySource, error) {
+	overlay := overlaySource{}
+
+	path := filepath.Join(refDir, overlayFile)
+
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		log.Warn("overlay not found, guide-only descs", "path", path)
+
+		return overlay, nil
+	}
+
+	if err != nil {
+		return overlaySource{}, fmt.Errorf("read %s: %w", overlayFile, err)
+	}
+
+	if err := json.Unmarshal(raw, &overlay); err != nil {
+		return overlaySource{}, fmt.Errorf("decode %s: %w", overlayFile, err)
+	}
+
+	return overlay, nil
+}
+
+// applyOverlay fills only the descs the extraction left empty: attributes
+// by name, positional arguments by index with a bounds-checked lookup — a
+// shorter overlay list fills its prefix and invents nothing for the rest.
+// Every inserted desc goes through mineCommandArg, so bounds prose
+// ("number (0-9)") lands in the structured Range exactly as it does on the
+// load path and the two pipelines stay idempotent.
+func applyOverlay(commands []Command, overlay overlaySource) {
+	for ci := range commands {
+		cmd := &commands[ci]
+		argDescs := overlay.CommandArgs[cmd.Name]
+
+		for i := range cmd.Attributes {
+			fill := &cmd.Attributes[i]
+			if fill.Desc != "" {
+				continue
+			}
+
+			if desc, ok := overlay.Attributes[fill.Name]; ok {
+				fill.Desc = desc
+				mineCommandArg(fill)
+			}
+		}
+
+		for i := range cmd.Args {
+			fill := &cmd.Args[i]
+			if fill.Desc != "" || i >= len(argDescs) {
+				continue
+			}
+
+			fill.Desc = argDescs[i]
+			mineCommandArg(fill)
+		}
+	}
+}
+
+// descCoverage counts the desc coverage of the generated data. Totals and
+// filled count instances; emptyNames collects the unique attribute names
+// without a desc, sorted — argument slots are positional and only counted.
+func descCoverage(commands []Command) coverageReport {
+	var cov coverageReport
+
+	for _, cmd := range commands {
+		for _, arg := range cmd.Attributes {
+			cov.attrsTotal++
+			if arg.Desc != "" {
+				cov.attrsFilled++
+
+				continue
+			}
+
+			cov.emptyNames = append(cov.emptyNames, arg.Name)
+		}
+
+		for _, arg := range cmd.Args {
+			cov.argsTotal++
+			if arg.Desc != "" {
+				cov.argsFilled++
+			}
+		}
+	}
+
+	slices.Sort(cov.emptyNames)
+	cov.emptyNames = slices.Compact(cov.emptyNames)
+
+	return cov
 }
 
 // genFunctions adapts the guide's functions.json into the flat

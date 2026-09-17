@@ -279,8 +279,9 @@ func TestStore_LoadKeepsStructuredKindOverMined(t *testing.T) {
 	assert.Equal(t, ValueRange{Min: "0", Max: "100"}, cmd.Args[0].Range)
 }
 
-// TestStore_FlagAttributesStayNameOnly covers flag attributes (empty
-// Desc): nothing to mine, the name-only form survives the load pipeline.
+// TestStore_FlagAttributesStayNameOnly feeds the load pipeline an empty
+// desc (synthetic payload — the shipped data has none left): nothing to
+// mine, the raw record survives unchanged.
 func TestStore_FlagAttributesStayNameOnly(t *testing.T) {
 	t.Parallel()
 	s := newStore()

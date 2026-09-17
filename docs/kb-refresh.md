@@ -17,6 +17,7 @@
 | Release notes AoE2 DE | новые/изменённые функции, константы, команды; версионность `since_update` | `docs/ref/aoe2de-xs-rms-changelog.md` | ageofempires.com/news (посты Update/Hotfix) |
 | UGC Guide | `functions.json`, `constants.json` | `docs/ref/ugc-guide/xs/{functions,constants}/` | ugc.aoe2.rocks |
 | Zetnus-гайд (Definitive Random Map Scripting Guide) | RMS-команды (Syntax Skeleton) | `docs/ref/zetnus-rms-guide.txt` | гугл-док Zetnus, текстовый экспорт |
+| attribute-descs overlay | ручные desc для пробелов гайда (сейчас пуст) | `docs/ref/attribute-descs.json` | проектный файл, не зеркало |
 
 Шаги независимы — процесс переживает задержки внешних мейнтейнеров:
 

@@ -497,17 +497,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify which terrain the land should have."
       },
       {
         "name": "land_percent",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "100"
         },
         "required": false,
-        "desc": ""
+        "desc": "Percentage of the total map that the land should grow to cover."
       },
       {
         "name": "number_of_tiles",
@@ -517,7 +517,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Fixed number of tiles that the land should grow by."
       },
       {
         "name": "base_size",
@@ -527,7 +527,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Square radius of the initially placed land origin, before any growth."
       },
       {
         "name": "set_circular_base",
@@ -537,7 +537,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The square land origin becomes a circle of the size that would be exactly inscribed by the square."
       },
       {
         "name": "generate_mode",
@@ -547,107 +547,107 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "By default lands are positioned at random in a cross-shaped area, and will never be in the corners.  Setting the generate mode to 1 will allow lands to be randomly positioned anywhere, including the corners."
       },
       {
         "name": "land_position",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify the exact origin point for a land, as a percentage of total map dimensions."
       },
       {
         "name": "circle_radius",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "1",
+          "max": "50"
         },
         "required": false,
-        "desc": ""
+        "desc": "Used in create_player_lands to position the player lands in a circle with equal distance to the center, with specified variance."
       },
       {
         "name": "left_border",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a percentage of map width for land placement and growth to stay away from a given border."
       },
       {
         "name": "right_border",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a percentage of map width for land placement and growth to stay away from a given border."
       },
       {
         "name": "top_border",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a percentage of map width for land placement and growth to stay away from a given border."
       },
       {
         "name": "bottom_border",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a percentage of map width for land placement and growth to stay away from a given border."
       },
       {
         "name": "border_fuzziness",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "100"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specifies the extent to which land growth respects borders and actually stops at a border."
       },
       {
         "name": "clumping_factor",
         "kind": "number",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "11",
+          "max": "40"
         },
         "required": false,
-        "desc": ""
+        "desc": "The extent to which land growth prefers to clump together near existing tiles.  Moderate values (11-40) create rounder lands, while low values (0-10) create more irregular lands, and high values (40+) create lands that extend in one direction away from the origin.  Negative values create extremely snakey lands, and are generally not recommended."
       },
       {
         "name": "land_conformity",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "-1",
+          "max": "100"
         },
         "required": false,
-        "desc": ""
+        "desc": "Intended as a more potent version of clumping_factor, with higher values conforming more to the shape of the land origin set with base_size, and with negative numbers conforming less to it."
       },
       {
         "name": "base_elevation",
         "kind": "number",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "1",
+          "max": "16"
         },
         "required": false,
-        "desc": ""
+        "desc": "Elevate the entire land to the specified height."
       },
       {
         "name": "assign_to_player",
@@ -657,17 +657,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Assign a land created with create_land to one specific player, allowing you to place starting objects on that land for that player."
       },
       {
         "name": "assign_to",
         "kind": "const",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "3"
         },
         "required": false,
-        "desc": ""
+        "desc": "A more powerful version of assign_to_player.  Assign a land created with create_land to one specific player, allowing you to place starting objects on that land for that player."
       },
       {
         "name": "zone",
@@ -677,7 +677,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Set a numeric zone. Lands sharing the same zone can grow to touch each other.  If two lands have different zones, and other_zone_avoidance_distance is specified, land growth will avoid touching the other zone."
       },
       {
         "name": "set_zone_by_team",
@@ -687,7 +687,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "For create_player_lands.  Assigns the same zone to all members of the same team. Lands sharing the same zone can grow to touch each other.  If two lands have different zones, and other_zone_avoidance_distance is specified, land growth will avoid touching the other zone."
       },
       {
         "name": "set_zone_randomly",
@@ -697,7 +697,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Lands with this attribute will randomly share zones with other lands.  Lands sharing the same zone can grow to touch each other.  If two lands have different zones, and other_zone_avoidance_distance is specified, land growth will avoid touching the other zone. Specifically the land gets a random zone in the range -8 to (PlayerCount - 9).  This means:"
       },
       {
         "name": "other_zone_avoidance_distance",
@@ -707,7 +707,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Number of tiles away from a land with a different zone to stop land growth.  Used to create river maps and island maps."
       },
       {
         "name": "min_placement_distance",
@@ -717,7 +717,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Number of tiles to stay away from the origins of previously created lands when randomly selecting an origin for this land."
       },
       {
         "name": "land_id",
@@ -727,7 +727,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Assign a numeric label to a land, which can later be used to place objects specifically on that land with place_on_specific_land_id.  Unrelated to any zone numbers."
       }
     ],
     "desc": "Creates a land for every player.",
@@ -747,17 +747,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify which terrain the land should have."
       },
       {
         "name": "land_percent",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "100"
         },
         "required": false,
-        "desc": ""
+        "desc": "Percentage of the total map that the land should grow to cover."
       },
       {
         "name": "number_of_tiles",
@@ -767,7 +767,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Fixed number of tiles that the land should grow by."
       },
       {
         "name": "base_size",
@@ -777,7 +777,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Square radius of the initially placed land origin, before any growth."
       },
       {
         "name": "set_circular_base",
@@ -787,7 +787,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The square land origin becomes a circle of the size that would be exactly inscribed by the square."
       },
       {
         "name": "generate_mode",
@@ -797,107 +797,107 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "By default lands are positioned at random in a cross-shaped area, and will never be in the corners.  Setting the generate mode to 1 will allow lands to be randomly positioned anywhere, including the corners."
       },
       {
         "name": "land_position",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify the exact origin point for a land, as a percentage of total map dimensions."
       },
       {
         "name": "circle_radius",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "1",
+          "max": "50"
         },
         "required": false,
-        "desc": ""
+        "desc": "Used in create_player_lands to position the player lands in a circle with equal distance to the center, with specified variance."
       },
       {
         "name": "left_border",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a percentage of map width for land placement and growth to stay away from a given border."
       },
       {
         "name": "right_border",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a percentage of map width for land placement and growth to stay away from a given border."
       },
       {
         "name": "top_border",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a percentage of map width for land placement and growth to stay away from a given border."
       },
       {
         "name": "bottom_border",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a percentage of map width for land placement and growth to stay away from a given border."
       },
       {
         "name": "border_fuzziness",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "100"
         },
         "required": false,
-        "desc": ""
+        "desc": "Specifies the extent to which land growth respects borders and actually stops at a border."
       },
       {
         "name": "clumping_factor",
         "kind": "number",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "11",
+          "max": "40"
         },
         "required": false,
-        "desc": ""
+        "desc": "The extent to which land growth prefers to clump together near existing tiles.  Moderate values (11-40) create rounder lands, while low values (0-10) create more irregular lands, and high values (40+) create lands that extend in one direction away from the origin.  Negative values create extremely snakey lands, and are generally not recommended."
       },
       {
         "name": "land_conformity",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "-1",
+          "max": "100"
         },
         "required": false,
-        "desc": ""
+        "desc": "Intended as a more potent version of clumping_factor, with higher values conforming more to the shape of the land origin set with base_size, and with negative numbers conforming less to it."
       },
       {
         "name": "base_elevation",
         "kind": "number",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "1",
+          "max": "16"
         },
         "required": false,
-        "desc": ""
+        "desc": "Elevate the entire land to the specified height."
       },
       {
         "name": "assign_to_player",
@@ -907,17 +907,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Assign a land created with create_land to one specific player, allowing you to place starting objects on that land for that player."
       },
       {
         "name": "assign_to",
         "kind": "const",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "3"
         },
         "required": false,
-        "desc": ""
+        "desc": "A more powerful version of assign_to_player.  Assign a land created with create_land to one specific player, allowing you to place starting objects on that land for that player."
       },
       {
         "name": "zone",
@@ -927,7 +927,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Set a numeric zone. Lands sharing the same zone can grow to touch each other.  If two lands have different zones, and other_zone_avoidance_distance is specified, land growth will avoid touching the other zone."
       },
       {
         "name": "set_zone_by_team",
@@ -937,7 +937,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "For create_player_lands.  Assigns the same zone to all members of the same team. Lands sharing the same zone can grow to touch each other.  If two lands have different zones, and other_zone_avoidance_distance is specified, land growth will avoid touching the other zone."
       },
       {
         "name": "set_zone_randomly",
@@ -947,7 +947,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Lands with this attribute will randomly share zones with other lands.  Lands sharing the same zone can grow to touch each other.  If two lands have different zones, and other_zone_avoidance_distance is specified, land growth will avoid touching the other zone. Specifically the land gets a random zone in the range -8 to (PlayerCount - 9).  This means:"
       },
       {
         "name": "other_zone_avoidance_distance",
@@ -957,7 +957,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Number of tiles away from a land with a different zone to stop land growth.  Used to create river maps and island maps."
       },
       {
         "name": "min_placement_distance",
@@ -967,7 +967,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Number of tiles to stay away from the origins of previously created lands when randomly selecting an origin for this land."
       },
       {
         "name": "land_id",
@@ -977,7 +977,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Assign a numeric label to a land, which can later be used to place objects specifically on that land with place_on_specific_land_id.  Unrelated to any zone numbers."
       }
     ],
     "desc": "Create a single non-player (neutral) land.",
@@ -1008,7 +1008,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Terrain on which the hill(s) should generate.  If you have multiple terrains you want hills on, then you need multiple create_elevation commands."
       },
       {
         "name": "base_layer",
@@ -1018,7 +1018,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Use this attribute in addition to base_terrain if (and only if) you specified a layer for the map base terrain at the beginning of \u003cLAND_GENERATION\u003e."
       },
       {
         "name": "number_of_tiles",
@@ -1028,7 +1028,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Total base tile count allocated to this create_elevation command.  If number_of_clumps is specified, this value is divided equally among the clumps."
       },
       {
         "name": "number_of_clumps",
@@ -1038,7 +1038,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Number of individual hills to create.  If clumps are adjacent, the hills may merge."
       },
       {
         "name": "set_scale_by_size",
@@ -1048,7 +1048,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Scales number_of_tiles to the map size.  Unscaled value refers to a 100x100 map (see: Map Sizes for the scaling table)"
       },
       {
         "name": "set_scale_by_groups",
@@ -1058,7 +1058,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Scales number_of_clumps to the map size.  Unscaled value refers to a 100x100 map (see: Map Sizes for the scaling table)"
       },
       {
         "name": "spacing",
@@ -1068,7 +1068,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Number of tiles between each elevation level.  Numbers larger than 1 will produce rings of flat terrain on each level of a hill."
       },
       {
         "name": "enable_balanced_elevation",
@@ -1078,7 +1078,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Removes the bias of hill placement towards the bottom (south) of the map.  Default is disabled, so you should always include this attribute!"
       }
     ],
     "desc": "Create one or more hills of random height, up to the given height.",
@@ -1289,7 +1289,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify the base terrain on which you want to place your new terrain."
       },
       {
         "name": "base_layer",
@@ -1299,7 +1299,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a layered terrain on which you want to place your new terrain."
       },
       {
         "name": "beach_terrain",
@@ -1309,7 +1309,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify a terrain that should be placed where the current terrain borders water."
       },
       {
         "name": "terrain_mask",
@@ -1319,7 +1319,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Enables terrain masking/layering for the terrain being created.  Terrain inherits all properties, placement restrictions, automatic objects (such as trees for forest terrains), minimap color, etc. from the terrain underneath (ie. base_terrain when masking over, or create_terrain when masking under)"
       },
       {
         "name": "spacing_to_other_terrain_types",
@@ -1329,7 +1329,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Minimum distance that this terrain will stay away from other terrain types."
       },
       {
         "name": "spacing_to_specific_terrain",
@@ -1339,7 +1339,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Minimum distance that this terrain will stay away from a specific terrain."
       },
       {
         "name": "set_flat_terrain_only",
@@ -1349,17 +1349,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The terrain will avoid sloped tiles by the distance specified in spacing_to_other_terrain_types"
       },
       {
         "name": "land_percent",
         "kind": "percent",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "1",
+          "max": "100"
         },
         "required": false,
-        "desc": ""
+        "desc": "Percentage of the total map allocated to this create_terrain command.  If number_of_clumps is specified, this value is divided equally among the clumps."
       },
       {
         "name": "number_of_tiles",
@@ -1369,7 +1369,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Total tile count allocated to this create_terrain command.  If number_of_clumps is specified, this value is divided equally among the clumps."
       },
       {
         "name": "number_of_clumps",
@@ -1379,17 +1379,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Number of individual terrain patches to create."
       },
       {
         "name": "clumping_factor",
         "kind": "number",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "5",
+          "max": "25"
         },
         "required": false,
-        "desc": ""
+        "desc": "The extent to which terrain tiles prefer to be together next to other tiles of the same clump.  Moderate values (5-25) create rounder terrain patches, while low values (0-5) create more irregular terrain patches.  Negative values create extremely snakey terrains."
       },
       {
         "name": "set_scale_by_size",
@@ -1399,7 +1399,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Scales number_of_tiles to the map size.  Unscaled value refers to a 100x100 map (see: Map Sizes for the scaling table)"
       },
       {
         "name": "set_scale_by_groups",
@@ -1409,7 +1409,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Scales number_of_clumps to the map size.  Unscaled value refers to a 100x100 map (see: Map Sizes for the scaling table)"
       },
       {
         "name": "set_avoid_player_start_areas",
@@ -1419,7 +1419,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The terrain will avoid the origins of player lands by the specified number of tiles (with some variance)."
       },
       {
         "name": "height_limits",
@@ -1429,7 +1429,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The terrain will only be placed on tiles of height between min and max (inclusive)."
       }
     ],
     "desc": "Create a clump of terrain.  The exact behavior is dependent on the attributes specified.",
@@ -1458,7 +1458,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Replace ALL terrain in the connection with the specified terrain."
       },
       {
         "name": "replace_terrain",
@@ -1468,17 +1468,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "If the specified terrain is part of the connection, replace it with the new terrain specified."
       },
       {
         "name": "terrain_cost",
         "kind": "const",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "4294967296"
         },
         "required": false,
-        "desc": ""
+        "desc": "The cost of having the connection run through the specified terrain."
       },
       {
         "name": "terrain_size",
@@ -1488,7 +1488,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "When a connection passes through a tile of the specified terrain, the area within radius +/- variance will be subject to replace_terrain / default_terrain_replacement and terrains will be replaced accordingly."
       }
     ],
     "desc": "Connections will be generated between the origins of all player lands, and all lands assigned to players.",
@@ -1508,7 +1508,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Replace ALL terrain in the connection with the specified terrain."
       },
       {
         "name": "replace_terrain",
@@ -1518,17 +1518,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "If the specified terrain is part of the connection, replace it with the new terrain specified."
       },
       {
         "name": "terrain_cost",
         "kind": "const",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "4294967296"
         },
         "required": false,
-        "desc": ""
+        "desc": "The cost of having the connection run through the specified terrain."
       },
       {
         "name": "terrain_size",
@@ -1538,7 +1538,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "When a connection passes through a tile of the specified terrain, the area within radius +/- variance will be subject to replace_terrain / default_terrain_replacement and terrains will be replaced accordingly."
       }
     ],
     "desc": "Connections will be generated between the origins of player lands belonging to members of the same team.",
@@ -1558,7 +1558,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Replace ALL terrain in the connection with the specified terrain."
       },
       {
         "name": "replace_terrain",
@@ -1568,17 +1568,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "If the specified terrain is part of the connection, replace it with the new terrain specified."
       },
       {
         "name": "terrain_cost",
         "kind": "const",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "4294967296"
         },
         "required": false,
-        "desc": ""
+        "desc": "The cost of having the connection run through the specified terrain."
       },
       {
         "name": "terrain_size",
@@ -1588,7 +1588,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "When a connection passes through a tile of the specified terrain, the area within radius +/- variance will be subject to replace_terrain / default_terrain_replacement and terrains will be replaced accordingly."
       }
     ],
     "desc": "Connections will be generated between the origins of all lands.",
@@ -1608,7 +1608,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Replace ALL terrain in the connection with the specified terrain."
       },
       {
         "name": "replace_terrain",
@@ -1618,17 +1618,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "If the specified terrain is part of the connection, replace it with the new terrain specified."
       },
       {
         "name": "terrain_cost",
         "kind": "const",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "4294967296"
         },
         "required": false,
-        "desc": ""
+        "desc": "The cost of having the connection run through the specified terrain."
       },
       {
         "name": "terrain_size",
@@ -1638,7 +1638,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "When a connection passes through a tile of the specified terrain, the area within radius +/- variance will be subject to replace_terrain / default_terrain_replacement and terrains will be replaced accordingly."
       }
     ],
     "desc": "Behaves identically to create_connect_all_lands",
@@ -1679,7 +1679,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Replace ALL terrain in the connection with the specified terrain."
       },
       {
         "name": "replace_terrain",
@@ -1689,17 +1689,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "If the specified terrain is part of the connection, replace it with the new terrain specified."
       },
       {
         "name": "terrain_cost",
         "kind": "const",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "4294967296"
         },
         "required": false,
-        "desc": ""
+        "desc": "The cost of having the connection run through the specified terrain."
       },
       {
         "name": "terrain_size",
@@ -1709,7 +1709,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "When a connection passes through a tile of the specified terrain, the area within radius +/- variance will be subject to replace_terrain / default_terrain_replacement and terrains will be replaced accordingly."
       }
     ],
     "desc": "Generate connections between all lands belonging to the zones listed.",
@@ -1729,7 +1729,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Replace ALL terrain in the connection with the specified terrain."
       },
       {
         "name": "replace_terrain",
@@ -1739,17 +1739,17 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "If the specified terrain is part of the connection, replace it with the new terrain specified."
       },
       {
         "name": "terrain_cost",
         "kind": "const",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "4294967296"
         },
         "required": false,
-        "desc": ""
+        "desc": "The cost of having the connection run through the specified terrain."
       },
       {
         "name": "terrain_size",
@@ -1759,7 +1759,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "When a connection passes through a tile of the specified terrain, the area within radius +/- variance will be subject to replace_terrain / default_terrain_replacement and terrains will be replaced accordingly."
       }
     ],
     "desc": "Connect all player lands to all neutral lands, but do not directly generate connections between individual players.",
@@ -1836,11 +1836,11 @@
         "name": "add_object",
         "kind": "const",
         "range": {
-          "min": "",
-          "max": ""
+          "min": "0",
+          "max": "99"
         },
         "required": false,
-        "desc": ""
+        "desc": "List a selection of objects with probabilities.  When the chosen constant name is used in your script, an object will be chosen from the group at random, using the specified probabilities."
       }
     ],
     "desc": "List a selection of objects with probabilities.  When the chosen constant name is used in your script, an object will be chosen from the group at random, using the specified probabilities.",
@@ -1871,7 +1871,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Number of objects to create."
       },
       {
         "name": "number_of_groups",
@@ -1881,7 +1881,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Place the specified number of groups, which each consist of the number of individual objects chosen in number_of_objects"
       },
       {
         "name": "group_variance",
@@ -1891,7 +1891,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The number_of_objects is randomly varied by up to the amount specified, with maximum variance in the positive direction being reduced by 1."
       },
       {
         "name": "group_placement_radius",
@@ -1901,7 +1901,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify the number of tiles out from the central tile that objects belonging to the same group may spawn."
       },
       {
         "name": "set_tight_grouping",
@@ -1911,7 +1911,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Objects belonging to the same group must be in adjacent tiles.  Commonly used for berries, gold and stone."
       },
       {
         "name": "set_loose_grouping",
@@ -1921,7 +1921,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Objects belonging to the same group can be placed anywhere within the confines of group_placement_radius"
       },
       {
         "name": "min_connected_tiles",
@@ -1931,7 +1931,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Prevents grouped objects from being placed in an area with fewer tiles than the specified amount.  Intended to be used to keep objects off tiny islands and out of tiny forest clearings."
       },
       {
         "name": "resource_delta",
@@ -1941,7 +1941,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Modify the amount of food/wood/gold/stone in an object."
       },
       {
         "name": "second_object",
@@ -1951,7 +1951,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Specify ANY object to be placed on top of the main object."
       },
       {
         "name": "set_scaling_to_map_size",
@@ -1961,7 +1961,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Scales number_of_groups to the map size.  Unscaled value refers to a 100x100 map (see: Map Sizes for the scaling table)"
       },
       {
         "name": "set_scaling_to_player_number",
@@ -1971,7 +1971,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Scales number_of_groups to player count. This means x2 for a 2-player game and x8 for an 8-player game."
       },
       {
         "name": "set_place_for_every_player",
@@ -1981,7 +1981,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Place the object(s) as a personal object for each player (actually for each player land).  Objects that cannot be owned by players (boar, gold, trees, etc.) also require set_gaia_object_only to be placed for every player."
       },
       {
         "name": "place_on_specific_land_id",
@@ -1991,7 +1991,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Place the object(s) on each land of the specified identifier.  IDs are set in \u003cLAND_GENERATION\u003e by using the land_id attribute."
       },
       {
         "name": "avoid_other_land_zones",
@@ -2001,7 +2001,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "An object will only be placed on tiles belonging to the land that it is referenced to, and will avoid the edges of that land by the specified distance."
       },
       {
         "name": "generate_for_first_land_only",
@@ -2011,7 +2011,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "If there are multiple create_player_lands commands or multiple lands sharing a land_id, this object will only be placed on the first applicable land, instead of on all of them."
       },
       {
         "name": "set_gaia_object_only",
@@ -2021,7 +2021,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Use with set_place_for_every_player to place gaia (neutral) objects on a per-player basis.  Must be used when placing player's gold/stone/berries/deer/boar."
       },
       {
         "name": "set_gaia_unconvertible",
@@ -2031,7 +2031,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Use with any gaia object to make that object unrescuable by players and hostile towards them."
       },
       {
         "name": "set_building_capturable",
@@ -2041,7 +2041,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Used to make a building switch control to whoever most recently has units nearby."
       },
       {
         "name": "make_indestructible",
@@ -2051,7 +2051,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Make a building indestructible.  The building receives 9999 HP, 1000/1000 armor, and cannot be attacked, damaged or deleted."
       },
       {
         "name": "min_distance_to_players",
@@ -2061,7 +2061,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Minimum and maximum distance (in tiles) from the origin of player lands, that the object can be placed."
       },
       {
         "name": "max_distance_to_players",
@@ -2071,7 +2071,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Minimum and maximum distance (in tiles) from the origin of player lands, that the object can be placed."
       },
       {
         "name": "set_circular_placement",
@@ -2081,7 +2081,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Changes min_distance_to_players and max_distance_to_players to use the circular (Euclidean) distance, rather than a square radius.  This prevents resources on the diagonal from being very far away."
       },
       {
         "name": "terrain_to_place_on",
@@ -2091,7 +2091,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The object(s) will only be placed on the specified terrain."
       },
       {
         "name": "layer_to_place_on",
@@ -2101,7 +2101,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The object(s) will only be placed on the specified layering terrain."
       },
       {
         "name": "ignore_terrain_restrictions",
@@ -2111,7 +2111,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Objects can be placed on terrains they are normally restricted from, and these terrains no longer constitute a border on their placement.  Must be used with set_place_for_every_player or set_place_on_specific_land_id."
       },
       {
         "name": "max_distance_to_other_zones",
@@ -2121,7 +2121,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Minimum (NOT maximum) distance, in tiles, that objects will stay away from terrains that they are restricted from being placed on."
       },
       {
         "name": "place_on_forest_zone",
@@ -2131,7 +2131,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Place objects only on, and directly next to, tiles with trees on them (including straggler trees and scenario editor trees)."
       },
       {
         "name": "avoid_forest_zone",
@@ -2141,7 +2141,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Objects will stay the specified number of tiles away from any trees (including straggler trees and scenario editor trees)"
       },
       {
         "name": "avoid_cliff_zone",
@@ -2151,7 +2151,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Objects will stay the specified number of tiles away from cliffs.  Note that because of the size of the cliff objects, you need to specify at least a distance of 2 to actually create a gap between the cliffs and the object(s)."
       },
       {
         "name": "min_distance_to_map_edge",
@@ -2161,7 +2161,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Minimum distance, in tiles, that objects will stay away from the edge of the map."
       },
       {
         "name": "min_distance_group_placement",
@@ -2171,7 +2171,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Minimum distance, in tiles, that individual objects of the same create_object command, and ALL future objects, must stay away from each object."
       },
       {
         "name": "temp_min_distance_group_placement",
@@ -2181,7 +2181,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Like min_distance_group_placement, but only applies to the current create_object command - future objects are unaffected."
       },
       {
         "name": "find_closest",
@@ -2191,7 +2191,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Place the object on the closest free tile to the center of the land, taking into consideration all other constraints."
       },
       {
         "name": "find_closest_to_map_center",
@@ -2201,7 +2201,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Place the object on the closest free tile to the center of the map, taking into consideration all other constraints."
       },
       {
         "name": "find_closest_to_map_edge",
@@ -2211,7 +2211,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Place the object on the closest free tile to the edge of the map, taking into consideration all other constraints."
       },
       {
         "name": "enable_tile_shuffling",
@@ -2221,7 +2221,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Increases randomness of object positions by shuffling the list of candidate tiles rather than just using the first entry."
       },
       {
         "name": "require_path",
@@ -2231,7 +2231,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Objects with this attribute must have a path to the origin of their associated land.  Use this attribute to prevent player resources from being trapped in or behind forests."
       },
       {
         "name": "force_placement",
@@ -2241,7 +2241,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Allows multiple objects to be placed on the same tile at once, if necessary.  Normally, objects are placed one per tile, and if the tiles run out, no more objects are placed.  With force_placement active, when tiles run out, the remaining objects are placed on the corners of tiles, and then on top of each other."
       },
       {
         "name": "actor_area",
@@ -2251,7 +2251,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Specifies a numerical identifier which can be referred to in future objects with avoid_actor_area or actor_area_to_place_in"
       },
       {
         "name": "actor_area_radius",
@@ -2261,7 +2261,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Used with actor_area to specify how large it should be."
       },
       {
         "name": "override_actor_radius_if_required",
@@ -2271,7 +2271,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Prevents buildings from overlapping when placed in an actor_area with a radius that is too small to contain them, by expanding the valid placement area outwards."
       },
       {
         "name": "actor_area_to_place_in",
@@ -2281,7 +2281,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Place the object only within the radius of the specified actor_area or create_actor_area"
       },
       {
         "name": "avoid_actor_area",
@@ -2291,7 +2291,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The object will avoid the specified actor_area or create_actor_area"
       },
       {
         "name": "avoid_all_actor_areas",
@@ -2301,7 +2301,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "The object will avoid being placed within ANY existing actor_area or create_actor_area"
       },
       {
         "name": "set_facet",
@@ -2311,7 +2311,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Choose which frame (of the sprite) of an object to generate."
       },
       {
         "name": "match_player_civ",
@@ -2321,7 +2321,7 @@
           "max": ""
         },
         "required": false,
-        "desc": ""
+        "desc": "Used to ensure that each faction gets their correct starting scout unit."
       }
     ],
     "desc": "Place the specified object, according to the chosen attributes.",
@@ -2411,29 +2411,29 @@
     "section": "global",
     "args": [
       {
-        "name": "arg1",
+        "name": "min",
         "kind": "number",
         "range": {
           "min": "",
           "max": ""
         },
         "required": true,
-        "desc": ""
+        "desc": "number"
       },
       {
-        "name": "arg2",
+        "name": "max",
         "kind": "number",
         "range": {
           "min": "",
           "max": ""
         },
         "required": true,
-        "desc": ""
+        "desc": "number"
       }
     ],
     "attributes": [],
-    "desc": "",
-    "game_versions": "",
+    "desc": "Randomize a numeric argument between min and max (inclusive).",
+    "game_versions": "UP/DE",
     "since_update": ""
   },
   {
