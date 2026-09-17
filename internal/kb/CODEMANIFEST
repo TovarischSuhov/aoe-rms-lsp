@@ -10,6 +10,25 @@ Usages:
     since_update sourced from docs/ref/aoe2de-xs-rms-changelog.md; empty string when unknown.
     Names must be unique within each file — validated on load.
 
+    Attribute descs (signature help) come from the guide's glossary doc
+    blocks, merged into the skeleton by name, fill-when-empty: the desc is
+    the record's first prose paragraph verbatim; Range/Kind come from the
+    first Arguments bullet of the merged record carrying mineable bounds.
+    A name documented per section (6 names, 2-3 variants) takes the record
+    whose Example block names the command's section, else the first record
+    in file order. Flag attributes keep Kind empty — their prose has no
+    kind word — with the desc filled. Positional argument descs are instead
+    the "* Name - desc" bullets of the command's own Arguments block,
+    matched by index, with Range/Kind mined from that desc.
+
+    Regeneration inputs beside the sources above: the glossary blocks
+    (above) and the optional overlay docs/ref/attribute-descs.json — a
+    project file, not a guide mirror: {"attributes": {name: desc},
+    "command_args": {command: [desc, …]}}; fills only what the glossary
+    left, never overwrites; ships empty because the guide covers every
+    name. GenKB logs a desc-coverage summary and WARNs on names still
+    without a desc.
+
     Desc prose mining (signature help):
     - Value bounds appear as "(<num>-<num>)" right after the kind word:
       "number (0-99)", "number (1-16)", "number (36-480)"; decimals and negative
@@ -18,8 +37,9 @@ Usages:
     - The kind word in prose is "number" even for percent-typed args
       (cliff_curliness %: kind=percent, desc="number (0-100)") — mined kind fills
       only empty Kind entries, never overwrites structured ones.
-    - Flag attributes (34 entries: set_circular_base, make_indestructible, …) carry
-      empty Desc — nothing to mine; they stay name-only by design.
+    - Mined Range bounds are a heuristic read of the guide prose (bullet
+      bounds, prose bands like clumping_factor's "Moderate values (11-40)")
+      — not authoritative limits.
 
 Annotations: |
   Use `conventions` for code writing rules and testing.
@@ -214,7 +234,9 @@ Annotations: |
     1. Прочитать файл по `path`
     2. Найти секции Syntax Skeleton и пройтись по блокам команд
     3. Для каждой команды собрать Name, Section, Args, Attributes, Desc,
-       GameVersions; для каждого CommandArg — `MineKindRange`(Desc) →
+       GameVersions; пустые поля атрибутов заполнить из глоссария гайда
+       (запись по секции команды, Range/Kind — из первого Arguments-буллета
+       с границами), затем для каждого CommandArg — `MineKindRange`(Desc) →
        заполнить Range, Kind пуст → замайненный kind
     4. Обогатить SinceUpdate по changelog (docs/ref/aoe2de-xs-rms-changelog.md)
     5. Проверить дубликаты имён; вернуть []Command
@@ -239,8 +261,13 @@ Annotations: |
     1. Прочитать из `refDir` источники по `kbdata`: функции и константы —
        адаптацией JSON ugc-guide; команды — `ExtractRmsCommands`(гайд, `log`)
     2. Пополнить SinceUpdate по changelog из `refDir`
-    3. Проверить уникальность имён внутри каждого набора; коллизия — ошибка
-    4. Записать три файла данных в `dataDir` по формату `kbdata`
+    3. Наложить опциональный overlay attribute-descs.json из `refDir`
+       (fill-when-empty по `kbdata`): файл отсутствует → WARN и пустой
+       overlay, битый JSON — ошибка сборки
+    4. Посчитать desc-coverage и записать в `log` INFO-сводку (attributes/
+       args filled/total) и WARN по именам атрибутов без desc
+    5. Проверить уникальность имён внутри каждого набора; коллизия — ошибка
+    6. Записать три файла данных в `dataDir` по формату `kbdata`
 
     Requirements:
     - сериализация детерминирована: повторный запуск на тех же исходниках
