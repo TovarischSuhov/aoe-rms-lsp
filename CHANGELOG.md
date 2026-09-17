@@ -1,5 +1,68 @@
 # Changelog
 
+## v0.7.0 (2026-09-17)
+
+### Features
+
+- feat: kb — регенерация rms-commands.json и пустой overlay (#59)
+- feat: kb — глоссарный мерж desc атрибутов и overlay (#59)
+- feat: vscode — статус-бар состояния сервера и версии (#85)
+- feat: server — версия в ServerInfo initialize-ответа (#85)
+- feat: newscheck + kb-monitor — ежедневный cron, issue на батч, пуш state (#61)
+- feat: news — детектор патч-постов AoE2 DE в RSS-фиде (#61)
+- feat: kbgen — режим -diff: отчёт «что нового» без записи данных (#57)
+- feat: kb — DiffKB, агрегированный дифф каталогов данных kb (#57)
+- feat: vscode — автозагрузка бинарника aoe2-lsp (#52)
+- feat: duplicate-include — warning на повторный include в корневом документе (#58)
+- feat: snippets — VS Code-сниппеты RMS-бойлерплейта (#54)
+- feat: server — PrepareRename/Rename по замыканию (#44)
+- feat: include — Resolver.RenameSites: склейка rename-сайтов по замыканию (#44)
+- feat: rms — RenameRefs: by-name rename-сайты (#44)
+- feat: rename-server — контракты rms/include/server + cook Rename (#44)
+
+### Fixes
+
+- fix: check-vsix — vsce кладёт payload под extension/ внутри vsix (#69)
+- fix: vscode — includeRoots-дока под реальные пути DE + allowScripts (#70)
+- fix: vscode — glob в scripts.test для Node 22 (#52)
+- fix: corpus — discard connCtx на месте связывания protocol.NewClient
+- fix: xs — doc XsFile.Symbols: точный глосс include-директив, дубль у EnclosingRanges убран
+
+### Tests
+
+- test: include — t.Parallel() в closure/source тестах
+- test: analysis — t.Parallel() в трёх integration-тестах
+
+### CI
+
+- ci: release — vsix в GitHub Release, синк версий, харденинг упаковки (#69)
+
+### Docs
+
+- docs: kb — контракт desc-покрытия (#59)
+- docs: kb-attribute-desc — формулировка задачи (#59)
+- docs: status-bar — формулировка задачи (#85)
+- docs: news — CODEMANIFEST + .usages из arch-плана (apply, #61)
+- docs: news — arch-план ячейки internal/news (brainstorm, #61)
+- docs: release-notes-monitor — формулировка задачи (#61)
+- docs: ux-wave-2 — снять hover-attribute (уже в PR #40), 7 слотов
+- docs: ux-wave-2 — пачка «UX волна 2», 8 слотов (#78–#85)
+- docs: kb-refresh — процесс обновления kb под патчи игры (#57)
+- docs: kb-refresh — формулировка задачи (#57)
+- docs: duplicate-include — формулировка задачи (#58)
+- docs: vsix-release-ci — snippets[].path в перечне contributes-путей (#69)
+- docs: snippets — формулировка задачи (#54)
+- docs: CLAUDE.md — Structure: cmd corpus/tmgen, internal corpus/highlight, editors/
+- docs: CLAUDE.md — готовность к ревью только после зелёного CI
+- docs: rename-server — arch-план: склейка rename-сайтов по замыканию (#44)
+- docs: rename-server — формулировка задачи #44 (PrepareRename/Rename по замыканию)
+- docs: vscode-hygiene — формулировка задачи + зеркало #70 (из диагностики #68)
+- docs: vsix-release-ci — формулировка задачи + cooks (зеркало #69)
+
+### Chore
+
+- news: kb-monitor anchor updated
+
 ## v0.6.0 (2026-09-10)
 
 ### Features
