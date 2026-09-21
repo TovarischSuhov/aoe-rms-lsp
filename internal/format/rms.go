@@ -5,6 +5,7 @@ import (
 	"aoe2-lsp/internal/rms"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -43,6 +44,7 @@ func RMS(source string, opts Options) (string, error) {
 		size: indentWidth(opts.TabSize),
 	}
 	p.comments = file.Comments
+	p.rawClosed = make(map[uint64]bool)
 	p.xsMask = xsLineMask(p.doc.blanked, file.XsBlocks)
 	p.chainLast = chainLast(p.doc.blanked, p.xsMask)
 	p.list(p.elements(file), 0, p.doc.eof(), true)
@@ -386,10 +388,16 @@ type printer struct {
 	tabs bool
 	size int
 
-	out       []string
-	comments  []common.Range
-	pending   int             // index of the next comment not yet anchored
-	rawClosed int             // closers raw slices already printed; closer() spends one per synthesis it skips
+	out      []string
+	comments []common.Range
+	pending  int // index of the next comment not yet anchored
+	// rawClosed holds, keyed by the construct's start, every chain-last
+	// closer a raw slice already put on the page; closer() spends the
+	// matching entry skipping that one synthesis. Addressed, not counted:
+	// the replay can close scopes no live element owns — the parser's
+	// brace tracking diverges from the line replay on a glued `word{` —
+	// and a counted credit would leak into someone else's synthesis.
+	rawClosed map[uint64]bool
 	chainLast map[uint64]bool // conditionals ending their chain, by lineCol key
 	xsMask    []bool          // lines the rms parser never reads: embedded XS
 }
@@ -525,7 +533,7 @@ func (p *printer) element(el element, level int, limit common.Pos) (common.Pos, 
 		if p.verbatim(el.stmt) {
 			p.emit(p.at(level) + rawChunk(trimBlankLines(p.doc.text(ranges(el.stmt.Range.Start, limit)))))
 			p.dropBefore(limit)
-			p.rawClosed += p.rawClosers(el.stmt.Range.Start, limit)
+			maps.Copy(p.rawClosed, p.rawClosers(el.stmt.Range.Start, limit))
 
 			return limit, true
 		}
@@ -613,7 +621,8 @@ func (p *printer) statement(stmt rms.Statement, level int, limit common.Pos) {
 // cross section headers — so the answer comes from the chainLast replay.
 // A closer a raw slice has already put on the page — a { } block reaching
 // past its chain's endif, a warning end_random finishing an if together
-// with its start_random — is skipped, spent from rawClosed.
+// with its start_random — is skipped: the construct's start key is spent
+// from rawClosed, and an unsuppressed synthesis always prints.
 func (p *printer) closer(el element, level int) {
 	last := el.stmt.Name == "start_random" ||
 		(el.stmt.Kind == rms.KindConditional && p.chainLast[lineCol(el.stmt.Range.Start)])
@@ -621,8 +630,10 @@ func (p *printer) closer(el element, level int) {
 		return
 	}
 
-	if p.rawClosed > 0 {
-		p.rawClosed--
+	at := lineCol(el.stmt.Range.Start)
+
+	if p.rawClosed[at] {
+		delete(p.rawClosed, at)
 
 		return
 	}
@@ -661,7 +672,7 @@ func chainLast(blanked []string, mask []bool) map[uint64]bool {
 // scopes a closer or a branch switch finished; open holds the ones still
 // standing at the walk's end (percent_chance aside).
 func replayChains(blanked []string, from, to int, skip func(int) bool, seed replaySeed) (res replayResult) {
-	w := replay{ended: make(map[uint64]bool), seed: len(seed.stack)}
+	w := replay{ended: make(map[uint64]bool), closed: make(map[uint64]bool), seed: len(seed.stack)}
 	w.stack = append(w.stack, seed.stack...)
 	depth := seed.depth
 
@@ -735,14 +746,14 @@ type replayResult struct {
 	open       []uint64        // scopes never closed by the walk, percent_chance aside
 	stack      []chainFrame    // scopes still standing at the walk's end
 	depth      int             // brace depth at the walk's end
-	closedSeed int             // planted scopes the walk finished, percent aside
+	closedSeed map[uint64]bool // planted scopes the walk finished, percent aside, keyed by start
 }
 
 // replay is the scope state of one structural walk.
 type replay struct {
 	stack  []chainFrame
 	seed   int             // frames planted where the walk began, at the stack's bottom
-	closed int             // planted scopes the walk finished, percent aside
+	closed map[uint64]bool // planted scopes the walk finished, percent aside, keyed by start
 	ended  map[uint64]bool // scopes a closer or a branch switch finished
 }
 
@@ -788,9 +799,9 @@ func (w *replay) closeScopes(stop byte, markStop bool) {
 	}
 }
 
-// finish records one popped scope: chain-last in ended, and counted when
-// planted. percent_chance branches carry no closer of their own and never
-// count.
+// finish records one popped scope: chain-last in ended, and keyed into
+// closed when planted. percent_chance branches carry no closer of their
+// own and never count.
 func (w *replay) finish(frame chainFrame, planted bool) {
 	if frame.kind == 'p' {
 		return
@@ -799,7 +810,7 @@ func (w *replay) finish(frame chainFrame, planted bool) {
 	w.ended[frame.at] = true
 
 	if planted {
-		w.closed++
+		w.closed[frame.at] = true
 	}
 }
 
@@ -836,17 +847,20 @@ func xsLineMask(lines []string, blocks []rms.XsBlock) []bool {
 	return mask
 }
 
-// rawClosers counts the enclosing chain-last constructs a raw slice's
-// closers finish: the slice prints source bytes, and an endif/end_random
-// inside them can close the constructs wrapping the raw statement — a
-// warning input's end_random finishes an inner if and its start_random at
-// once. The scopes standing around the statement come from replaying the
-// file before it; every planted scope the slice finishes is one closer()
-// synthesis the page already carries. percent_chance branches carry no
-// closer and never count. Frames are counted, not closer lines: one line
-// may finish several constructs, and the credit must cover every
-// synthesis it stands in for.
-func (p *printer) rawClosers(from, to common.Pos) int {
+// rawClosers names, by their start, the enclosing chain-last constructs a
+// raw slice's closers finish: the slice prints source bytes, and an
+// endif/end_random inside them can close the constructs wrapping the raw
+// statement — a warning input's end_random finishes an inner if and its
+// start_random at once. The scopes standing around the statement come
+// from replaying the file before it; every planted scope the slice
+// finishes is one closer() synthesis the page already carries, and the
+// key makes the credit addressed — a scope no live element owns (the
+// replay's line view diverges from the parser's brace tracking on a
+// glued `word{`) can never spend another construct's synthesis.
+// percent_chance branches carry no closer and never count. Frames are
+// named, not closer lines counted: one line may finish several
+// constructs, and every one of them stands covered.
+func (p *printer) rawClosers(from, to common.Pos) map[uint64]bool {
 	last := int(to.Line)
 	if to.Column == 0 && last > int(from.Line) {
 		last--
