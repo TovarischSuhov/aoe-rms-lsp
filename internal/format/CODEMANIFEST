@@ -1,0 +1,100 @@
+Imports:
+  - Types:
+      - Range
+      - Diagnostic
+    From: internal/common
+  - Types:
+      - RmsFile
+      - Parse
+    Usages:
+      - rms-parsing
+    From: internal/rms
+
+Usages:
+  conventions: .goga/usages/conventions.md
+  rms_grammar: .goga/usages/rms-grammar.md
+
+Annotations: |
+  Use `conventions` for code writing rules and testing.
+  Use `rms_grammar` for the RMS language structure being printed.
+  Use `rms-parsing` from Imports для потребления Parse и AST.
+
+  Ячейка печатает отформатированный текст из готовых AST:
+  stateless, протоколо-независима (без LSP-типов); результат
+  зависит только от аргументов вызова. Печать перестраивает
+  пробелы, отступы и пустые строки; тексты токенов — из AST;
+  достоверность выхода относительно входа держится инвариантами
+  контракта RMS.
+
+---
+
+"Options(tabSize: int, indentTabs: bool)":
+  location: options.go
+  annotations: |
+    Параметры отступа печати — общие для точек входа ячейки.
+
+    Requirements:
+    - zero-value валиден: TabSize=0 означает дефолт 4
+    - чистые данные: construct-and-use, без методов
+  properties:
+    "TabSize -> int": |
+      Ширина одного уровня отступа в пробелах; 0 — дефолт 4.
+    "IndentTabs -> bool": |
+      true — один таб на уровень вместо TabSize пробелов.
+
+"RMS(source: string, opts: Options) -> formatted: string, err: error":
+  location: rms.go
+  annotations: |
+    Форматирование RMS-исходника в канонический стиль:
+    отступы и пустые строки перестраиваются, семантика неизменна.
+
+    `source`: текст .rms-файла; `opts`: параметры отступа;
+    `formatted`: результат; `err`: отказ — вход содержит
+    error-диагностики (sentinel, классификация errors.Is
+    по `conventions`; `formatted` пуст)
+
+    Algorithm:
+    1. Разобрать вход: `Parse` по `rms-parsing` → `RmsFile` и
+       diags; error-severity в `Diagnostic` → отказ
+    2. Определить EOL входа: доминирующий из "\r\n"/"\n";
+       нет переводов или равенство — "\n"
+    3. Упорядочить элементы: слить Sections, Includes, XsIncludes,
+       XsBlocks по Start их `Range` (исходный порядок); глобальные
+       statements — из синтетической секции "global"
+    4. Напечатать по `rms_grammar`: секция — <name>, содержимое
+       с отступом уровня+1, </name>; команда — имя и позиционные
+       аргументы одной строкой; каждый атрибут — отдельной строкой
+       с отступом уровня+1; блоки random/conditional — рекурсивно
+       (строка percent_chance/if, дети с отступом); директивы
+       #include/#includeXS — как записаны; XsBlock — директива
+       и Code вербатим
+    5. Якорение комментариев: тексты из source по диапазонам
+       свойства Comments у `RmsFile`; сравнением с диапазонами
+       узлов поместить каждый в ближайшую меж-узловую позицию
+       потока; порядок комментариев сохраняется; каждый — на
+       отдельной строке
+    6. Пустые строки: одна между элементами верхнего уровня,
+       внутри секций/блоков — без пустых строк; один финальный
+       перевод строки
+    7. Склеить строки EOL-ом входа
+
+    Requirements:
+    - инварианты: parse(RMS(x)) структурно эквивалентен parse(x)
+      (сравнение без Range); все тексты комментариев входа
+      присутствуют в выходе байт-в-байт; RMS(RMS(x)) байт-идентичен
+      RMS(x)
+    - порядок позиционных аргументов и атрибутов команды неизменен
+    - детерминизм: одинаковые вход и `Options` → одинаковый выход
+
+    Constraints:
+    - XsBlock.Code не переформатируется
+    - не печатать содержимое, отсутствующее в AST (потеря ловится
+      инвариантом на корпусе)
+
+---
+
+Author: Goga
+CreatedAt: 21/09/26
+Description: |
+  Форматирование RMS: печать канонического стиля из AST с якорением
+  комментариев; протоколо-независимая ячейка над rms/common.
