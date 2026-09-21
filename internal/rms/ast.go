@@ -76,9 +76,18 @@ type RmsFile struct {
 	// strings are the string-token spans of statement lines (attribute
 	// values); ArgAt answers silence from here.
 	strings []common.Range
-	// comments are the exact /* */ and // comment extents; ArgAt answers
-	// silence from here.
-	comments []common.Range
+	// Comments are the exact comment extents: /* */ blocks from "/*"
+	// through "*/" (multi-line included), // line comments to the end of
+	// their line and plain #-lines outside inline-XS from the "#" to the
+	// end of the line — sorted by position, never overlapping. Extents
+	// inside an inline-XS region (/* */ and // scanned there) repeat
+	// bytes that travel verbatim in XsBlock.Code: the printer filters
+	// them out by XsBlock.Range — anchoring them from Comments prints the
+	// block twice. Comment texts are not stored: the offsets address the
+	// \r\n→\n-normalized source, like every AST Range — slice the
+	// normalized text, and key on Line/Column for anything
+	// source-agnostic. ArgAt answers silence from here.
+	Comments []common.Range
 	// excluded are the line spans that never own a statement — section
 	// headers, #include/#includeXS directive lines (path arguments
 	// included) and plain #-comment lines.
@@ -177,7 +186,7 @@ func (f RmsFile) ArgAt(pos common.Pos) (ArgSite, bool) {
 		}
 	}
 
-	for _, r := range f.comments {
+	for _, r := range f.Comments {
 		if r.Contains(pos) {
 			return ArgSite{}, false
 		}
