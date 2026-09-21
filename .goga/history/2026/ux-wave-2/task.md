@@ -37,8 +37,8 @@ M — с коротким дизайн-проходом. Не блокирует
 |---|---|---|---|---|
 | `xs-unused` | #79 | Диагностика unused/duplicate declarations в XS: локальные переменные/функции без использований; правила severity-override работают как обычно. **2026-09-22: разбит на `xs-duplicate-decls` (дубликаты) + `xs-unused` (unused + entry-point модель)** | analysis, xs | S–M |
 | `auto-include` | #80 | Completion предлагает символы из доступных (не подключённых) include-файлов с пометкой источника; выбор вставляет `#include`/`#includeXS`; quickfix для unknown-symbol с однозначным кандидатом. **2026-09-22: разбит на `auto-include-completion` (completion+вставка) + `auto-include-quickfix` (quickfix)** | complete, server, include | M |
-| `rename-file` | #81 | Хендлер `workspace/willRenameFiles`: переименование/перемещение .rms/.xs обновляет `#include` во всех ссылающихся файлах замыкания (WorkspaceEdit) | server (+include) | M |
-| `game-detect` | #82 | Автодетект установки AoE2 DE (Steam — стандартные пути + `libraryfolders.vdf`, MS Store/Xbox) → автозаполнение `aoe2lsp.includeRoots`; явная ручная настройка выигрывает; перенос 1.x-кандидата из эпика | editors/vscode | M |
+| `rename-file` | #81 | Хендлер `workspace/willRenameFiles`: переименование/перемещение .rms/.xs обновляет `#include` во всех ссылающихся файлах замыкания (WorkspaceEdit). **2026-09-22: разбит на include-индекс ссылающихся (#121) + server-хендлер (#122, закрывает #81)** | server (+include) | M |
+| `game-detect` | #82 | Автодетект установки AoE2 DE (Steam — стандартные пути + `libraryfolders.vdf`, MS Store/Xbox) → автозаполнение `aoe2lsp.includeRoots`; явная ручная настройка выигрывает; перенос 1.x-кандидата из эпика. **2026-09-22: разбит на Steam-детект (#123, создаёт cook aoe2-game-paths) + MS Store/Xbox (#124, закрывает #82)** | editors/vscode | M |
 | `deploy-to-game` | #83 | Команда «деплой карты»: копирование активной .rms (и её include-зависимостей — решает design) в мод-папку игры для теста | editors/vscode | S–M |
 | `walkthrough` | #84 | Welcome walkthrough в VS Code: установка → первый скрипт → диагностика/hover/completion | editors/vscode | S–M |
 | `status-bar` | #85 | Статус-бар: состояние сервера (running/stopped), версия kb | editors/vscode | S |
@@ -145,7 +145,8 @@ M — с коротким дизайн-проходом. Не блокирует
 - Декомпозиция 2026-09-22 (пользователь): `xs-unused` (#79) →
   `xs-duplicate-decls` (#114) + `xs-unused` (#115, entry-point модель —
   единственный design-вопрос остался в нём); `auto-include` (#80) →
-  `auto-include-completion` (#116) + `auto-include-quickfix` (#117).
-  Родительские issue закрываются последними смерженными слотами;
-  `rename-file` (#81) и `game-detect` (#82) — одним слотом каждый,
-  декомпозиция отклонена как оверхед
+  `auto-include-completion` (#116) + `auto-include-quickfix` (#117);
+  `rename-file` (#81) → include-индекс ссылающихся (#121) + server-хендлер
+  (#122, по прецеденту #43/#44); `game-detect` (#82) → Steam (#123) +
+  MS Store/Xbox (#124). Родительские issue закрываются последними
+  смерженными слотами
