@@ -35,8 +35,8 @@ M — с коротким дизайн-проходом. Не блокирует
 
 | Слот | Issue | Что делаем | Ячейки/области | Размер |
 |---|---|---|---|---|
-| `xs-unused` | #79 | Диагностика unused/duplicate declarations в XS: локальные переменные/функции без использований; правила severity-override работают как обычно | analysis, xs | S–M |
-| `auto-include` | #80 | Completion предлагает символы из доступных (не подключённых) include-файлов с пометкой источника; выбор вставляет `#include`/`#includeXS`; quickfix для unknown-symbol с однозначным кандидатом | complete, server, include | M |
+| `xs-unused` | #79 | Диагностика unused/duplicate declarations в XS: локальные переменные/функции без использований; правила severity-override работают как обычно. **2026-09-22: разбит на `xs-duplicate-decls` (дубликаты) + `xs-unused` (unused + entry-point модель)** | analysis, xs | S–M |
+| `auto-include` | #80 | Completion предлагает символы из доступных (не подключённых) include-файлов с пометкой источника; выбор вставляет `#include`/`#includeXS`; quickfix для unknown-symbol с однозначным кандидатом. **2026-09-22: разбит на `auto-include-completion` (completion+вставка) + `auto-include-quickfix` (quickfix)** | complete, server, include | M |
 | `rename-file` | #81 | Хендлер `workspace/willRenameFiles`: переименование/перемещение .rms/.xs обновляет `#include` во всех ссылающихся файлах замыкания (WorkspaceEdit) | server (+include) | M |
 | `game-detect` | #82 | Автодетект установки AoE2 DE (Steam — стандартные пути + `libraryfolders.vdf`, MS Store/Xbox) → автозаполнение `aoe2lsp.includeRoots`; явная ручная настройка выигрывает; перенос 1.x-кандидата из эпика | editors/vscode | M |
 | `deploy-to-game` | #83 | Команда «деплой карты»: копирование активной .rms (и её include-зависимостей — решает design) в мод-папку игры для теста | editors/vscode | S–M |
@@ -142,3 +142,10 @@ M — с коротким дизайн-проходом. Не блокирует
   остаются 1.x-кандидатами (решения 2026-09-09/10)
 - cook `aoe2-game-paths.md` создаётся первым исполняемым слотом из
   `game-detect`/`deploy-to-game`, общая база для обоих
+- Декомпозиция 2026-09-22 (пользователь): `xs-unused` (#79) →
+  `xs-duplicate-decls` (#114) + `xs-unused` (#115, entry-point модель —
+  единственный design-вопрос остался в нём); `auto-include` (#80) →
+  `auto-include-completion` (#116) + `auto-include-quickfix` (#117).
+  Родительские issue закрываются последними смерженными слотами;
+  `rename-file` (#81) и `game-detect` (#82) — одним слотом каждый,
+  декомпозиция отклонена как оверхед

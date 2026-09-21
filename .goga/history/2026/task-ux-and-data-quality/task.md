@@ -26,9 +26,9 @@ Roadmap-пачка самостоятельных задач повседнев�
 
 | Слот | Что делаем | Ячейки/области | Размер |
 |---|---|---|---|
-| `nuance-rules` | Вердикты real-map-nuances → данные в kb (алиасы/опечатки/no-op списки) + правила: «вероятно игнорируется»=hint, ✍️=warning. Перенос потерянного слота editor-experience (волна 1) | analysis, kb | M |
+| `nuance-rules` | Вердикты real-map-nuances → данные в kb (алиасы/опечатки/no-op списки) + правила: «вероятно игнорируется»=hint, ✍️=warning. Перенос потерянного слота editor-experience (волна 1). **2026-09-22: декомпозирован в микропачку `2026/nuance-rules` (15 слотов: фундамент + 14 по паттернам)** | analysis, kb | M |
 | `snippets` | VS Code snippets: скелет новой карты (Zetnus skeleton), частые блоки из map-scripting-practices (create_object с полями, start_random, base_terrain…) | editors/vscode | S |
-| `map-structure` | Структурные линты карты: отсутствующие обязательные секции, дубликаты секций, пустые секции; коды диагностик + severity-override из конфига работают как обычно | analysis (+rms Sections), server | S–M |
+| `map-structure` | Структурные линты карты: отсутствующие обязательные секции, дубликаты секций, пустые секции; коды диагностик + severity-override из конфига работают как обычно. **2026-09-22: разбит на `map-structure-diags` (диагностики) + `map-structure-quickfix` (вставить секцию)** | analysis (+rms Sections), server | S–M |
 | `fuzz` | Fuzz-цели парсеров rms/xs (native Go fuzzing), сиды из фикстур и корпуса; CI-джоба с коротким бюджетом | rms, xs, CI | S |
 | `kb-refresh` | Документированный процесс обновления kb под патч игры: чеклист источников (UGC Guide, release notes), полуавтоматический diff «что нового», версионирование "since update N" | kb, docs/ref | S |
 | `duplicate-include` | Warning на повторный `#include`/`#includeXS` одного файла в замыкании одного корня (дубли эффектов — реальная боль RMS) | include, analysis/server | S |
@@ -112,3 +112,8 @@ Roadmap-пачка самостоятельных задач повседнев�
 - nuance-rules — перенос потерянного слота editor-experience (волна 1,
   никогда не подбирался: топика в истории нет)
 - webview/nvim-lspconfig осознанно в 1.x-кандидаты
+- Декомпозиция 2026-09-22 (пользователь): `nuance-rules` (#53) → микропачка
+  `2026/nuance-rules` (1 фундамент + 14 микрозадач по паттернам справочника,
+  issue #97–#111); `map-structure` (#55) → `map-structure-diags` (#112) +
+  `map-structure-quickfix` (#113). Родительские issue закрываются последними
+  смерженными слотами
