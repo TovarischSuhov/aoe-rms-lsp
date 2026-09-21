@@ -1,0 +1,11 @@
+<LAND_GENERATION>
+start_random
+if TURF 1
+percent_chance 50
+create_object BOAR
+number_of_objects 2
+end_random
+{
+set_scaling_to_map_size
+}
+</LAND_GENERATION>
