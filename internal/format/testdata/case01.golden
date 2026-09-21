@@ -1,0 +1,5 @@
+<land_generation>
+    base_terrain GRASS
+    base_elevation 1
+    connect_players ROADS
+</land_generation>

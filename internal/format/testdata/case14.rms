@@ -1,0 +1,10 @@
+<OBJECTS_GENERATION>
+create_object DEER {
+	number_of_objects 5
+	if TINY_MAP
+		set_scaling 0.5
+	else
+		set_scaling 1
+	endif
+}
+</OBJECTS_GENERATION>

@@ -1,0 +1,7 @@
+<land_generation>
+    base_terrain GRASS
+</land_generation>
+
+<objects_generation>
+    create_object DEER
+</objects_generation>

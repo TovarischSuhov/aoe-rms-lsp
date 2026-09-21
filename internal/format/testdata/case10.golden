@@ -1,0 +1,13 @@
+#includeXS
+const int TERRAINS = 3;
+
+void pick(int player) {
+    int idx = player % TERRAINS;   /*   keep   spacing   */
+    if (idx < 0) {
+        idx = -idx;
+    }
+}
+
+<land_generation>
+    base_terrain GRASS
+</land_generation>

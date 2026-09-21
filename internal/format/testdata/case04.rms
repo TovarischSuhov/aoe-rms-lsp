@@ -1,0 +1,12 @@
+<TERRAIN_GENERATION>
+if   TINY_MAP
+create_terrain GRASS
+number_of_real_tiles   100
+elseif   MEDIUM_MAP
+create_terrain DIRT
+number_of_real_tiles   200
+else
+create_terrain PAVEMENT
+number_of_real_tiles   300
+endif
+</TERRAIN_GENERATION>

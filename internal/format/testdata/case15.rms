@@ -1,0 +1,10 @@
+<OBJECTS_GENERATION>
+create_object
+object_name "Grassland"
+</OBJECTS_GENERATION>
+#includeXS
+void loop() {
+	int total = 0;
+	// sum things
+	total = total + 1;
+}

@@ -1,0 +1,11 @@
+<LAND_GENERATION>
+start_random
+percent_chance 50
+base_terrain GRASS
+end_random
+# choose the palette
+start_random
+percent_chance 100
+base_terrain DIRT
+end_random
+</LAND_GENERATION>

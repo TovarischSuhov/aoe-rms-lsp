@@ -1,0 +1,6 @@
+#includeXS
+int a = 1;
+<LAND_GENERATION>
+base_terrain GRASS
+</LAND_GENERATION>
+#includeXS empty.xs

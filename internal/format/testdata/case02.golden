@@ -1,0 +1,7 @@
+<objects_generation>
+    create_object {
+        number_of_objects 5
+        land_position 50 50
+        set_placement_for_player 1 2 3
+    }
+</objects_generation>
