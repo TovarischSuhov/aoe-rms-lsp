@@ -313,7 +313,12 @@ func linesDiff(want, got []string) string {
 
 // treeShape renders the position-free shape of a parsed file: sections
 // with their statements, then the directives and XS blocks. Positions and
-// Attribute nameAt spans differ by construction and never enter.
+// Attribute nameAt spans differ by construction and never enter. The
+// values an attribute carries past its head are not invariant either:
+// the pathological corpus parses stretch an attribute's extent across
+// whole sections, and the tail cut would compare reformatted bytes, not
+// the attribute's own — the printer's tail handling is pinned by the
+// golden fixtures instead.
 func treeShape(f rms.RmsFile) []string {
 	out := []string{}
 
