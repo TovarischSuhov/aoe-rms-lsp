@@ -128,3 +128,24 @@ Preconditions:
   an attribute name to its index in kb Attributes — RMS has no local
   declarations to consult.
 
+## Comment extents (formatting, comment-aware checks)
+
+RmsFile.Comments carries every comment extent of the file — /* … */
+(including multi-line), //… and #-lines that are not directives —
+sorted by position. The parser does not keep comment texts: extract
+them from the source by range.
+
+```go
+file, _ := rms.Parse(text, uri)
+for _, r := range file.Comments {
+    // r is a common.Range in absolute file coordinates;
+    // text[r.Start.Offset:r.End.Offset] is the exact comment bytes
+    // (from "/*" through "*/", or to the end of line)
+}
+```
+
+Preconditions:
+- Extents are byte-exact and non-overlapping.
+- Positions inside them answer found=false in ArgAt — the same
+  extents gate argument lookup.
+
