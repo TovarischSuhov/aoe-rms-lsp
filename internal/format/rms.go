@@ -155,7 +155,11 @@ func cutLines(lines []string, r common.Range) string {
 	lastCol := min(int(r.End.Column), len(lines[end]))
 	if lastCol == 0 && end > start {
 		end--
-		lastCol = len(lines[end])
+		// the previous line's "\r" tail is not payload: a zero-column
+		// end means "just past the newline", and the page adds its own
+		// line ending — carrying the "\r" into the bytes would grow the
+		// document one CR per pass
+		lastCol = len(strings.TrimRight(lines[end], "\r"))
 	}
 
 	first := min(int(r.Start.Column), len(lines[start]))
@@ -279,6 +283,10 @@ func (p *printer) elements(file rms.RmsFile) []element {
 // directives builds the include and XS-block units that carry their own
 // lines, position-ordered: an include whose directive line opens an XS
 // block is left out — its bytes travel inside the block's verbatim print.
+// Both kinds start at column 0 of their directive line, not at the AST's
+// argument or block position: a comment written on the directive line
+// travels inside the line's own verbatim print, and anchoring it as a
+// standalone line first would print it twice.
 func (p *printer) directives(file rms.RmsFile) []element {
 	var out []element
 
@@ -292,14 +300,14 @@ func (p *printer) directives(file rms.RmsFile) []element {
 
 	for _, block := range file.XsBlocks {
 		rawTo := block.Range.End
-		if dir := p.doc.lineEnd(int(block.Range.Start.Line) - 1); rawTo.Before(dir) {
+		if dir := p.doc.lineEnd(dirLine(block)); rawTo.Before(dir) {
 			rawTo = dir
 		}
 
 		out = append(out, element{
 			kind:  elemXsBlock,
 			block: block,
-			start: block.Range.Start,
+			start: common.Pos{Line: uint32(dirLine(block)), Column: 0},
 			end:   block.Range.End,
 			rawTo: rawTo,
 		})
@@ -308,6 +316,19 @@ func (p *printer) directives(file rms.RmsFile) []element {
 	slices.SortStableFunc(out, byStart)
 
 	return out
+}
+
+// dirLine is the line an XS block's #includeXS directive sits on. A
+// block with content starts on the line after its directive, at column
+// 0; the parser's EOF fallback for a directive-only block — bare
+// #includeXS as the file's last line, no newline after it — starts on
+// the directive line itself, at a column past its text.
+func dirLine(block rms.XsBlock) int {
+	if block.Range.Start.Column > 0 {
+		return int(block.Range.Start.Line)
+	}
+
+	return int(block.Range.Start.Line) - 1
 }
 
 // absorb splits the directives into those written inside sec's span and
@@ -345,12 +366,14 @@ func byStart(a, b element) int {
 }
 
 // appendInclude adds one directive to the stream — unless its line opens
-// an XS block: the block's range starts on the line after the directive,
-// and the directive's bytes travel inside the block's verbatim print, so
-// printing the include too would duplicate the line.
+// an XS block: the directive's bytes travel inside the block's verbatim
+// print, so printing the include too would duplicate the line. The
+// element starts at column 0 of the directive line: a comment on that
+// line rides inside it (directives print as written) instead of
+// anchoring as its own line first.
 func (p *printer) appendInclude(out []element, inc rms.Include, blocks []rms.XsBlock) []element {
 	for _, block := range blocks {
-		if int(block.Range.Start.Line) == int(inc.Range.Start.Line)+1 {
+		if dirLine(block) == int(inc.Range.Start.Line) {
 			return out
 		}
 	}
@@ -358,7 +381,7 @@ func (p *printer) appendInclude(out []element, inc rms.Include, blocks []rms.XsB
 	return append(out, element{
 		kind:    elemInclude,
 		include: inc,
-		start:   inc.Range.Start,
+		start:   common.Pos{Line: inc.Range.Start.Line, Column: 0},
 		end:     inc.Range.Start,
 		rawTo:   p.doc.lineEnd(int(inc.Range.Start.Line)),
 	})
@@ -684,10 +707,16 @@ func replayChains(blanked []string, from, to int, skip func(int) bool, seed repl
 		fields := strings.Fields(blanked[i])
 		opened, closed := braceDelta(fields)
 
-		if len(fields) > 0 && depth == 0 {
+		// the leading word is cut by the lexer's rules (rms.FirstWord):
+		// `if}` and `else{` are the words "if" and "else" to the parser,
+		// while a Fields split would see one glued token and lose the
+		// scope line
+		word := rms.FirstWord(blanked[i])
+
+		if word != "" && depth == 0 {
 			key := lineCol(common.Pos{Line: uint32(i), Column: uint32(fieldStart(blanked[i]))})
 
-			switch fields[0] {
+			switch word {
 			case "if":
 				w.push(chainFrame{at: key, kind: 'c'})
 			case "start_random":
@@ -705,7 +734,7 @@ func replayChains(blanked []string, from, to int, skip func(int) bool, seed repl
 				w.push(chainFrame{at: key, kind: 'c'})
 			case "endif", "end_random":
 				stop := byte('c')
-				if fields[0] == "end_random" {
+				if word == "end_random" {
 					stop = 'r'
 				}
 
@@ -905,8 +934,9 @@ func (p *printer) verbatim(stmt rms.Statement) bool {
 	}
 
 	for i := int(stmt.Range.Start.Line); i <= last && i < len(p.doc.blanked); i++ {
-		fields := strings.Fields(p.doc.blanked[i])
-		if len(fields) > 0 && rms.IsStructural(fields[0]) {
+		// the word is cut by the lexer's rules: `if}` opens a scope the
+		// parser sees, and a Fields split would miss it
+		if rms.IsStructural(rms.FirstWord(p.doc.blanked[i])) {
 			return true
 		}
 	}
@@ -919,7 +949,7 @@ func (p *printer) verbatim(stmt rms.Statement) bool {
 // verbatim. The rms parser does not read XS, so the bytes are not the
 // printer's to normalize.
 func (p *printer) xsBlock(block rms.XsBlock, level int) {
-	p.line(level, p.directiveLine(int(block.Range.Start.Line)-1))
+	p.line(level, p.directiveLine(dirLine(block)))
 
 	if code := rawChunk(p.doc.text(block.Range)); code != "" {
 		p.emit(code)
@@ -947,7 +977,11 @@ func (p *printer) directiveLine(line int) string {
 
 // attribute prints one attribute line: name and first value from the AST,
 // the values past it cut from the source — the AST keeps only the first,
-// and the rest are data the printer must not lose.
+// and the rest are data the printer must not lose. A name starting with
+// '#' is the one spelling that cannot round-trip: only the single-line
+// `{ #x 1 }` form lexes into an attribute, and the printed multi-line
+// form re-parses as a plain #-comment (issue #95) — RMS attribute names
+// never start with '#'.
 func (p *printer) attribute(attr rms.Attribute) string {
 	out := attr.Name
 
@@ -1014,6 +1048,13 @@ func (p *printer) expr(e rms.Expr, minPrec int) string {
 
 		return out
 	case rms.KindUnary:
+		// a failed operand parse leaves the unary without children and
+		// without an error diagnostic — the operator token is all the AST
+		// ever knew, and its source bytes are the faithful print
+		if len(e.Children) == 0 {
+			return p.doc.text(e.Range)
+		}
+
 		// the operand binds tighter than any binary operator, mirroring
 		// the parser's own minimum
 		return e.Value + p.expr(e.Children[0], 3)
@@ -1029,6 +1070,10 @@ func (p *printer) expr(e rms.Expr, minPrec int) string {
 		return e.Value + "(" + strings.Join(parts, ", ") + ")"
 	}
 
+	// a leaf's bytes are its source cut. The zero-width leaves of the
+	// parser's error recovery (a failed operand swallowed without a
+	// diagnostic, issue #96) print as nothing — their bytes were never
+	// recorded anywhere the AST reaches
 	return p.doc.text(e.Range)
 }
 

@@ -1,0 +1,5 @@
+<player_setup>
+    random_placement
+</player_setup>
+
+#includeXS

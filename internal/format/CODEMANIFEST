@@ -8,6 +8,7 @@ Imports:
       - RmsFile
       - Parse
       - IsStructural
+      - FirstWord
     Usages:
       - rms-parsing
     From: internal/rms
@@ -68,7 +69,8 @@ Annotations: |
        аргументы одной строкой; каждый атрибут — отдельной строкой
        с отступом уровня+1; блоки random/conditional — рекурсивно
        (строка percent_chance/if, дети с отступом); команда, чей
-       экстент содержит структурное слово (`IsStructural`), —
+       экстент содержит строку со структурным первым словом
+       (`FirstWord` + `IsStructural`), —
        исходные байты среза; директивы
        #include/#includeXS — как записаны; XsBlock — директива
        и Code вербатим
