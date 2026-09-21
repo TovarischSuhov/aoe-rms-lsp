@@ -70,6 +70,23 @@ Annotations: |
     Constraints:
     - не паниковать и не возвращать err для некорректного входа
 
+"IsStructural(word: string) -> structural: bool":
+  location: parse.go
+  annotations: |
+    Принадлежность слова структурным ключевым словам — тем, что
+    открывают или закрывают вложенность (if/elseif/else/endif,
+    start_random/end_random, percent_chance) по `rms_grammar`.
+
+    `word`: слово-токен; `structural`: слово управляет вложенностью
+
+    Requirements:
+    - единственный источник — словарь самого парсера; собственные копии
+      у потребителей дрейфуют молча при росте грамматики
+
+    Constraints:
+    - только членство в словаре; дисциплина закрытия областей —
+      внутренняя реализация Parse
+
 "RmsFile()":
   location: ast.go
   annotations: |

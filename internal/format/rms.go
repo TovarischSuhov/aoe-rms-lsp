@@ -23,20 +23,6 @@ const (
 	elemXsBlock   = "xs-block"
 )
 
-// nestingWords mirrors the parser's structural keywords
-// (internal/rms/parse.go, unexported): a command whose extent holds one of
-// them as a line's first word prints as its source bytes, since no AST
-// walk can re-emit what the parser tracked without materializing nodes.
-var nestingWords = map[string]bool{
-	"if":             true,
-	"elseif":         true,
-	"else":           true,
-	"endif":          true,
-	"start_random":   true,
-	"end_random":     true,
-	"percent_chance": true,
-}
-
 // RMS formats an RMS source into the cell's canonical style: indentation,
 // brace placement and blank lines are rebuilt from the AST, token text
 // comes from the source so string literals keep their quotes. The output
@@ -891,7 +877,9 @@ func braceDelta(fields []string) (opened, closed int) {
 // extent holds a line whose first word is a structural keyword. Inside a
 // { } block the parser tracks those without materializing nodes, and a
 // brace-less create_* covers a sibling if — both are invisible to the AST,
-// so the only faithful print is the source itself.
+// so the only faithful print is the source itself. The keyword set is the
+// parser's own (rms.IsStructural) — a private copy here would drift the
+// day the grammar grows.
 func (p *printer) verbatim(stmt rms.Statement) bool {
 	if stmt.Kind != rms.KindCommand {
 		return false
@@ -904,7 +892,7 @@ func (p *printer) verbatim(stmt rms.Statement) bool {
 
 	for i := int(stmt.Range.Start.Line); i <= last && i < len(p.doc.blanked); i++ {
 		fields := strings.Fields(p.doc.blanked[i])
-		if len(fields) > 0 && nestingWords[fields[0]] {
+		if len(fields) > 0 && rms.IsStructural(fields[0]) {
 			return true
 		}
 	}

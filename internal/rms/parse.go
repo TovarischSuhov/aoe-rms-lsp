@@ -785,6 +785,15 @@ func (p *parser) reportf(r common.Range, severity int, code string, format strin
 	})
 }
 
+// IsStructural reports whether word is one of the structural keywords
+// that open or close nesting: if, elseif, else, endif, start_random,
+// end_random, percent_chance. This is the parser's own dictionary,
+// exported so consumers recognize the same lines — a private copy
+// drifts silently when the grammar grows.
+func IsStructural(word string) bool {
+	return structuralWords[word]
+}
+
 // structuralWords are the keywords that open or close nesting.
 var structuralWords = map[string]bool{
 	"if":             true,

@@ -149,3 +149,23 @@ Preconditions:
 - Positions inside them answer found=false in ArgAt — the same
   extents gate argument lookup.
 
+
+## Structural keywords (line classification)
+
+IsStructural answers whether a word is one of the nesting keywords —
+if, elseif, else, endif, start_random, end_random, percent_chance.
+It is the parser's own dictionary: consumers classifying lines by
+their first word must use it rather than keep a copy, which drifts
+silently when the grammar grows.
+
+```go
+fields := strings.Fields(line)
+if len(fields) > 0 && rms.IsStructural(fields[0]) {
+    // the line opens or closes nesting — the parser gave it scope
+    // semantics an AST walk alone cannot re-derive
+}
+```
+
+Preconditions:
+- Membership only; how scopes open and close is Parse's internals —
+  replay it against the parser's own discipline, never assume it.
