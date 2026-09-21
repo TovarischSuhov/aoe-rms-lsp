@@ -830,3 +830,35 @@ func TestParse_StringLiteralKeepsBlockMarker(t *testing.T) {
 	// the command after the string still parses — no runaway comment
 	assert.Equal(t, "create_elevator", file.Sections[0].Statements[0].Name)
 }
+
+// TestFirstWord checks the lexer-faithful first-word cut: leading blanks
+// never enter the answer, the word breaks at the first non-word byte, and
+// a non-word opening token answers empty.
+func TestFirstWord(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range [...]struct {
+		line string
+		want string
+	}{
+		{"if TURF 1", "if"},
+		{"    if TURF 1", "if"},
+		{"\tif}", "if"},
+		{"else{", "else"},
+		{"endif,", "endif"},
+		{"start_random 5", "start_random"},
+		{"#const A 1", "#const"},
+		{"random_map.def 54000", "random_map.def"},
+		{"_private", "_private"},
+		{"create_object BOAR\r", "create_object"},
+		{"50 percent", ""},
+		{`"str" x`, ""},
+		{"{", ""},
+		{"", ""},
+		{"   ", ""},
+	} {
+		if got := FirstWord(tc.line); got != tc.want {
+			t.Errorf("FirstWord(%q) = %q, want %q", tc.line, got, tc.want)
+		}
+	}
+}

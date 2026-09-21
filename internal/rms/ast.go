@@ -80,10 +80,11 @@ type RmsFile struct {
 	// through "*/" (multi-line included), // line comments to the end of
 	// their line and plain #-lines outside inline-XS from the "#" to the
 	// end of the line — sorted by position, never overlapping. Extents
-	// inside an inline-XS region (/* */ and // scanned there) repeat
-	// bytes that travel verbatim in XsBlock.Code: the printer filters
-	// them out by XsBlock.Range — anchoring them from Comments prints the
-	// block twice. Comment texts are not stored: the offsets address the
+	// inside an inline-XS region (/* */ and // scanned there), and on its
+	// directive line, repeat bytes that travel verbatim in the block's
+	// own print: the consumer filters them out by the directive line and
+	// the block's extent — anchoring them from Comments prints the block
+	// twice. Comment texts are not stored: the offsets address the
 	// \r\n→\n-normalized source, like every AST Range — slice the
 	// normalized text, and key on Line/Column for anything
 	// source-agnostic. ArgAt answers silence from here.

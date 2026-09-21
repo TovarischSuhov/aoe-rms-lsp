@@ -794,6 +794,47 @@ func IsStructural(word string) bool {
 	return structuralWords[word]
 }
 
+// FirstWord returns line's first word token by the lexer's own rules:
+// leading blanks are skipped, the word starts on a letter, '_', '#' or a
+// non-ASCII byte, and continues through letters, digits, '_', '#', '.'
+// and non-ASCII bytes — so `if}` and `else{` yield "if" and "else" while
+// a Fields split would see one glued token. An empty answer means the
+// first token is not a word (a number, string, brace or operator) or the
+// line is blank. Consumers classifying lines by their first word must
+// cut it here, not with their own splitting — the two views of the same
+// line drift apart exactly on the punctuation-glued spellings.
+func FirstWord(line string) string {
+	i := 0
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t' || line[i] == '\r') {
+		i++
+	}
+
+	start := i
+
+	if i >= len(line) {
+		return ""
+	}
+
+	ch := line[i]
+	isWord := ch == '_' || ch == '#' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch >= 0x80
+	if !isWord {
+		return ""
+	}
+
+	for i < len(line) {
+		c := line[i]
+		if c == '_' || c == '#' || c == '.' || (c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c >= 0x80 {
+			i++
+			continue
+		}
+
+		break
+	}
+
+	return line[start:i]
+}
+
 // structuralWords are the keywords that open or close nesting.
 var structuralWords = map[string]bool{
 	"if":             true,

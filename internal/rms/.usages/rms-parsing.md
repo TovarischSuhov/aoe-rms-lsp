@@ -169,3 +169,23 @@ if len(fields) > 0 && rms.IsStructural(fields[0]) {
 Preconditions:
 - Membership only; how scopes open and close is Parse's internals —
   replay it against the parser's own discipline, never assume it.
+
+## First word of a line (lexer-faithful classification)
+
+FirstWord returns a line's first word token cut by the lexer's own
+rules — leading blanks skipped, word boundary at the first
+non-word byte. `if}` and `else{` answer "if" and "else"; a
+whitespace Fields split sees one glued token and misclassifies the
+line. Callers that switch on a line's leading word (structural
+keywords, command names) must cut it here.
+
+```go
+if rms.IsStructural(rms.FirstWord(line)) {
+    // the line opens or closes nesting however its word is spelled —
+    // `if}`, `else{`, `endif,` included
+}
+```
+
+Preconditions:
+- "" means the line is blank or starts with a non-word token (number,
+  string, brace, operator) — never treat it as a word.
