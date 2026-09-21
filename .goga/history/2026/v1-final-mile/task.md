@@ -129,9 +129,9 @@
 
 | # | Слот | Issue | Ячейки | Зависимости | Объём |
 |---|------|-------|--------|-------------|-------|
-| 1 | format-handler: textDocument/formatting (RMS) | new | server | мерж #45 | малый |
-| 2 | xs-comments: экспорт комментариев + аудит AST | new | xs | — (лист) | малый-средний |
-| 3 | format-xs: XS-принтер + .xs в хендлере | new (закрывает #46) | format, server | слоты 1 + 2 | средний |
+| 1 | format-handler: textDocument/formatting (RMS) | #118 | server | мерж #45 | малый |
+| 2 | xs-comments: экспорт комментариев + аудит AST | #119 | xs | — (лист) | малый-средний |
+| 3 | format-xs: XS-принтер + .xs в хендлере | #120 (закрывает #46) | format, server | слоты 1 + 2 | средний |
 | 4 | publish-extension: Marketplace + Open VSX | #47 | editors, CI | секреты | малый |
 | 5 | package-managers: winget + Homebrew tap | #49 | scripts, CI, внешние | релизные артефакты | малый-средний |
 
