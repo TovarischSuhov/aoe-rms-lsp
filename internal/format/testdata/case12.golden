@@ -1,0 +1,9 @@
+<objects_generation>
+    create_object {
+        // after the command line
+        number_of_objects 5
+        // between attrs
+        land_position 50 50
+    }
+    /* past the last attribute */
+</objects_generation>

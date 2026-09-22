@@ -1,0 +1,6 @@
+<LAND_GENERATION>
+base_elevation rnd(-302, 50)
+min_elevation -5%
+base_terrain_mask elevation_mask(3, 4)
+create_elevation (1 + 2) * 3
+</LAND_GENERATION>

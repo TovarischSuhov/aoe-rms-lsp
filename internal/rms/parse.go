@@ -66,6 +66,11 @@ type parser struct {
 	inXs    bool
 	xsStart int
 	xsArg   bool // the open inline region was started by an argumented #includeXS
+
+	// hashes are the plain #-comment line extents recorded during the
+	// walk; mergeComments folds them with the blankComments extents into
+	// file.Comments at the end.
+	hashes []common.Range
 }
 
 // newParser creates a parser for the named file.
@@ -83,7 +88,6 @@ func (p *parser) run(source string) {
 	}
 
 	visible, comments := blankComments(p.lines, p.starts)
-	p.file.comments = comments
 	p.cur = &sect{name: "global", start: common.Pos{}}
 
 	for i := range p.lines {
@@ -131,6 +135,7 @@ func (p *parser) run(source string) {
 
 		if strings.HasPrefix(trimmed, "#") {
 			p.recordExcluded(i) // plain #-comment line
+			p.recordHashComment(line, i)
 
 			continue
 		}
@@ -138,7 +143,22 @@ func (p *parser) run(source string) {
 		p.statementLine(line, i)
 	}
 
+	p.file.Comments = mergeComments(comments, p.hashes)
+
 	p.closeAll()
+}
+
+// recordHashComment records the extent of a plain #-comment line: from
+// the "#" to the end of the line. The "#" is looked up in the blanked
+// line — a "#" inside a comment scanned away earlier must not start the
+// extent (`/* # */ #foo` starts at the second "#").
+func (p *parser) recordHashComment(blanked string, idx int) {
+	col := strings.IndexByte(blanked, '#')
+
+	p.hashes = append(p.hashes, common.Range{
+		Start: p.pos(idx, col),
+		End:   p.pos(idx, len(p.lines[idx])),
+	})
 }
 
 // recordExcluded adds the whole physical line to the excluded index.
@@ -765,6 +785,56 @@ func (p *parser) reportf(r common.Range, severity int, code string, format strin
 	})
 }
 
+// IsStructural reports whether word is one of the structural keywords
+// that open or close nesting: if, elseif, else, endif, start_random,
+// end_random, percent_chance. This is the parser's own dictionary,
+// exported so consumers recognize the same lines — a private copy
+// drifts silently when the grammar grows.
+func IsStructural(word string) bool {
+	return structuralWords[word]
+}
+
+// FirstWord returns line's first word token by the lexer's own rules:
+// leading blanks are skipped, the word starts on a letter, '_', '#' or a
+// non-ASCII byte, and continues through letters, digits, '_', '#', '.'
+// and non-ASCII bytes — so `if}` and `else{` yield "if" and "else" while
+// a Fields split would see one glued token. An empty answer means the
+// first token is not a word (a number, string, brace or operator) or the
+// line is blank. Consumers classifying lines by their first word must
+// cut it here, not with their own splitting — the two views of the same
+// line drift apart exactly on the punctuation-glued spellings.
+func FirstWord(line string) string {
+	i := 0
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t' || line[i] == '\r') {
+		i++
+	}
+
+	start := i
+
+	if i >= len(line) {
+		return ""
+	}
+
+	ch := line[i]
+	isWord := ch == '_' || ch == '#' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch >= 0x80
+	if !isWord {
+		return ""
+	}
+
+	for i < len(line) {
+		c := line[i]
+		if c == '_' || c == '#' || c == '.' || (c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c >= 0x80 {
+			i++
+			continue
+		}
+
+		break
+	}
+
+	return line[start:i]
+}
+
 // structuralWords are the keywords that open or close nesting.
 var structuralWords = map[string]bool{
 	"if":             true,
@@ -880,6 +950,82 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 	}
 
 	return out, comments
+}
+
+// mergeComments folds the scanned /* */ and // extents with the #-comment
+// extents into the file's Comments: a scanned extent swallowed whole by a
+// #-line (`#foo /* x */ // y`) disappears — the #-extent already covers
+// its bytes — while a merely adjacent one (`/* x */ #foo`) stays. A block
+// comment opened on a #-line and running past it truncates the #-extent
+// to the comment's start (`#foo /* start\nstill in block */`), so every
+// byte is covered exactly once. The result is stable-sorted by position
+// and never overlaps.
+func mergeComments(scanned []common.Range, hashes []common.Range) []common.Range {
+	out := make([]common.Range, 0, len(scanned)+len(hashes))
+
+	for _, h := range hashes {
+		if cut, ok := commentCut(scanned, h); ok {
+			h.End = cut
+		}
+
+		out = append(out, h)
+	}
+
+	for _, c := range scanned {
+		if insideRange(c, hashes) {
+			continue
+		}
+
+		out = append(out, c)
+	}
+
+	slices.SortStableFunc(out, func(a, b common.Range) int {
+		if a.Start.Line != b.Start.Line {
+			return int(a.Start.Line) - int(b.Start.Line)
+		}
+
+		return int(a.Start.Column) - int(b.Start.Column)
+	})
+
+	return out
+}
+
+// commentCut returns where the #-extent h must yield to a scanned /*
+// */ opened on its line: an unterminated block comment starts inside the
+// #-extent and runs past it, so the #-extent ends where the comment
+// begins and the comment keeps its own bytes. ok=false when no scanned
+// extent crosses h's end.
+func commentCut(scanned []common.Range, h common.Range) (common.Pos, bool) {
+	var cut common.Pos
+
+	found := false
+
+	for _, c := range scanned {
+		if c.Start.Before(h.Start) || !c.Start.Before(h.End) {
+			continue // starts outside the #-extent
+		}
+
+		if !c.End.After(h.End) {
+			continue // swallowed whole by the #-extent
+		}
+
+		if !found || c.Start.Before(cut) {
+			cut, found = c.Start, true
+		}
+	}
+
+	return cut, found
+}
+
+// insideRange reports whether r lies entirely within one of the ranges.
+func insideRange(r common.Range, rs []common.Range) bool {
+	for _, outer := range rs {
+		if !r.Start.Before(outer.Start) && !r.End.After(outer.End) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // tokenKind enumerates the lexer token kinds.

@@ -1,0 +1,17 @@
+start_random
+    create_object A{
+if X
+set_a
+}
+    create_object B{
+if Z
+end_random
+set_b
+}
+    if Y
+        create_object C
+    endif
+    create_land 45
+
+<land_generation>
+</land_generation>

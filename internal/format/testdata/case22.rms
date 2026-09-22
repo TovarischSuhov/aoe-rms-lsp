@@ -1,0 +1,12 @@
+start_random
+percent_chance 50
+create_object BOAR
+start_random
+percent_chance 5
+number_of_objects 9
+end_random
+end_random
+{
+set_gaia_object_only
+}
+create_object DEER

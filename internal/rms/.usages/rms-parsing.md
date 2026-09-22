@@ -128,3 +128,64 @@ Preconditions:
   an attribute name to its index in kb Attributes — RMS has no local
   declarations to consult.
 
+## Comment extents (formatting, comment-aware checks)
+
+RmsFile.Comments carries every comment extent of the file — /* … */
+(including multi-line), //… and #-lines that are not directives —
+sorted by position. The parser does not keep comment texts: extract
+them from the source by range.
+
+```go
+file, _ := rms.Parse(text, uri)
+for _, r := range file.Comments {
+    // r is a common.Range in absolute file coordinates;
+    // text[r.Start.Offset:r.End.Offset] is the exact comment bytes
+    // (from "/*" through "*/", or to the end of line)
+}
+```
+
+Preconditions:
+- Extents are byte-exact and non-overlapping.
+- Positions inside them answer found=false in ArgAt — the same
+  extents gate argument lookup.
+
+
+## Structural keywords (line classification)
+
+IsStructural answers whether a word is one of the nesting keywords —
+if, elseif, else, endif, start_random, end_random, percent_chance.
+It is the parser's own dictionary: consumers classifying lines by
+their first word must use it rather than keep a copy, which drifts
+silently when the grammar grows.
+
+```go
+fields := strings.Fields(line)
+if len(fields) > 0 && rms.IsStructural(fields[0]) {
+    // the line opens or closes nesting — the parser gave it scope
+    // semantics an AST walk alone cannot re-derive
+}
+```
+
+Preconditions:
+- Membership only; how scopes open and close is Parse's internals —
+  replay it against the parser's own discipline, never assume it.
+
+## First word of a line (lexer-faithful classification)
+
+FirstWord returns a line's first word token cut by the lexer's own
+rules — leading blanks skipped, word boundary at the first
+non-word byte. `if}` and `else{` answer "if" and "else"; a
+whitespace Fields split sees one glued token and misclassifies the
+line. Callers that switch on a line's leading word (structural
+keywords, command names) must cut it here.
+
+```go
+if rms.IsStructural(rms.FirstWord(line)) {
+    // the line opens or closes nesting however its word is spelled —
+    // `if}`, `else{`, `endif,` included
+}
+```
+
+Preconditions:
+- "" means the line is blank or starts with a non-word token (number,
+  string, brace, operator) — never treat it as a word.

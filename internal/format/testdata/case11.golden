@@ -1,0 +1,11 @@
+// what this map does
+/* three-terrain
+   rotation */
+#hash marker
+<land_generation>
+    // before the command
+    base_terrain GRASS
+    /* after the command */
+    create_elevation 2
+    # inside section
+</land_generation>

@@ -1,0 +1,4 @@
+<LAND_GENERATION>
+base_terrain GRASS
+create_elevation 2
+</LAND_GENERATION>

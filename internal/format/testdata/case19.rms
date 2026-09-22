@@ -1,0 +1,6 @@
+#const MAP_SIZE 2
+#define ELEV 3
+#include_drs   50005
+<LAND_GENERATION>
+base_terrain GRASS
+</LAND_GENERATION>

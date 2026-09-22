@@ -1,0 +1,5 @@
+#include inc/lands.rms
+#include "my map.rms"
+<LAND_GENERATION>
+base_terrain GRASS
+</LAND_GENERATION>

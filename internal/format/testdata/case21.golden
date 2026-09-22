@@ -1,0 +1,5 @@
+<objects_generation>
+    create_object {
+        object_name "Grassland"
+    }
+</objects_generation>

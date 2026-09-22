@@ -1,0 +1,8 @@
+#includeXS
+void setup() {
+	// configure
+	int x = 1;
+}
+<LAND_GENERATION>
+base_terrain GRASS
+</LAND_GENERATION>

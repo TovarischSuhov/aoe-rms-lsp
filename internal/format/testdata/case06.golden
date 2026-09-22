@@ -1,0 +1,7 @@
+#const MAP_SIZE 2
+
+<land_generation>
+    base_terrain GRASS
+</land_generation>
+
+#define DIFFICULTY 3

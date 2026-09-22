@@ -1,0 +1,5 @@
+<LAND_GENERATION>
+start_random
+percent_chance 50
+base_terrain GRASS
+</LAND_GENERATION>

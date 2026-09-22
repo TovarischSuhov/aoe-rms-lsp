@@ -1,0 +1,8 @@
+#include /* cfg */ "startup.rms"
+
+<player_setup>
+    random_placement
+</player_setup>
+
+#includeXS "lib" // note
+void f() {}

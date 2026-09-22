@@ -1,0 +1,9 @@
+<objects_generation>
+    create_object BOAR {
+        number_of_objects 2 4
+        set_scaling_to_map_size
+    }
+    create_object DEER {
+        number_of_objects 3 5
+    }
+</objects_generation>
