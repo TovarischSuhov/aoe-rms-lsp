@@ -894,9 +894,12 @@ func xsTerminator(trimmed string) bool {
 // comment extents: multi-line block comments span from "/*" past "*/"
 // across the recorded lines; line comments span to the end of their line.
 // The scan mirrors the walk's inline-XS regions: a region body is scanned
-// as its own unit, so block-comment state never crosses a region boundary
-// (#93) — an unclosed /* inside the region clamps to the region's end and
-// the terminator line stays visible to the walk.
+// as its own unit, so block-comment state opened inside the region cannot
+// leak past its terminator (#93) — an unclosed /* there clamps to the
+// region's end and the terminator line stays visible to the walk.
+// Entering, a block opened on the directive line itself is clamped to
+// that line; a block opened before the directive blanks it (no region —
+// the walk's view too).
 func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 	out := make([]string, len(lines))
 	copy(out, lines)
@@ -912,7 +915,7 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 	}
 
 	for i := range out {
-		if inRegion && inBlock && xsTerminator(strings.TrimSpace(lines[i])) {
+		if inRegion && inBlock && xsTerminatorPrefix(lines[i]) {
 			// The open block cannot eat the region boundary: its extent
 			// ends with the previous line and the terminator line is
 			// rescanned with fresh state, so run() sees it.
@@ -985,6 +988,10 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 	return out, comments
 }
 
+// xsRegionDirective is the directive word that opens an inline XS region;
+// directiveWords knows the whole vocabulary, this word picks the opener.
+const xsRegionDirective = "#includeXS"
+
 // opensXsRegion reports whether a blanked line is an #includeXS directive
 // — the one directive that opens an inline XS region with the next line.
 // Fields on the blanked line mirror isDirectiveLine's vocabulary check;
@@ -992,7 +999,25 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 func opensXsRegion(blanked string) bool {
 	fields := strings.Fields(blanked)
 
-	return len(fields) > 0 && fields[0] == "#includeXS"
+	return len(fields) > 0 && fields[0] == xsRegionDirective
+}
+
+// xsTerminatorPrefix reports whether the raw line starts a region
+// terminator before any comment bytes: the open-block pre-check must not
+// be masked by a comment tail on the terminator line (`<X> /* keep`).
+// The prefix up to the first comment marker decides.
+func xsTerminatorPrefix(raw string) bool {
+	cut := len(raw)
+
+	if i := strings.Index(raw, "/*"); i >= 0 {
+		cut = min(cut, i)
+	}
+
+	if i := strings.Index(raw, "//"); i >= 0 {
+		cut = min(cut, i)
+	}
+
+	return xsTerminator(strings.TrimSpace(raw[:cut]))
 }
 
 // mergeComments folds the scanned /* */ and // extents with the #-comment

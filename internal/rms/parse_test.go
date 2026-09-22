@@ -710,17 +710,18 @@ func TestParse_XsBlockTrailingBlankLines(t *testing.T) {
 // section header stays visible to the walk, and every section after the
 // region lands in the AST — the file is not silently swallowed. Closed
 // /* */ and // inside the region keep reaching Comments (the contract
-// asymmetry pinned by TestRmsComments_HashInsideXsBlock).
+// asymmetry pinned by TestRmsComments_HashInsideXsBlock), and comment
+// texts slice byte-exact by offset — the formatter's read path.
 func TestParse_UnclosedBlockCommentInXsRegion(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		src       string
-		blockCode string
-		blockSpan [2]common.Pos
-		comments  []common.Range
-		sections  []xsScanSection
+		name     string
+		src      string
+		blocks   []xsScanBlock
+		comments []common.Range
+		texts    []string
+		sections []xsScanSection
 	}{
 		{
 			name: "unclosed /* no longer swallows the sections after the region",
@@ -729,12 +730,12 @@ func TestParse_UnclosedBlockCommentInXsRegion(t *testing.T) {
 				"<LAND_GENERATION>\n" +
 				"create_land X\n" +
 				"</LAND_GENERATION>\n",
-			blockCode: "/* xs",
-			blockSpan: [2]common.Pos{
-				{Line: 1, Column: 0, Offset: 11},
-				{Line: 2, Column: 0, Offset: 17},
-			},
+			blocks: []xsScanBlock{{
+				code: "/* xs",
+				span: [2]common.Pos{{Line: 1, Column: 0, Offset: 11}, {Line: 2, Column: 0, Offset: 17}},
+			}},
 			comments: []common.Range{commentExtent(1, 0, 1, 5)},
+			texts:    []string{"/* xs"},
 			sections: []xsScanSection{{name: "land_generation", stmts: []string{"create_land"}}},
 		},
 		{
@@ -748,12 +749,12 @@ func TestParse_UnclosedBlockCommentInXsRegion(t *testing.T) {
 				"<ELEVATION_GENERATION>\n" +
 				"create_elevation 3\n" +
 				"</ELEVATION_GENERATION>\n",
-			blockCode: "int a = 1;\n/* open",
-			blockSpan: [2]common.Pos{
-				{Line: 1, Column: 0, Offset: 11},
-				{Line: 3, Column: 0, Offset: 30},
-			},
+			blocks: []xsScanBlock{{
+				code: "int a = 1;\n/* open",
+				span: [2]common.Pos{{Line: 1, Column: 0, Offset: 11}, {Line: 3, Column: 0, Offset: 30}},
+			}},
 			comments: []common.Range{commentExtent(2, 0, 2, 7)},
+			texts:    []string{"/* open"},
 			sections: []xsScanSection{
 				{name: "land_generation", stmts: []string{"create_land"}},
 				{name: "elevation_generation", stmts: []string{"create_elevation"}},
@@ -767,15 +768,15 @@ func TestParse_UnclosedBlockCommentInXsRegion(t *testing.T) {
 				"<LAND_GENERATION>\n" +
 				"create_land X\n" +
 				"</LAND_GENERATION>\n",
-			blockCode: "/* xs pair */\ncode(); // tail",
-			blockSpan: [2]common.Pos{
-				{Line: 1, Column: 0, Offset: 11},
-				{Line: 3, Column: 0, Offset: 41},
-			},
+			blocks: []xsScanBlock{{
+				code: "/* xs pair */\ncode(); // tail",
+				span: [2]common.Pos{{Line: 1, Column: 0, Offset: 11}, {Line: 3, Column: 0, Offset: 41}},
+			}},
 			comments: []common.Range{
 				commentExtent(1, 0, 1, 13),
 				commentExtent(2, 8, 2, 15),
 			},
+			texts:    []string{"/* xs pair */", "// tail"},
 			sections: []xsScanSection{{name: "land_generation", stmts: []string{"create_land"}}},
 		},
 		{
@@ -784,12 +785,77 @@ func TestParse_UnclosedBlockCommentInXsRegion(t *testing.T) {
 				"<LAND_GENERATION>\n" +
 				"create_land X\n" +
 				"</LAND_GENERATION>\n",
-			blockCode: "",
-			blockSpan: [2]common.Pos{
-				{Line: 1, Column: 0, Offset: 19},
-				{Line: 1, Column: 0, Offset: 19},
-			},
+			blocks: []xsScanBlock{{
+				code: "",
+				span: [2]common.Pos{{Line: 1, Column: 0, Offset: 19}, {Line: 1, Column: 0, Offset: 19}},
+			}},
 			comments: []common.Range{commentExtent(0, 11, 0, 18)},
+			texts:    []string{"/* open"},
+			sections: []xsScanSection{{name: "land_generation", stmts: []string{"create_land"}}},
+		},
+		{
+			name: "terminator with a block-comment tail still closes the region",
+			src: "#includeXS\n" +
+				"/* xs\n" +
+				"<LAND_GENERATION> /* keep\n" +
+				"create_land X\n" +
+				"*/\n" +
+				"</LAND_GENERATION>\n" +
+				"create_terrain GRASS\n",
+			blocks: []xsScanBlock{{
+				code: "/* xs",
+				span: [2]common.Pos{{Line: 1, Column: 0, Offset: 11}, {Line: 2, Column: 0, Offset: 17}},
+			}},
+			comments: []common.Range{
+				commentExtent(1, 0, 1, 5),
+				commentExtent(2, 18, 4, 2),
+			},
+			// create_land X rides inside the /* keep */ comment; the
+			// statement after the closed comment survives in global
+			texts: []string{"/* xs", "/* keep\ncreate_land X\n*/"},
+			sections: []xsScanSection{
+				{name: "land_generation", stmts: []string{}},
+				{name: "global", stmts: []string{"create_terrain"}},
+			},
+		},
+		{
+			name: "terminator with a line-comment tail still closes the region",
+			src: "#includeXS\n" +
+				"/* xs\n" +
+				"<LAND_GENERATION> // note\n" +
+				"create_land X\n" +
+				"</LAND_GENERATION>\n",
+			blocks: []xsScanBlock{{
+				code: "/* xs",
+				span: [2]common.Pos{{Line: 1, Column: 0, Offset: 11}, {Line: 2, Column: 0, Offset: 17}},
+			}},
+			comments: []common.Range{
+				commentExtent(1, 0, 1, 5),
+				commentExtent(2, 18, 2, 25),
+			},
+			texts:    []string{"/* xs", "// note"},
+			sections: []xsScanSection{{name: "land_generation", stmts: []string{"create_land"}}},
+		},
+		{
+			name: "includeXS directive terminating a region opens the next one",
+			src: "#includeXS\n" +
+				"/* xs\n" +
+				"#includeXS lib.xs\n" +
+				"void f() { }\n" +
+				"<LAND_GENERATION>\n" +
+				"create_land X\n",
+			blocks: []xsScanBlock{
+				{
+					code: "/* xs",
+					span: [2]common.Pos{{Line: 1, Column: 0, Offset: 11}, {Line: 2, Column: 0, Offset: 17}},
+				},
+				{
+					code: "void f() { }",
+					span: [2]common.Pos{{Line: 3, Column: 0, Offset: 35}, {Line: 4, Column: 0, Offset: 48}},
+				},
+			},
+			comments: []common.Range{commentExtent(1, 0, 1, 5)},
+			texts:    []string{"/* xs"},
 			sections: []xsScanSection{{name: "land_generation", stmts: []string{"create_land"}}},
 		},
 	}
@@ -801,13 +867,25 @@ func TestParse_UnclosedBlockCommentInXsRegion(t *testing.T) {
 			file, diags := Parse(tt.src, "t.rms")
 
 			require.Empty(t, diags, tt.name)
-			require.Len(t, file.XsBlocks, 1, tt.name)
-			assert.Equal(t, tt.blockCode, file.XsBlocks[0].Code, tt.name)
-			assert.Equal(t, common.Range{Start: tt.blockSpan[0], End: tt.blockSpan[1]}, file.XsBlocks[0].Range, tt.name)
+			require.Len(t, file.XsBlocks, len(tt.blocks), tt.name)
+
+			for j, want := range tt.blocks {
+				assert.Equal(t, want.code, file.XsBlocks[j].Code, tt.name)
+				assert.Equal(t, common.Range{Start: want.span[0], End: want.span[1]}, file.XsBlocks[j].Range, tt.name)
+			}
+
 			assert.Equal(t, tt.comments, commentExtents(file.Comments), tt.name)
+			assert.Equal(t, tt.texts, commentTexts(tt.src, file.Comments), tt.name)
 			assert.Equal(t, tt.sections, xsScanSections(file), tt.name)
 		})
 	}
+}
+
+// xsScanBlock is the XsBlock expectation of the region comment tests: the
+// verbatim code with the block's line span.
+type xsScanBlock struct {
+	code string
+	span [2]common.Pos
 }
 
 // xsScanSection is the section expectation of the region comment tests:
