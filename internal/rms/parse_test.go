@@ -704,6 +704,136 @@ func TestParse_XsBlockTrailingBlankLines(t *testing.T) {
 	assert.Equal(t, common.Pos{Line: 2, Column: 0, Offset: 24}, file.XsBlocks[0].Range.End)
 }
 
+// TestParse_UnclosedBlockCommentInXsRegion pins #93: block-comment state
+// does not cross an inline-XS region boundary. An unclosed /* inside the
+// region yields one extent contained in the region, the terminating
+// section header stays visible to the walk, and every section after the
+// region lands in the AST — the file is not silently swallowed. Closed
+// /* */ and // inside the region keep reaching Comments (the contract
+// asymmetry pinned by TestRmsComments_HashInsideXsBlock).
+func TestParse_UnclosedBlockCommentInXsRegion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		src       string
+		blockCode string
+		blockSpan [2]common.Pos
+		comments  []common.Range
+		sections  []xsScanSection
+	}{
+		{
+			name: "unclosed /* no longer swallows the sections after the region",
+			src: "#includeXS\n" +
+				"/* xs\n" +
+				"<LAND_GENERATION>\n" +
+				"create_land X\n" +
+				"</LAND_GENERATION>\n",
+			blockCode: "/* xs",
+			blockSpan: [2]common.Pos{
+				{Line: 1, Column: 0, Offset: 11},
+				{Line: 2, Column: 0, Offset: 17},
+			},
+			comments: []common.Range{commentExtent(1, 0, 1, 5)},
+			sections: []xsScanSection{{name: "land_generation", stmts: []string{"create_land"}}},
+		},
+		{
+			name: "terminator swallowed by the open block still closes the region",
+			src: "#includeXS\n" +
+				"int a = 1;\n" +
+				"/* open\n" +
+				"<LAND_GENERATION>\n" +
+				"create_land X\n" +
+				"</LAND_GENERATION>\n" +
+				"<ELEVATION_GENERATION>\n" +
+				"create_elevation 3\n" +
+				"</ELEVATION_GENERATION>\n",
+			blockCode: "int a = 1;\n/* open",
+			blockSpan: [2]common.Pos{
+				{Line: 1, Column: 0, Offset: 11},
+				{Line: 3, Column: 0, Offset: 30},
+			},
+			comments: []common.Range{commentExtent(2, 0, 2, 7)},
+			sections: []xsScanSection{
+				{name: "land_generation", stmts: []string{"create_land"}},
+				{name: "elevation_generation", stmts: []string{"create_elevation"}},
+			},
+		},
+		{
+			name: "closed comments inside the region keep their extents",
+			src: "#includeXS\n" +
+				"/* xs pair */\n" +
+				"code(); // tail\n" +
+				"<LAND_GENERATION>\n" +
+				"create_land X\n" +
+				"</LAND_GENERATION>\n",
+			blockCode: "/* xs pair */\ncode(); // tail",
+			blockSpan: [2]common.Pos{
+				{Line: 1, Column: 0, Offset: 11},
+				{Line: 3, Column: 0, Offset: 41},
+			},
+			comments: []common.Range{
+				commentExtent(1, 0, 1, 13),
+				commentExtent(2, 8, 2, 15),
+			},
+			sections: []xsScanSection{{name: "land_generation", stmts: []string{"create_land"}}},
+		},
+		{
+			name: "block opened on the directive line stays on the directive line",
+			src: "#includeXS /* open\n" +
+				"<LAND_GENERATION>\n" +
+				"create_land X\n" +
+				"</LAND_GENERATION>\n",
+			blockCode: "",
+			blockSpan: [2]common.Pos{
+				{Line: 1, Column: 0, Offset: 19},
+				{Line: 1, Column: 0, Offset: 19},
+			},
+			comments: []common.Range{commentExtent(0, 11, 0, 18)},
+			sections: []xsScanSection{{name: "land_generation", stmts: []string{"create_land"}}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			file, diags := Parse(tt.src, "t.rms")
+
+			require.Empty(t, diags, tt.name)
+			require.Len(t, file.XsBlocks, 1, tt.name)
+			assert.Equal(t, tt.blockCode, file.XsBlocks[0].Code, tt.name)
+			assert.Equal(t, common.Range{Start: tt.blockSpan[0], End: tt.blockSpan[1]}, file.XsBlocks[0].Range, tt.name)
+			assert.Equal(t, tt.comments, commentExtents(file.Comments), tt.name)
+			assert.Equal(t, tt.sections, xsScanSections(file), tt.name)
+		})
+	}
+}
+
+// xsScanSection is the section expectation of the region comment tests:
+// the section name with the command names of its direct statements.
+type xsScanSection struct {
+	name  string
+	stmts []string
+}
+
+// xsScanSections projects the parsed sections into the xsScanSection
+// shape the tests compare against.
+func xsScanSections(file RmsFile) []xsScanSection {
+	out := make([]xsScanSection, 0, len(file.Sections))
+
+	for _, sec := range file.Sections {
+		stmts := make([]string, 0, len(sec.Statements))
+		for _, st := range sec.Statements {
+			stmts = append(stmts, st.Name)
+		}
+
+		out = append(out, xsScanSection{name: sec.Name, stmts: stmts})
+	}
+
+	return out
+}
+
 // TestParse_EndRandomClosesUnterminatedIf checks the implicit-close
 // warning: end_random silently closing an unterminated if reports a
 // warning naming both blocks.

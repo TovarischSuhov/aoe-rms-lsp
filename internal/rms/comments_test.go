@@ -107,6 +107,13 @@ func TestRmsComments_Extents(t *testing.T) {
 				commentExtent(0, 8, 0, 12),
 			},
 		},
+		{
+			name: "unclosed block comment outside a region spans to the end of the file",
+			// pre-existing EOF behavior: one extent to the end of the last
+			// line — the region fix must not change files without regions
+			src:  "create_land X\n/* trailing",
+			want: []common.Range{commentExtent(1, 0, 1, 11)},
+		},
 	}
 
 	for _, tt := range tests {
