@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make lint)",
+      "Bash(make lint *)",
+      "Bash(goga contract)",
+      "Bash(goga contract *)",
+      "Bash(goga schema)",
+      "Bash(goga schema *)",
+      "Bash(goga lint)",
+      "Bash(goga lint *)",
+      "Bash(goga config *)",
+      "Bash(journalctl *)",
+      "mcp__codegraph__codegraph_explore",
+      "mcp__happy__change_title"
+    ]
+  }
+}
