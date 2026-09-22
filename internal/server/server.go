@@ -4,6 +4,7 @@ import (
 	"aoe2-lsp/internal/analysis"
 	"aoe2-lsp/internal/common"
 	"aoe2-lsp/internal/complete"
+	"aoe2-lsp/internal/format"
 	"aoe2-lsp/internal/hints"
 	"aoe2-lsp/internal/include"
 	"aoe2-lsp/internal/kb"
@@ -11,6 +12,7 @@ import (
 	"aoe2-lsp/internal/xs"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -334,6 +336,7 @@ func (s *Server) Initialize(
 		CodeActionProvider: &protocol.CodeActionOptions{
 			CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
 		},
+		DocumentFormattingProvider: protocol.Boolean(true),
 	}
 
 	if enc, ok := negotiateEncoding(params); ok {
@@ -1720,6 +1723,61 @@ func lineRange(text string, line uint32) common.Range {
 		Start: common.Pos{Line: line},
 		End:   common.Pos{Line: line, Column: uint32(len(lineOf(text, line)))},
 	}
+}
+
+// Formatting answers textDocument/formatting with a single full-document
+// edit whose text is the format cell's canonical print. Inputs the
+// printer refuses (error-severity parse diagnostics) and non-RMS
+// documents answer an empty slice — the refusal is already published as
+// diagnostics, so no JSON-RPC error is warranted. The range end sits
+// just past the last byte: ending on the last meaningful line would
+// leave a trailing newline outside the edit and double it once the
+// client applies the replacement.
+func (s *Server) Formatting(
+	ctx context.Context,
+	params *protocol.DocumentFormattingParams,
+) ([]protocol.TextEdit, error) {
+	text, name, _ := s.openDocument(params.TextDocument.URI) // editor state, not the FS
+
+	if !strings.HasSuffix(name, ".rms") {
+		return []protocol.TextEdit{}, nil
+	}
+
+	// TrimTrailingWhitespace and friends stay unread: the printer owns
+	// the whole canonical shape, indentation is the only per-request
+	// knob left to the client.
+	opts := format.Options{TabSize: int(params.Options.TabSize), IndentTabs: !params.Options.InsertSpaces}
+
+	formatted, err := format.RMS(text, opts)
+	if errors.Is(err, format.ErrParseErrors) {
+		return []protocol.TextEdit{}, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("format %s: %w", name, err) // defensive: format.RMS returns no other errors today
+	}
+
+	slog.DebugContext(ctx, "formatting", "uri", name, "bytes", len(formatted))
+
+	return []protocol.TextEdit{{
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 0, Character: 0},
+			End:   s.toProtocolPos(text, endOfDocument(text)),
+		},
+		NewText: formatted,
+	}}, nil
+}
+
+// endOfDocument is the position just past the document's last byte — the
+// mirror of the printer's own stream boundary, so the trailing newline
+// (when there is one) stays inside the replaced range.
+func endOfDocument(text string) common.Pos {
+	line := uint32(strings.Count(text, "\n"))
+	if last := lineOf(text, line); last != "" {
+		return common.Pos{Line: line, Column: uint32(len(last))}
+	}
+
+	return common.Pos{Line: line}
 }
 
 // Shutdown acknowledges a clean shutdown request.

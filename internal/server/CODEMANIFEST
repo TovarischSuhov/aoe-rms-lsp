@@ -51,6 +51,12 @@ Imports:
     Usages:
       - closure
     From: internal/include
+  - Types:
+      - RMS
+      - Options
+    Usages:
+      - formatting
+    From: internal/format
 
 Usages:
   conventions: .goga/usages/conventions.md
@@ -127,6 +133,11 @@ Annotations: |
   plain WorkspaceEdit{Changes} по rename-сайтам замыкания (склейка —
   RenameSites `Resolver` по `closure`), включая неоткрытые файлы;
   невалидный NewName — ResponseError.
+  Formatting следует секции Formatting `lsp-protocol`: один
+  full-document TextEdit, конец диапазона — позиция за последним байтом
+  (хвостовой \n внутри правки); непечатаемое (error-severity parse
+  diagnostics) и не-.rms — пустой slice, не nil; опции запроса маппятся
+  в `Options` (TabSize, !InsertSpaces), прочие игнорируются.
 
 ---
 
@@ -157,6 +168,7 @@ Annotations: |
       (в go.lsp.dev поле типизировано опциями, не Boolean);
       SelectionRangeProvider — Boolean(true);
       RenameProvider — RenameOptions с PrepareProvider;
+      DocumentFormattingProvider — Boolean(true);
       SemanticTokensProvider — SemanticTokensOptions{
       Legend: TokenTypes=[known, unknown, deprecated, section, kind],
       TokenModifiers=[]};
@@ -543,6 +555,37 @@ Annotations: |
       - без DocumentChanges/resource-операций и ChangeAnnotations
       - словарные конфликты NewName (keyword/builtin-тёзка) не
         проверяются — лексическая валидация только
+    "Formatting(ctx: Context, params: DocumentFormattingParams) -> edits: []TextEdit, err: error": |
+      Каноническая перепечатка текущего документа (stateless, read-only);
+      имя метода — по интерфейсу go.lsp.dev (Formatting).
+
+      `params`: документ и опции форматирования клиента; `edits`: один
+      full-document TextEdit; `err`: только протокольные сбои
+
+      Algorithm:
+      1. Текст документа из DocStore (не ФС); не .rms — пустой список
+         (формат .xs — слот 3 #120)
+      2. Опции запроса → `Options`: TabSize → TabSize,
+         !InsertSpaces → IndentTabs; прочие FormattingOptions не читаются
+      3. `RMS` по `formatting`; вход с error-severity диагностиками
+         (sentinel ErrParseErrors, классификация errors.Is) → пустой
+         список (причина уже опубликована diagnostics — не
+         JSON-RPC-ошибка)
+      4. Один TextEdit: Range от {0,0} до позиции за последним байтом
+         (хвостовой \n входит в правку — конец на последней
+         содержательной строке удвоил бы его при apply), NewText —
+         вывод `RMS`; конец конвертируется по positionEncoding
+
+      Requirements:
+      - пустой результат — пустой slice, не nil
+      - NewText байт-идентичен выводу `RMS`
+      - stateless/read-only: состояние сервера не меняется
+
+      Constraints:
+      - .xs не форматируется (слот 3 #120)
+      - rangeFormatting не заявляем
+      - прочие FormattingOptions (TrimTrailingWhitespace и т.п.)
+        игнорируются — канонический вид целиком за принтером
     "Shutdown(ctx: Context) -> err: error": |
       Вернуть nil (default Unimplemented возвращает not-implemented).
     "Exit(ctx: Context) -> err: error": |
