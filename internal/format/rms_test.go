@@ -395,3 +395,70 @@ func commentTexts(f rms.RmsFile, src string) []string {
 
 	return out
 }
+
+// TestRMS_IdempotentMappedCorpus pins the idempotency invariant against
+// "foreign" CR data: a document re-wrapped to "\r\r\n" endings carries a
+// CR that is payload, not line ending, and the channel that cuts at a
+// line boundary — the raw verbatim slice — must strip exactly one EOL
+// byte there. Trimming the whole CR run instead eats the data byte, and
+// the document never reaches its fixed point (class #94: CR-dependent
+// residual non-idempotency). The raw cut is the channel the fixture
+// exercises: comment ranges are single-line, so the zero-column branch
+// stays out of their reach — the comment anchor meets it through the
+// mapped corpus, where a full-line comment ends its line, on the second
+// pass. The corpus is the source of pathological parses; the golden
+// fixtures are too tame to hit either channel. The mapped copies of the
+// corpus live in memory only — written to disk under testdata they would
+// enter the golden glob and pin the very bytes the bug corrupts;
+// case32.rms is the deliberate exception, a hand-written fixture keeping
+// the run covered where CI has no corpus. 078 keeps its stream-model
+// divergence (#94) under the mapped wrap too, so it is pinned by
+// convergence rather than skipped out of sight.
+func TestRMS_IdempotentMappedCorpus(t *testing.T) {
+	t.Parallel()
+
+	corpus, err := filepath.Glob(filepath.Join("..", "..", ".corpus", "*.rms"))
+	if err != nil || len(corpus) == 0 {
+		t.Skip("corpus not fetched")
+	}
+
+	for _, in := range corpus {
+		t.Run(filepath.Base(in), func(t *testing.T) {
+			t.Parallel()
+
+			raw, err := os.ReadFile(in)
+			if err != nil {
+				t.Fatalf("read input: %v", err)
+			}
+
+			src := strings.ReplaceAll(string(raw), "\n", "\r\r\n")
+
+			once, err := RMS(src, Options{TabSize: 4})
+			if err != nil {
+				t.Skipf("refused input: %v", err)
+			}
+
+			twice, err := RMS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("RMS(formatted): %v", err)
+			}
+
+			if knownDivergent[filepath.Base(in)] {
+				thrice, err := RMS(twice, Options{TabSize: 4})
+				if err != nil {
+					t.Fatalf("RMS(RMS(RMS(%s))): %v", in, err)
+				}
+
+				if thrice != twice {
+					t.Errorf("RMS(%s) stopped converging:\n--- twice ---\n%q\n--- thrice ---\n%q", in, twice, thrice)
+				}
+
+				return
+			}
+
+			if twice != once {
+				t.Errorf("RMS(RMS(%s)) differs:\n--- once ---\n%q\n--- twice ---\n%q", in, once, twice)
+			}
+		})
+	}
+}

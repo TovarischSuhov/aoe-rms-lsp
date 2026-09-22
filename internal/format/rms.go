@@ -155,15 +155,19 @@ func cutLines(lines []string, r common.Range) string {
 	lastCol := min(int(r.End.Column), len(lines[end]))
 	if lastCol == 0 && end > start {
 		end--
-		// the previous line's "\r" tail is not payload: a zero-column
-		// end means "just past the newline", and the page adds its own
-		// line ending — carrying the "\r" into the bytes would grow the
-		// document one CR per pass
-		lastCol = len(strings.TrimRight(lines[end], "\r"))
+		// the full raw tail travels: exactly one EOL byte is every
+		// consumer's own to cut — rawChunk (TrimSuffix) for the verbatim
+		// slices, commentText for the comment anchors — and the page
+		// ends the line with its own line ending
+		lastCol = len(lines[end])
 	}
 
 	first := min(int(r.Start.Column), len(lines[start]))
 	if start == end {
+		// a range retargeted by commentText can end before its start
+		// column on one line — the clamp keeps the slice from panicking
+		lastCol = max(lastCol, first)
+
 		return lines[start][first:lastCol]
 	}
 
@@ -463,12 +467,54 @@ func (p *printer) separate() {
 	}
 }
 
+// eolCut is a raw line's last column in the coordinates the parser
+// addresses: the parser folds "\r\n" to "\n" and so eats exactly one "\r"
+// before every "\n" — a line's own ending byte is the one column the
+// parser can never name.
+func eolCut(line string) int {
+	if strings.HasSuffix(line, "\r") {
+		return len(line) - 1
+	}
+
+	return len(line)
+}
+
+// commentText cuts one comment's bytes for the page. A comment can end at
+// a line boundary — a zero-column end names the previous line's tail —
+// and always in the parser's normalized coordinates, so the end moves to
+// that line's last column first, its own ending byte included: one short
+// of the raw tail is the farthest the cut can reach without growing the
+// CR run — a byte a pass, and the document never reaches a fixed point.
+// Whatever trails the range on its own line is then a run of "\r" bytes,
+// and all but one ride with the comment, the page adding the last one.
+// A run broken by code (`/* c */ code`) is not the comment's to take.
+func (p *printer) commentText(r common.Range) string {
+	if r.End.Column == 0 && r.End.Line > 0 && int(r.End.Line) < len(p.doc.lines) {
+		r.End = common.Pos{Line: r.End.Line - 1, Column: uint32(eolCut(p.doc.lines[r.End.Line-1]))}
+	}
+
+	text := p.doc.text(r)
+
+	if int(r.End.Line) >= len(p.doc.lines) {
+		return text
+	}
+
+	line := p.doc.lines[r.End.Line]
+	rest := line[min(int(r.End.Column), len(line)):]
+
+	if rest != "" && strings.Trim(rest, "\r") == "" {
+		return text + rest[:len(rest)-1]
+	}
+
+	return text
+}
+
 // flushBefore anchors every comment starting before pos, in source order,
 // one per line at the given level: the nearest inter-node position a
 // comment can take is the gap it already sits in.
 func (p *printer) flushBefore(pos common.Pos, level int) {
 	for p.pending < len(p.comments) && p.comments[p.pending].Start.Before(pos) {
-		p.line(level, p.doc.text(p.comments[p.pending]))
+		p.line(level, p.commentText(p.comments[p.pending]))
 		p.pending++
 	}
 }

@@ -1,0 +1,16 @@
+<LAND_GENERATION>
+create_player_lands 
+{            
+if DESERT_MAP
+  terrain_type                     DIRT
+endif
+  land_percent                     30
+}
+
+/* **** banner **** */
+
+<TERRAIN_GENERATION>
+create_terrain MED_WATER
+{
+base_terrain WATER
+}
