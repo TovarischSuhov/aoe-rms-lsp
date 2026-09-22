@@ -28,7 +28,7 @@ Initialize advertises: diagnostics (Full sync + OpenClose), hover,
 completion, navigation — definition, references, documentSymbol,
 documentHighlight, workspace symbol search, document links, selection
 ranges, rename (prepareProvider) — semantic tokens (full document),
-folding ranges, quick fixes
+folding ranges, document formatting, quick fixes
 (did-you-mean renames, effect_percent replacement, missing-include
 file creation), and signature help (TriggerCharacters "(" and ",").
 Editor configs need no extra flags; positionEncoding is negotiated
@@ -142,6 +142,23 @@ Preconditions:
   missing-include diagnostics.
 - Unresolved directives are skipped (the missing-include diagnostic is
   the signal); .xs documents return an empty list.
+
+## Document formatting
+
+textDocument/formatting reprints the whole .rms document in the
+canonical printer's shape and returns a single full-document edit —
+one replacement spanning the file, the current trailing newline
+included in the range so applying it does not double. Indentation is
+the only knob: the request's TabSize and InsertSpaces are honored,
+there are no formatting settings in the `"aoe2lsp"` section.
+
+Preconditions:
+- Documents with error-severity parse diagnostics answer an empty edit
+  list (not an error) — the reason is already published as diagnostics;
+  analyzer-level findings (unknown-command and friends) do not block
+  formatting.
+- .xs documents are not formatted yet (slot 3 of #120) and also answer
+  an empty list.
 
 ## Selection ranges
 
