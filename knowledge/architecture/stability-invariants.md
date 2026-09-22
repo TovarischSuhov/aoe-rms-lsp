@@ -7,6 +7,8 @@ sources:
   - resource: docs/plans/build-lsp-rms-xs.md
   - resource: Makefile
   - resource: internal/include/source.go
+  - resource: internal/rms/parse.go
+  - resource: .goga/history/2026/task-xs-comment-scan/arch.md
 generated:
   by: claude-code/glm-5.3
   at: 2026-09-22T07:12:06Z
@@ -29,6 +31,13 @@ verified:
   разбирать `docs/ref/ugc-guide/xs/prelude.xs` (дамп игры, 882 extern) —
   это фиксированный тест. RMS — фикстуры в `internal/rms/testdata` и
   корпус из 100 опубликованных карт (corpus gate).
+- **Скан комментариев и обход сходятся на одном виде строки.**
+  `blankComments` и `run` обязаны классифицировать границы inline-XS-
+  регионов по гашёной строке (единственная сырая проверка — пре-чек
+  терминатора, поглощённого открытым блоком, по префиксу до первого
+  маркера комментария); состояние блок-комментария не пересекает границу
+  региона. Расхождение моделей = молчаливая потеря секций без
+  диагностики (#93, тест `TestParse_UnclosedBlockCommentInXsRegion`).
 
 ## Диагностика
 
