@@ -387,6 +387,34 @@ Rules:
 - Empty/unknown documents answer `Data: []uint32{}` — an empty slice,
   not nil, not an error.
 
+### Formatting
+
+`textDocument/formatting` reprints the whole document in the printer's
+canonical shape. Advertise `DocumentFormattingProvider:
+protocol.Boolean(true)` in Initialize; the server-interface method is
+`Formatting` (named after the request — match the interface or
+UnimplementedServer answers for you). Return `[]protocol.TextEdit`
+with exactly one entry spanning the document: `Range` starts at
+`{0,0}` and ends just past the last byte (a range ending on the last
+meaningful line leaves the trailing newline outside the edit and the
+client doubles it on apply), the end converted per the negotiated
+positionEncoding — same conversion as ranges.
+
+`params.Options` (`FormattingOptions`) is the only per-request input:
+`TabSize` passes through as-is (0 resolves to the printer's default
+width of 4 inside the printer) and `InsertSpaces=false` selects one tab
+per level; `TrimTrailingWhitespace`, `InsertFinalNewline` and
+`TrimFinalNewlines` stay unread — the printer owns the entire
+canonical shape, indentation is the only client knob.
+
+A refusal is not an error: a source carrying error-severity parse
+diagnostics (the parse-level refusal, not analyzer findings such as
+unknown-command — those documents format normally) answers
+`[]protocol.TextEdit{}` — an empty slice, not nil, never a JSON-RPC
+error; the client keeps its text and the reason is already visible in
+the published diagnostics. Non-matching documents (e.g. .xs) answer an
+empty slice the same way.
+
 ## Cross-file Navigation Results
 
 Definition/References may return locations in files other than the queried
