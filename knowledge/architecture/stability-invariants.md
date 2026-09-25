@@ -1,7 +1,7 @@
 ---
 type: Invariant
 title: Инварианты стабильности
-description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, данные без сети.
+description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, данные без сети.
 sources:
   - resource: README.md
   - resource: docs/plans/build-lsp-rms-xs.md
@@ -9,9 +9,11 @@ sources:
   - resource: internal/include/source.go
   - resource: internal/rms/parse.go
   - resource: .goga/history/2026/task-xs-comment-scan/arch.md
+  - resource: internal/xs/parse.go
+  - resource: internal/server/server.go
 generated:
-  by: claude-code/glm-5.3
-  at: 2026-09-22T07:12:06Z
+  by: claude-code/deepseek-chat
+  at: 2026-09-25T18:19:01Z
 verified:
   - by: claude-code/glm-5.3
     at: 2026-09-22T07:12:06Z
@@ -38,6 +40,14 @@ verified:
   маркера комментария); состояние блок-комментария не пересекает границу
   региона. Расхождение моделей = молчаливая потеря секций без
   диагностики (#93, тест `TestParse_UnclosedBlockCommentInXsRegion`).
+- **EOL нормализует только RMS.** RMS приводит `\r\n` к `\n` до разбора
+  (`internal/rms/parse.go`), XS разбирается по сырым байтам
+  (`internal/server/server.go`) — поэтому `Pos.Offset` в XS есть байтовый
+  сдвиг в переданном источнике, а перевод строки, если его явно не
+  остановить, попадает в экстент токена: строчный комментарий в CRLF-файле
+  обязан останавливаться и на `\r` (`internal/xs/parse.go`). Позиции
+  inline-XS относительны первой строки блока `rms.XsBlock.Code`, в
+  координаты RMS-файла их переносить нельзя.
 
 ## Диагностика
 
