@@ -146,3 +146,32 @@ Preconditions:
   not after the statement.
 - `include` declarations are skipped (not name-bearing for completion).
 
+## Comment extents (formatting, comment-aware checks)
+
+XsFile.Comments carries every comment extent of the file — // to the end
+of its line and /* */ blocks from "/*" through "*/" (multi-line and
+unterminated ones alike) — sorted by position and non-overlapping. The
+parser does not store comment texts: extract them from the source by
+Offset.
+
+```go
+file, _ := xs.XsParse(src, "a.xs")
+for _, r := range file.Comments {
+    text := src[r.Start.Offset:r.End.Offset] // тексты в AST не хранятся
+}
+```
+
+Preconditions:
+- Extents are byte-exact: each r is a common.Range whose Offsets address
+  the very src passed to XsParse, and text[r.Start.Offset:r.End.Offset]
+  is the comment verbatim — from "//" to the end of line, or from "/*"
+  through "*/".
+- String literals are never comments: a "//" or "/*" inside a string
+  belongs to the string token and does not appear in Comments.
+- CallAt and VisibleAt answer silence inside these extents (found=false) —
+  the same ranges gate call and symbol lookup, exactly as they do for
+  strings.
+- XsParse also runs on inline-XS blocks (rms.XsBlock.Code); there the
+  positions are relative to the block's first line, not the RMS file — do
+  not carry such an Offset into RMS source coordinates.
+

@@ -94,9 +94,19 @@ type XsFile struct {
 	// calls are the call contexts recorded by the parser (one per
 	// Kind=call expression); CallAt answers from here.
 	calls []*callRec
-	// noncode are the string and comment spans; positions inside them
-	// resolve to no symbol and no call.
-	noncode []common.Range
+	// strings are the string-token spans; positions inside them resolve to
+	// no symbol and no call.
+	strings []common.Range
+	// Comments are the exact comment extents: /* */ blocks from "/*"
+	// through "*/" (multi-line and unterminated ones alike), // line
+	// comments to the end of their line — sorted by position, never
+	// overlapping. Comment texts are not stored: the offsets address the
+	// source passed to XsParse, like every AST Range. XsParse also runs on
+	// inline-XS blocks, where the positions are relative to the block's
+	// first line rather than the enclosing RMS file; those blocks travel
+	// verbatim, so a consumer must not re-anchor these extents into the
+	// RMS source. CallAt and VisibleAt answer silence from here.
+	Comments []common.Range
 }
 
 // symbol is one identifier occurrence.
@@ -167,7 +177,13 @@ func (f XsFile) ReferencesAt(pos common.Pos) []common.Range {
 func (f XsFile) CallAt(pos common.Pos) (CallSite, bool) {
 	// Step 1: positions inside strings and comments resolve to no call —
 	// checked before any call lookup.
-	for _, r := range f.noncode {
+	for _, r := range f.strings {
+		if r.Contains(pos) {
+			return CallSite{}, false
+		}
+	}
+
+	for _, r := range f.Comments {
 		if r.Contains(pos) {
 			return CallSite{}, false
 		}
@@ -671,7 +687,13 @@ func declaredLocalName(item Expr) (string, common.Range, bool) {
 // the end of its enclosing block.
 func (f XsFile) VisibleAt(pos common.Pos) ([]common.Symbol, bool) {
 	// Step 1: positions inside strings and comments resolve to nothing.
-	for _, r := range f.noncode {
+	for _, r := range f.strings {
+		if r.Contains(pos) {
+			return nil, false
+		}
+	}
+
+	for _, r := range f.Comments {
 		if r.Contains(pos) {
 			return nil, false
 		}

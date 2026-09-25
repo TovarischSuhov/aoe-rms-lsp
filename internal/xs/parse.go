@@ -29,20 +29,22 @@ func XsParse(source string, name string) (XsFile, []common.Diagnostic) {
 
 	p.file.symbols = p.syms
 	p.file.calls = p.calls
-	p.file.noncode = p.noncode
+	p.file.Comments = p.comments
+	p.file.strings = p.strings
 
 	return p.file, p.diags
 }
 
 // xparser holds the incremental state of one XsParse run.
 type xparser struct {
-	file    XsFile
-	diags   []common.Diagnostic
-	toks    []xtoken
-	pos     int
-	syms    []symbol
-	calls   []*callRec
-	noncode []common.Range
+	file     XsFile
+	diags    []common.Diagnostic
+	toks     []xtoken
+	pos      int
+	syms     []symbol
+	calls    []*callRec
+	comments []common.Range
+	strings  []common.Range
 }
 
 // parseDecl parses one top-level declaration, recovering to the next
@@ -1391,7 +1393,7 @@ var multiCharOps = []string{
 const singleOps = "+-*/%=<>!&|^~?:;,(){}[]."
 
 // scan tokenizes the whole source into p.toks with an EOF sentinel and
-// collects the non-code spans (strings, comments) into p.noncode.
+// collects the comment and string spans into p.comments and p.strings.
 func (p *xparser) scan(source string) {
 	// the source stays a string: token texts are substrings that share
 	// the backing array (zero-copy), not per-token conversions of a
@@ -1402,7 +1404,8 @@ func (p *xparser) scan(source string) {
 		tok := s.next()
 		p.toks = append(p.toks, tok)
 		if tok.kind == xEOF {
-			p.noncode = s.noncode
+			p.comments = s.comments
+			p.strings = s.strings
 
 			return
 		}
@@ -1415,7 +1418,8 @@ type xscanner struct {
 	pos       int
 	line      uint32
 	lineStart int
-	noncode   []common.Range
+	comments  []common.Range
+	strings   []common.Range
 }
 
 // posAt builds the position of byte offset i.
@@ -1423,14 +1427,17 @@ func (s *xscanner) posAt(i int) common.Pos {
 	return common.Pos{Line: s.line, Column: uint32(i - s.lineStart), Offset: i}
 }
 
-// span builds the range [start, s.pos).
-func (s *xscanner) span(start int) common.Range {
-	return common.Range{Start: s.posAt(start), End: s.posAt(s.pos)}
+// span builds the range [start, s.pos): start is the position captured when
+// the token began, so a token spanning lines keeps its start on the line it
+// began on (skipBlockComment and an escaped-newline scanString advance
+// line/lineStart past it), while the end follows the current scanner state.
+func (s *xscanner) span(start common.Pos) common.Range {
+	return common.Range{Start: start, End: s.posAt(s.pos)}
 }
 
-// token builds a token for [start, s.pos).
-func (s *xscanner) token(kind xtokKind, start int) xtoken {
-	return xtoken{kind: kind, text: s.src[start:s.pos], at: s.span(start)}
+// token builds a token for [start.Offset, s.pos).
+func (s *xscanner) token(kind xtokKind, start common.Pos) xtoken {
+	return xtoken{kind: kind, text: s.src[start.Offset:s.pos], at: s.span(start)}
 }
 
 // next returns the next token, skipping whitespace and comments.
@@ -1444,19 +1451,23 @@ func (s *xscanner) next() xtoken {
 		}
 
 		start := s.pos
+		// startPos is captured before the token is consumed: a multi-line
+		// block comment or an escaped-newline string moves line/lineStart,
+		// so the token's start must be anchored on its first line here.
+		startPos := s.posAt(start)
 		c := s.src[s.pos]
 
 		if c == '/' && s.pos+1 < len(s.src) {
 			if s.src[s.pos+1] == '/' {
 				s.skipLineComment()
-				s.noncode = append(s.noncode, s.span(start))
+				s.comments = append(s.comments, s.span(startPos))
 
 				continue
 			}
 
 			if s.src[s.pos+1] == '*' {
 				s.skipBlockComment()
-				s.noncode = append(s.noncode, s.span(start))
+				s.comments = append(s.comments, s.span(startPos))
 
 				continue
 			}
@@ -1468,15 +1479,15 @@ func (s *xscanner) next() xtoken {
 				s.pos++
 			}
 
-			return s.token(xIdent, start)
+			return s.token(xIdent, startPos)
 		case c >= '0' && c <= '9':
 			s.scanNumber()
 
-			return s.token(xNumber, start)
+			return s.token(xNumber, startPos)
 		case c == '"':
 			s.scanString()
-			tok := s.token(xString, start)
-			s.noncode = append(s.noncode, tok.at)
+			tok := s.token(xString, startPos)
+			s.strings = append(s.strings, tok.at)
 
 			return tok
 		default:
@@ -1507,9 +1518,14 @@ func (s *xscanner) skipSpace() {
 	}
 }
 
-// skipLineComment consumes a // comment.
+// skipLineComment consumes a // comment. XS source is scanned as raw bytes
+// (unlike RMS, which normalizes EOL), so a CRLF terminator must be stopped
+// on explicitly: otherwise the \r lands inside the comment extent and a
+// consumer printing it re-emits the carriage return. Stopping at \r also
+// keeps the tail of CR-only input out of the extent; skipSpace consumes the
+// terminator itself in the next step.
 func (s *xscanner) skipLineComment() {
-	for s.pos < len(s.src) && s.src[s.pos] != '\n' {
+	for s.pos < len(s.src) && s.src[s.pos] != '\n' && s.src[s.pos] != '\r' {
 		s.pos++
 	}
 }
@@ -1597,7 +1613,7 @@ func (s *xscanner) scanOp() (xtoken, bool) {
 
 	for _, op := range multiCharOps {
 		if len(rest) >= len(op) && rest[:len(op)] == op {
-			start := s.pos
+			start := s.posAt(s.pos)
 			s.pos += len(op)
 
 			return s.token(xOp, start), true
@@ -1605,7 +1621,7 @@ func (s *xscanner) scanOp() (xtoken, bool) {
 	}
 
 	if s.indexByte(s.src[s.pos]) {
-		start := s.pos
+		start := s.posAt(s.pos)
 		s.pos++
 
 		return s.token(xOp, start), true
