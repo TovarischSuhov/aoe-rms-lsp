@@ -1,0 +1,8 @@
+<land_generation>
+    create_land F
+{
+if DESERT_MAP
+}
+</land_generation>
+
+/* oops

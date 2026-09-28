@@ -49,6 +49,14 @@ func RMS(source string, opts Options) (string, error) {
 	p.chainLast = chainLast(p.doc.blanked, p.xsMask)
 	p.list(p.elements(file), 0, p.doc.eof(), true)
 
+	// Whatever is still pending here is unclosed-to-EOF: every flush left
+	// it for this anchor, so it prints past every closer synthesized
+	// above — the one position its extent cannot swallow on a re parse.
+	for p.pending < len(p.comments) {
+		p.line(0, p.commentText(p.comments[p.pending]))
+		p.pending++
+	}
+
 	return p.result(), nil
 }
 
@@ -509,11 +517,38 @@ func (p *printer) commentText(r common.Range) string {
 	return text
 }
 
+// unclosedEOF reports whether r is the comment the parser clipped at the
+// file's end: an unterminated /* — or a // on the file's last line — whose
+// extent runs to EOF, so every closer printed after its start is swallowed
+// by it on the next parse. The end is compared by line and column alone:
+// eof() fills no offset. The extent's bytes are checked too — a "*/" inside
+// means the scanner closed this comment and the EOF end came from somewhere
+// else. An extent trimmed by the XS-region clamp stops short of EOF and
+// never fires.
+func (p *printer) unclosedEOF(r common.Range) bool {
+	eof := p.doc.eof()
+
+	if r.End.Line != eof.Line || r.End.Column != eof.Column {
+		return false
+	}
+
+	return !strings.Contains(p.doc.text(r), "*/")
+}
+
 // flushBefore anchors every comment starting before pos, in source order,
 // one per line at the given level: the nearest inter-node position a
-// comment can take is the gap it already sits in.
+// comment can take is the gap it already sits in. An unclosed-to-EOF
+// comment stops the walk and stays pending: it is always the last one —
+// nothing live starts past its extent — and anchoring it here would put it
+// ahead of the closers synthesized after this point, closers its extent
+// swallows on the next parse. The pass's final anchor prints it past every
+// synthesis.
 func (p *printer) flushBefore(pos common.Pos, level int) {
 	for p.pending < len(p.comments) && p.comments[p.pending].Start.Before(pos) {
+		if p.unclosedEOF(p.comments[p.pending]) {
+			return
+		}
+
 		p.line(level, p.commentText(p.comments[p.pending]))
 		p.pending++
 	}
@@ -600,11 +635,27 @@ func (p *printer) element(el element, level int, limit common.Pos) (common.Pos, 
 		p.section(el, level, limit)
 	case elemStatement:
 		if p.verbatim(el.stmt) {
-			p.emit(p.at(level) + rawChunk(trimBlankLines(p.doc.text(ranges(el.stmt.Range.Start, limit)))))
-			p.dropBefore(limit)
-			maps.Copy(p.rawClosed, p.rawClosers(el.stmt.Range.Start, limit))
+			// An unclosed-to-EOF comment pending under the slice's end
+			// must not ride inside it: the chunk lands on the page before
+			// the closers synthesized after this element, and the comment
+			// would swallow them on the next parse. The slice stops at the
+			// comment's start — clipping the final boundary, whichever one
+			// the cut picked, keeps every byte before it on the chunk and
+			// leaves the comment's own extent to the pass's final anchor.
+			end := limit
+			for _, c := range p.comments[p.pending:] {
+				if p.unclosedEOF(c) && c.Start.Before(limit) {
+					end = c.Start
 
-			return limit, true
+					break
+				}
+			}
+
+			p.emit(p.at(level) + rawChunk(trimBlankLines(p.doc.text(ranges(el.stmt.Range.Start, end)))))
+			p.dropBefore(end)
+			maps.Copy(p.rawClosed, p.rawClosers(el.stmt.Range.Start, end))
+
+			return end, true
 		}
 
 		p.statement(el.stmt, level, limit)
