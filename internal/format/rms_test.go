@@ -104,6 +104,91 @@ func TestRMS_Idempotent(t *testing.T) {
 	}
 }
 
+// TestRMS_UnclosedCommentConvergence pins the #126 convergence contract:
+// a /* comment unterminated to EOF swallows the section closer that
+// follows it, the printer synthesizes a replacement, and the next pass
+// swallows that one too — every pass adds a closer and the output grows
+// without bound. The fix moves the comment past every synthesized closer
+// with its full extent, so the formatter converges from the first pass
+// and the number of closers stays constant; the raw-count guard keeps a
+// "converges, but somewhere else" fix from slipping through. The guard
+// row is the class next door — a closed section with a trailing //
+// comment — whose already-converging behavior must not change.
+func TestRMS_UnclosedCommentConvergence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		src     string
+		closers int // strings.Count(out, "</") every pass must hold
+	}{
+		{
+			name: "issue",
+			src:  "<LAND_GENERATION>\ncreate_land F\n/* trailing\n</LAND_GENERATION>\n",
+			// one synthesized closer plus the swallowed one riding
+			// inside the comment's full extent
+			closers: 2,
+		},
+		{
+			name:    "no-closer",
+			src:     "<LAND_GENERATION>\ncreate_land F\n/* oops\n",
+			closers: 1,
+		},
+		{
+			// the only row that reaches the verbatim slice's clip at the
+			// pending unclosed comment: the statement's raw extent covers
+			// the lines the comment would swallow with it
+			name:    "verbatim",
+			src:     "<LAND_GENERATION>\ncreate_land F\n{\nif DESERT_MAP\n}\n/* oops\n",
+			closers: 1,
+		},
+		{
+			// the canonical statement path: the conditional sibling, not a
+			// verbatim slice, owns the synthesis here
+			name:    "conditional-sibling",
+			src:     "<LAND_GENERATION>\ncreate_land F\nif 1\n/* oops\n",
+			closers: 1,
+		},
+		{
+			// guard: closed content — converges today, must keep doing so
+			name:    "closed-with-tail-comment",
+			src:     "<LAND_GENERATION>\ncreate_land F\n</LAND_GENERATION>\n// tail\n",
+			closers: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := RMS(tt.src, Options{})
+			if err != nil {
+				t.Fatalf("RMS: %v", err)
+			}
+
+			twice, err := RMS(once, Options{})
+			if err != nil {
+				t.Fatalf("RMS(formatted): %v", err)
+			}
+
+			thrice, err := RMS(twice, Options{})
+			if err != nil {
+				t.Fatalf("RMS(RMS(formatted)): %v", err)
+			}
+
+			if twice != once || thrice != once {
+				t.Errorf("RMS does not converge from the first pass:\n--- src ---\n%s\n--- pass 1 ---\n%s\n--- pass 2 ---\n%s\n--- pass 3 ---\n%s", tt.src, once, twice, thrice)
+			}
+
+			for i, out := range []string{once, twice, thrice} {
+				if n := strings.Count(out, "</"); n != tt.closers {
+					t.Errorf("pass %d closers = %d, want %d:\n%s", i+1, n, tt.closers, out)
+				}
+			}
+		})
+	}
+}
+
 // TestRMS_EmptyInput checks that nothing printable answers nothing: the
 // empty document and whitespace-only text format to the empty string.
 func TestRMS_EmptyInput(t *testing.T) {

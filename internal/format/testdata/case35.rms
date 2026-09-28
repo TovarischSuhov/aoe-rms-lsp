@@ -1,0 +1,4 @@
+<LAND_GENERATION>
+create_land F
+if 1
+/* oops
