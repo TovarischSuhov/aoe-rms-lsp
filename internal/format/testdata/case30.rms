@@ -1,5 +1,0 @@
-<LAND_GENERATION>
-if TURF 1}
-base_terrain GRASS
-endif,
-</LAND_GENERATION>

@@ -1,5 +1,0 @@
-<land_generation>
-    if TURF 1
-        base_terrain GRASS
-    endif
-</land_generation>
