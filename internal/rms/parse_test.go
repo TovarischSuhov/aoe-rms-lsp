@@ -1070,3 +1070,344 @@ func TestFirstWord(t *testing.T) {
 		}
 	}
 }
+
+// exprShape is the AST expectation of one value expression in the
+// operand-failure tests: Expr projected into a comparable recursive shape.
+type exprShape struct {
+	kind     string
+	value    string
+	span     common.Range
+	children []exprShape
+}
+
+// argShapes projects expressions into the exprShape form; empty input
+// stays nil so the table literals can spell "no children" as nil.
+func argShapes(exprs []Expr) []exprShape {
+	if len(exprs) == 0 {
+		return nil
+	}
+
+	out := make([]exprShape, 0, len(exprs))
+	for _, e := range exprs {
+		out = append(out, exprShape{
+			kind:     e.Kind,
+			value:    e.Value,
+			span:     e.Range,
+			children: argShapes(e.Children),
+		})
+	}
+
+	return out
+}
+
+// TestParse_OperandFailureDiagnostics pins the six operand-failure
+// emitters (issue #96): a failed operand parse is never silent — every
+// consumed byte is covered by a diagnostic, and the recovery forms
+// (childless unary, zero-width inner, kept arity) stay in the AST.
+func TestParse_OperandFailureDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want []common.Diagnostic
+		args []exprShape
+	}{
+		{
+			// №1: at EOF the span ends at the last consumed token —
+			// the operator itself.
+			name: "missing operand after binary op",
+			src:  "create_land 1 +\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 15, Offset: 15}},
+				Severity: common.SeverityError,
+				Message:  `missing operand after "+"`,
+				Code:     "syntax",
+			}},
+			args: []exprShape{{
+				kind:  KindNumber,
+				value: "1",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 13, Offset: 13}},
+			}},
+		},
+		{
+			// №2: the EOF anchor degrades to the operator token's range;
+			// the childless unary is the recovery form and stays in Args.
+			name: "missing operand after unary op",
+			src:  "create_land -\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 13, Offset: 13}},
+				Severity: common.SeverityError,
+				Message:  `missing operand after unary "-"`,
+				Code:     "syntax",
+			}},
+			args: []exprShape{{
+				kind:  KindUnary,
+				value: "-",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 13, Offset: 13}},
+			}},
+		},
+		{
+			// №3: the group span `(`…`)` is reported; the zero-width
+			// inner Expr keeps its exact pre-fix shape — the zero Expr{}
+			// (no kind, zero-width range).
+			name: "parenthesis without a valid expression",
+			src:  "create_land ( )\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 15, Offset: 15}},
+				Severity: common.SeverityError,
+				Message:  `"(" without a valid expression`,
+				Code:     "syntax",
+			}},
+			args: []exprShape{{}},
+		},
+		{
+			// №3 cascade: the inner group failure recovers with ok=true,
+			// so the outer `(` gets its own group report — one anchor per
+			// paren token, position order after the stable sort.
+			name: "nested parenthesis without a valid expression",
+			src:  "create_land (( )\n",
+			want: []common.Diagnostic{
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 16, Offset: 16}},
+					Severity: common.SeverityError,
+					Message:  `"(" without a valid expression`,
+					Code:     "syntax",
+				},
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 13, Offset: 13}, End: common.Pos{Line: 0, Column: 16, Offset: 16}},
+					Severity: common.SeverityError,
+					Message:  `"(" without a valid expression`,
+					Code:     "syntax",
+				},
+			},
+			args: []exprShape{{}},
+		},
+		{
+			// №2 inside a group: the unary failure recovers with ok=true,
+			// and the group report covers the consumed `(` the childless
+			// unary's range does not represent.
+			name: "unary failure inside a group",
+			src:  "create_land ( - )\n",
+			want: []common.Diagnostic{
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 17, Offset: 17}},
+					Severity: common.SeverityError,
+					Message:  `"(" without a valid expression`,
+					Code:     "syntax",
+				},
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 16, Offset: 16}, End: common.Pos{Line: 0, Column: 17, Offset: 17}},
+					Severity: common.SeverityError,
+					Message:  `missing operand after unary "-"`,
+					Code:     "syntax",
+				},
+			},
+			args: []exprShape{{
+				kind:  KindUnary,
+				value: "-",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 15, Offset: 15}},
+			}},
+		},
+		{
+			// №3 + №2: the inner unary failure recovers right before the
+			// group's `)`, which the group then consumes itself — the
+			// group report covers it too, or the paren would be lost to
+			// both the AST and the diagnostics.
+			name: "group report covers the closing parenthesis",
+			src:  "create_land ( - , )\n",
+			want: []common.Diagnostic{
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 19, Offset: 19}},
+					Severity: common.SeverityError,
+					Message:  `"(" without a valid expression`,
+					Code:     "syntax",
+				},
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 16, Offset: 16}, End: common.Pos{Line: 0, Column: 17, Offset: 17}},
+					Severity: common.SeverityError,
+					Message:  `missing operand after unary "-"`,
+					Code:     "syntax",
+				},
+			},
+			args: []exprShape{{
+				kind:  KindUnary,
+				value: "-",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 15, Offset: 15}},
+			}},
+		},
+		{
+			// №4: the stray comma is anchored where it lies; the recovery
+			// must not skip past the following `2` (off-by-one regression)
+			// and the call stays closed by its `)`.
+			name: "unexpected token in call arguments",
+			src:  "create_land f(1, , 2)\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 17, Offset: 17}, End: common.Pos{Line: 0, Column: 18, Offset: 18}},
+				Severity: common.SeverityError,
+				Message:  `unexpected "," in call arguments`,
+				Code:     "syntax",
+			}},
+			args: []exprShape{{
+				kind:  KindIdent,
+				value: "f",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 21, Offset: 21}},
+				children: []exprShape{
+					{kind: KindNumber, value: "1", span: common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 15, Offset: 15}}},
+					{kind: KindNumber, value: "2", span: common.Range{Start: common.Pos{Line: 0, Column: 19, Offset: 19}, End: common.Pos{Line: 0, Column: 20, Offset: 20}}},
+				},
+			}},
+		},
+		{
+			// №5: an unclosed call paren is the only warning of the table,
+			// anchored on `(` — the call itself is complete in the AST.
+			name: "unclosed call parenthesis",
+			src:  "create_land f(1, 2\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 13, Offset: 13}, End: common.Pos{Line: 0, Column: 14, Offset: 14}},
+				Severity: common.SeverityWarning,
+				Message:  `unclosed "(" in call to "f"`,
+				Code:     "syntax",
+			}},
+			args: []exprShape{{
+				kind:  KindIdent,
+				value: "f",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 18, Offset: 18}},
+				children: []exprShape{
+					{kind: KindNumber, value: "1", span: common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 15, Offset: 15}}},
+					{kind: KindNumber, value: "2", span: common.Range{Start: common.Pos{Line: 0, Column: 17, Offset: 17}, End: common.Pos{Line: 0, Column: 18, Offset: 18}}},
+				},
+			}},
+		},
+		{
+			// №3, unclosed branch: a clean inner parse with no `)` — the
+			// paren is not in the AST, so it gets its own warning; the
+			// inner expression stays a real operand, not a recovery form.
+			name: "unclosed group parenthesis",
+			src:  "create_land (1\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 13, Offset: 13}},
+				Severity: common.SeverityWarning,
+				Message:  `unclosed "("`,
+				Code:     "syntax",
+			}},
+			args: []exprShape{{
+				kind:  KindNumber,
+				value: "1",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 13, Offset: 13}, End: common.Pos{Line: 0, Column: 14, Offset: 14}},
+			}},
+		},
+		{
+			// №3, unclosed branch on the outer group: the inner group
+			// closes cleanly, so only the outer `(` is uncovered — one
+			// warning, no group error report.
+			name: "unclosed outer group around a closed inner one",
+			src:  "create_land ((1)\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 13, Offset: 13}},
+				Severity: common.SeverityWarning,
+				Message:  `unclosed "("`,
+				Code:     "syntax",
+			}},
+			args: []exprShape{{
+				kind:  KindNumber,
+				value: "1",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 15, Offset: 15}},
+			}},
+		},
+		{
+			// №6: the run loop continues past the bad token — the `5` is
+			// parsed, arity is not swallowed by the failure.
+			name: "leading comma does not swallow the rest",
+			src:  "create_land , 5\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 13, Offset: 13}},
+				Severity: common.SeverityError,
+				Message:  `unexpected ","`,
+				Code:     "syntax",
+			}},
+			args: []exprShape{{
+				kind:  KindNumber,
+				value: "5",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 15, Offset: 15}},
+			}},
+		},
+		{
+			// R9: the failed `)` lies inside the №1 span — the span covers
+			// it, so no second diagnostic anchors the same token.
+			name: "span covers the failed token without a second anchor",
+			src:  "create_land 1 + )\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 17, Offset: 17}},
+				Severity: common.SeverityError,
+				Message:  `missing operand after "+"`,
+				Code:     "syntax",
+			}},
+			args: []exprShape{{
+				kind:  KindNumber,
+				value: "1",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 13, Offset: 13}},
+			}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			file, diags := Parse(tt.src, "test.rms")
+
+			require.NotNil(t, file)
+			require.Len(t, file.Sections[0].Statements, 1)
+
+			assert.Equal(t, tt.want, diags)
+			assert.Equal(t, tt.args, argShapes(file.Sections[0].Statements[0].Args))
+		})
+	}
+}
+
+// TestParse_OperandFailure_NoDuplicateAnchors pins the anchor rule: two
+// failures on one line report once per distinct token in position order —
+// the `)` inside the missing-operand span is not anchored a second time.
+func TestParse_OperandFailure_NoDuplicateAnchors(t *testing.T) {
+	t.Parallel()
+
+	_, diags := Parse("create_land , 1 + )\n", "test.rms")
+
+	assert.Equal(t, []common.Diagnostic{
+		{
+			Range:    common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 13, Offset: 13}},
+			Severity: common.SeverityError,
+			Message:  `unexpected ","`,
+			Code:     "syntax",
+		},
+		{
+			Range:    common.Range{Start: common.Pos{Line: 0, Column: 16, Offset: 16}, End: common.Pos{Line: 0, Column: 19, Offset: 19}},
+			Severity: common.SeverityError,
+			Message:  `missing operand after "+"`,
+			Code:     "syntax",
+		},
+	}, diags)
+}
+
+// TestParse_EmptyCallIsValid guards the positive case: a closed empty
+// call is valid — the call-argument emitters must not fire on it.
+func TestParse_EmptyCallIsValid(t *testing.T) {
+	t.Parallel()
+
+	file, diags := Parse("create_land f()\n", "test.rms")
+
+	require.NotNil(t, file)
+	assert.Empty(t, diags)
+
+	require.Len(t, file.Sections[0].Statements, 1)
+
+	call := file.Sections[0].Statements[0].Args[0]
+	assert.Equal(t, KindIdent, call.Kind)
+	assert.Equal(t, "f", call.Value)
+	assert.Empty(t, call.Children)
+	assert.Equal(t, common.Range{
+		Start: common.Pos{Line: 0, Column: 12, Offset: 12},
+		End:   common.Pos{Line: 0, Column: 15, Offset: 15},
+	}, call.Range)
+}

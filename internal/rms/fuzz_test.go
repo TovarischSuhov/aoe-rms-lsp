@@ -18,6 +18,15 @@ func FuzzParse(f *testing.F) {
 	f.Add("<LAND_GENERATION>\ncreate_land {\nif\n")
 	f.Add("#includeXS \n<XS>\nrule 1 {")
 
+	// operand-failure seeds (issue #96): each of the six emitter paths
+	// must stay panic-free while reporting on its reproducer.
+	f.Add("create_land 1 +")
+	f.Add("create_land -")
+	f.Add("create_land ( )")
+	f.Add("create_land f(1, , 2)")
+	f.Add("create_land f(1, 2")
+	f.Add("create_land , 5")
+
 	seedFuzzFixtures(f, "testdata", ".rms")
 	seedFuzzFixtures(f, filepath.Join("..", "..", ".corpus"), ".rms")
 

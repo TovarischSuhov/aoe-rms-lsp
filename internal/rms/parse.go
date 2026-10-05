@@ -1322,9 +1322,13 @@ func (p *parser) expressions(toks []token) []Expr {
 		}
 
 		before := lex.pos
-		e, ok := parseExpr(lex, 1)
+		e, bad, ok := parseExpr(p, lex, 1)
 		if !ok {
-			break
+			// bad was already consumed by parsePrimary, so reporting on
+			// it and moving on keeps the rest of the line alive.
+			p.reportf(bad.at, common.SeverityError, "syntax", "unexpected %q", bad.text)
+
+			continue
 		}
 
 		p.recordValueWords(e)
@@ -1405,26 +1409,51 @@ func (r *tokenReader) peek() token {
 	return r.tokens[r.pos]
 }
 
+// consumedEnd returns the end of the last consumed token; it anchors a
+// diagnostic when the failure token is the synthetic EOF (which has no
+// source range of its own). The zero return for pos==0 is unreachable:
+// every caller has consumed a token by then.
+func (r *tokenReader) consumedEnd() common.Pos {
+	if r.pos == 0 {
+		return common.Pos{}
+	}
+
+	return r.tokens[r.pos-1].at.End
+}
+
 // parseExpr parses one expression with precedence climbing; minPrec is
-// the minimum binding power to continue with.
-func parseExpr(r *tokenReader, minPrec int) (Expr, bool) {
-	lhs, ok := parsePrimary(r)
+// the minimum binding power to continue with. On failure it returns the
+// offending token (already consumed) so the nearest handling context can
+// anchor a diagnostic on it.
+func parseExpr(p *parser, r *tokenReader, minPrec int) (Expr, token, bool) {
+	lhs, bad, ok := parsePrimary(p, r)
 	if !ok {
-		return Expr{}, false
+		return Expr{}, bad, false
 	}
 
 	for {
 		op := r.peek()
 		prec := operatorPrecedence(op)
 		if prec == 0 || prec < minPrec {
-			return lhs, true
+			return lhs, token{}, true
 		}
 
 		r.next()
 
-		rhs, ok := parseExpr(r, prec+1)
+		rhs, bad, ok := parseExpr(p, r, prec+1)
 		if !ok {
-			return lhs, true
+			// The missing operand lies between the operator and the
+			// offending token; at EOF the span degrades to the operator
+			// itself, the last consumed byte. Reported here, so the
+			// outer levels see a success and stay silent.
+			at := common.Range{Start: op.at.Start, End: bad.at.End}
+			if bad.kind == tokEOF {
+				at.End = r.consumedEnd()
+			}
+
+			p.reportf(at, common.SeverityError, "syntax", "missing operand after %q", op.text)
+
+			return lhs, token{}, true
 		}
 
 		lhs = Expr{
@@ -1437,7 +1466,10 @@ func parseExpr(r *tokenReader, minPrec int) (Expr, bool) {
 }
 
 // parsePrimary parses a literal, identifier, call or unary expression.
-func parsePrimary(r *tokenReader) (Expr, bool) {
+// The default branch fails silently — reporting is left to the nearest
+// handling context, which anchors on the offending token this function
+// consumed and returns.
+func parsePrimary(p *parser, r *tokenReader) (Expr, token, bool) {
 	tok := r.next()
 
 	switch tok.kind {
@@ -1447,9 +1479,9 @@ func parsePrimary(r *tokenReader) (Expr, bool) {
 			kind = KindPercent
 		}
 
-		return Expr{Kind: kind, Value: tok.text, Range: tok.at}, true
+		return Expr{Kind: kind, Value: tok.text, Range: tok.at}, token{}, true
 	case tokString:
-		return Expr{Kind: KindConst, Value: strings.Trim(tok.text, `"`), Range: tok.at}, true
+		return Expr{Kind: KindConst, Value: strings.Trim(tok.text, `"`), Range: tok.at}, token{}, true
 	case tokWord:
 		kind := KindIdent
 		if isConstName(tok.text) {
@@ -1457,18 +1489,29 @@ func parsePrimary(r *tokenReader) (Expr, bool) {
 		}
 
 		if r.peek().kind == tokLParen {
-			return parseCall(r, tok, kind)
+			call, ok := parseCall(p, r, tok, kind)
+
+			return call, token{}, ok
 		}
 
-		return Expr{Kind: kind, Value: tok.text, Range: tok.at}, true
+		return Expr{Kind: kind, Value: tok.text, Range: tok.at}, token{}, true
 	case tokOp:
 		if tok.text != "-" && tok.text != "+" {
-			return Expr{}, false
+			return Expr{}, tok, false
 		}
 
-		operand, ok := parseExpr(r, 3)
+		operand, bad, ok := parseExpr(p, r, 3)
 		if !ok {
-			return Expr{Kind: KindUnary, Value: tok.text, Range: tok.at}, true
+			// No operand follows: report and keep a childless unary, the
+			// recovery form the AST keeps. At EOF the offending token has
+			// no range, so the operator itself anchors the diagnostic.
+			if bad.kind == tokEOF {
+				bad.at = tok.at
+			}
+
+			p.reportf(bad.at, common.SeverityError, "syntax", "missing operand after unary %q", tok.text)
+
+			return Expr{Kind: KindUnary, Value: tok.text, Range: tok.at}, token{}, true
 		}
 
 		return Expr{
@@ -1476,24 +1519,66 @@ func parsePrimary(r *tokenReader) (Expr, bool) {
 			Value:    tok.text,
 			Children: []Expr{operand},
 			Range:    common.Range{Start: tok.at.Start, End: operand.Range.End},
-		}, true
+		}, token{}, true
 	case tokLParen:
-		inner, _ := parseExpr(r, 1)
+		reported := len(p.diags)
+		inner, _, ok := parseExpr(p, r, 1)
+		if !ok {
+			// The offending token is already consumed, so the span runs
+			// from `(` up to whatever ends the failure; at EOF that is
+			// the last consumed token. The zero-width inner stays the
+			// recovery form; a `)` here was already consumed as the
+			// offending token by the failed parse.
+			at := common.Range{Start: tok.at.Start, End: r.peek().at.End}
+			if r.peek().kind == tokEOF {
+				at.End = r.consumedEnd()
+			}
 
-		if r.peek().kind == tokRParen {
+			p.reportf(at, common.SeverityError, "syntax", `"(" without a valid expression`)
+
+			return inner, token{}, true
+		}
+
+		// Consume the closing `)` before the group report: the report
+		// must cover everything the group itself consumed, the paren
+		// included — a recovery that stops right before it would
+		// otherwise leave the `)` outside both the AST and the
+		// diagnostics.
+		closed := r.peek().kind == tokRParen
+		if closed {
 			r.next()
 		}
 
-		return inner, true
+		if len(p.diags) > reported {
+			// The inner parse recovered (ok=true) only by reporting its
+			// own failure, and the returned Expr is a recovery form whose
+			// range does not cover this `(` — without a group report the
+			// consumed paren is lost to both the AST and the diagnostics.
+			// The span ends at the last consumed token: the group's `)`
+			// when it was consumed, otherwise whatever the recovery
+			// stopped at.
+			at := common.Range{Start: tok.at.Start, End: r.consumedEnd()}
+
+			p.reportf(at, common.SeverityError, "syntax", `"(" without a valid expression`)
+		} else if !closed {
+			// A clean inner parse with no `)` in sight leaves the paren
+			// itself the only consumed byte outside the AST. Warning, not
+			// error: the expression is complete, the group is merely
+			// unfinished — the same severity policy as an unclosed call.
+			p.reportf(tok.at, common.SeverityWarning, "syntax", `unclosed "("`)
+		}
+
+		return inner, token{}, true
 	default:
-		return Expr{}, false
+		return Expr{}, tok, false
 	}
 }
 
 // parseCall parses name(arg, ...) helper calls, keeping arguments as
-// Children.
-func parseCall(r *tokenReader, name token, kind string) (Expr, bool) {
-	r.next() // consume "("
+// Children. It consumes the opening "(" itself so the unclosed-paren
+// diagnostic can anchor on it.
+func parseCall(p *parser, r *tokenReader, name token, kind string) (Expr, bool) {
+	open := r.next() // consume "("
 
 	call := Expr{Kind: kind, Value: name.text, Range: name.at}
 
@@ -1504,13 +1589,19 @@ func parseCall(r *tokenReader, name token, kind string) (Expr, bool) {
 			return call, true
 		}
 
-		arg, ok := parseExpr(r, 1)
+		arg, bad, ok := parseExpr(p, r, 1)
 		if !ok {
-			if r.peek().kind == tokEOF {
+			// A failed parsePrimary has already consumed the offending
+			// token: at EOF the paren is simply unclosed (warning), any
+			// other token is unexpected — report it and move on without
+			// consuming past it.
+			if bad.kind == tokEOF {
+				p.reportf(open.at, common.SeverityWarning, "syntax", `unclosed "(" in call to %q`, name.text)
+
 				return call, true
 			}
 
-			r.next() // skip the unexpected token and keep going
+			p.reportf(bad.at, common.SeverityError, "syntax", "unexpected %q in call arguments", bad.text)
 
 			continue
 		}
