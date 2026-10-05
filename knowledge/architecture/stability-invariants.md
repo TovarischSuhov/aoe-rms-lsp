@@ -1,7 +1,7 @@
 ---
 type: Invariant
 title: Инварианты стабильности
-description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтера, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, данные без сети.
+description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтера, покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, данные без сети.
 sources:
   - resource: README.md
   - resource: docs/plans/build-lsp-rms-xs.md
@@ -14,9 +14,10 @@ sources:
   - resource: internal/format/rms.go
   - resource: internal/format/invariants_test.go
   - resource: .goga/history/2026/task-format-unclosed-block/task.md
+  - resource: .goga/history/2026/task-rms-operand-failure-diags/design.md
 generated:
-  by: claude-code/glm-5.3
-  at: 2026-09-28T15:10:21Z
+  by: claude-code/claude-sonnet-4-6
+  at: 2026-10-06T00:00:00Z
 ---
 
 # Инварианты стабильности
@@ -48,6 +49,21 @@ generated:
   обязан останавливаться и на `\r` (`internal/xs/parse.go`). Позиции
   inline-XS относительны первой строки блока `rms.XsBlock.Code`, в
   координаты RMS-файла их переносить нельзя.
+- **Каждый потреблённый токен — в AST или под диагностикой (#96).**
+  RMS-парсер не теряет байты молча: токен, потреблённый на сбойном пути,
+  либо представлен в recovery-форме AST, либо покрыт позиционированной
+  диагностикой (аудит-критерий в `CODEMANIFEST` `internal/rms`). Сбой
+  операнда/выражения эмитит позиционированную диагностику (эмиттеры
+  №1–№6, таблица в `.goga/history/2026/task-rms-operand-failure-diags/design.md`);
+  незакрытая группа или вызов — warning `unclosed "("`; каскад групп —
+  error-спан внешней `(`…consumedEnd, покрывающий и закрывающую `)`,
+  когда группа потребила её сама. EOF за концом слайса — синтетический
+  (нулевой диапазон, позицию не продвигает), деградация спанов — через
+  `consumedEnd()`/`bad.at`-фолбэки; механизм in-slice EOF-токенов
+  рассмотрен и отклонён по замеренному регрессу горячего пути
+  (+16–20% allocs на BenchmarkParse). Пины: `TestParse_OperandFailureDiagnostics`,
+  `TestParse_OperandFailure_NoDuplicateAnchors`, `TestParse_EmptyCallIsValid`,
+  fuzz-семена путей эмиттеров (`internal/rms/fuzz_test.go`).
 
 ## Форматтер
 
@@ -96,6 +112,12 @@ generated:
   `undefined-symbol`, `bad-arity`, …) — на них опираются тесты и
   пользовательские `severityOverrides` в настройках. Код — это контракт.
 - Значения severity следуют нумерации LSP 1..4; новых значений нет.
+- **Error-диагностики парсера отказывают форматтер** (#96):
+  `format.RMS` на входе с хотя бы одной error-диагностикой возвращает
+  `ErrParseErrors` и пустой вывод (`internal/format/rms.go`, пины
+  `TestRMS_RefusalOnError`, `TestRMS_RefusesReproducer96`); warning-входы
+  печатаются — «незавершённая, но полная в AST конструкция» (незакрытая
+  группа/вызов) — warning, потерянный/невалидный байт — error.
 
 ## Сервер
 

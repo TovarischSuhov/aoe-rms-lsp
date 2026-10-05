@@ -142,8 +142,9 @@ parse.go, получают `*parser` первым аргументом (см. Al
 нет (все токен-раны либо в AST, либо под diag).
 
 **Edge Cases:** `, 5` в начале рана → error на `,`, затем 5 парсится
-(арность сохранена); EOF-токен: `r.next()` на EOF не продвигает позицию
-(parse.go:1400-1406) — гард `pos == before` защищает от зацикливания.
+(арность сохранена); EOF-токен один — синтетический за концом слайса:
+`next()`/`peek()` выдают его с нулевым диапазоном и не продвигают
+позицию; гард `pos == before` защищает от зацикливания на нём.
 
 ### `parseExpr` (parse.go:1410)
 **Responsibility**: precedence climbing; репорт потерянного оператора.
@@ -160,7 +161,8 @@ parse.go, получают `*parser` первым аргументом (см. Al
    rhs, bad, ok := parseExpr(r, prec+1)
    IF !ok:
      - span := Range{Start: op.at.Start, End: bad.at.End}  // op+сбойный
-       (bad на EOF: End = EOF-позиция r)
+       (bad на EOF — синтетический, без диапазона: End деградирует
+       до consumedEnd(), конца последнего потреблённого токена)
      - reportf(span, error, "syntax", `missing operand after %q`, op.text)  // №1
      - return lhs, token{}, true       // сбойный потреблён, покрыт span
    ...
@@ -169,9 +171,10 @@ parse.go, получают `*parser` первым аргументом (см. Al
 **Errors:** №1 — error, span покрывает и оператор, и сбойный токен (оба
 потреблены, оба не представлены в AST — lhs возвращается).
 
-**Edge Cases:** `1 + )` на верхнем уровне → 2 диагностики, НО с якорями на
-разных токенах (span `+`…`)` и `)` от expressions) — это не дубли по
-аудит-критерию; тест T9 фиксирует счётчик.
+**Edge Cases:** `1 + )` на верхнем уровне → 1 диагностика: span №1 `+`…`)`
+покрывает и оператор, и потреблённый `)`; возврат ok=true — expressions
+второго репорта не видит, а второй якорь на том же `)` запрещён правилом
+якорей; тест T9 фиксирует счётчик.
 
 ### `parsePrimary` (parse.go:1440)
 **Responsibility**: первичное выражение; возвращает сбойный токен наверх,
@@ -192,19 +195,43 @@ parse.go, получают `*parser` первым аргументом (см. Al
 4. tokOp прочие / default: return Expr{}, tok, false  // без репорта
 5. tokLParen:
    open := токен `(` (уже в tok)
+   reported := len(p.diags)
    inner, bad, ok := parseExpr(r, 1)
    IF !ok:
      - span := Range{Start: tok.at.Start, End: peek().at.End};
-       peek на EOF — EOF-позиция r
+       peek на EOF (синтетический, без диапазона) — End деградирует
+       до consumedEnd(), конца последнего потреблённого токена
      - reportf(span, error, "syntax", `"(" without a valid expression`)  // №3
-   IF r.peek().kind == tokRParen { r.next() }
-   return inner, token{}, true    // zero-width inner при провале — как
-                                  // сегодня; ошибка видна через diag
+     - return inner, token{}, true   // zero-width inner — recovery-форма;
+                                     // ошибка видна через diag
+   IF r.peek().kind == tokRParen { r.next() }   // ДО группового репорта:
+                                                 // его спан покрывает и `)`
+   IF len(p.diags) > reported:
+     - span := Range{Start: tok.at.Start, End: r.consumedEnd()}
+     - reportf(span, error, "syntax", `"(" without a valid expression`)  // №3
+   ELSE IF `)` не потреблена (EOF/другой токен):
+     - reportf(tok.at, warning, "syntax", `unclosed "("`)   // ветка №3:
+       чистый inner без закрывающей — потреблённая `(` не представлена
+       в AST (Range inner начинается с внутреннего токена) и не покрыта
+       диагностикой; warning, не error — конструкция полная в AST, лишь
+       незавершённая (консистентно с №5); аудит финального ревью R2
+   return inner, token{}, true
 ```
 
 **Errors:** №2 error (якорь = сбойный токен; op-токен представлен Range
-childless unary — печатается харденингом #45); №3 error (span покрывает
-всю негруппу `(...)` — все её байты не попадают в AST).
+childless unary — печатается харденингом #45); №3 — три ветки:
+(а) error — провал внутреннего парса (!ok): span `(`…peek (на EOF —
+consumedEnd: синтетический EOF диапазона не имеет); (б) error —
+внутренний recovery с диагностиками
+(ok=true, но p.diags вырос) — групповой репорт: внутренний Expr —
+recovery-форма, чей Range не покрывает внешнюю `(`; (в) warning — чистый
+inner без закрывающей `)` (аудит финального ревью R2, 2026-10-06):
+`unclosed "("` на токене `(` — severity по политике «незавершённая, но
+полная в AST конструкция — warning», консистентно с №5.
+Инвариант спана: групповой репорт покрывает всё,
+потреблённое группой, включая её закрывающую `)`, когда группа её
+потребила; на пути без закрывающей — до consumedEnd (конец последнего
+потреблённого токена).
 
 ### `parseCall` (parse.go:1495)
 **Responsibility**: `name(arg, ...)`; репорт мусора в аргументах и
@@ -382,13 +409,16 @@ format.RMS → rms.Parse → expressions → parsePrimary(tokLParen)
 
 #### `TestParse_OperandFailure_NoDuplicateAnchors` (T9)
 
-**Setup/Input**: `create_land 1 + )` (2 сбойных токена в одной строке).
+**Setup/Input**: `create_land , 1 + )` (два сбоя на разных токенах).
 
-**Trace**: binary-loop: rhs fail на `)` → span-диагностика `+`…`)`; возврат
-lhs; `)` потреблён parsePrimary, expressions репортит `unexpected ")"`.
+**Trace**: ведущая `,` — №6 от expressions; далее binary-loop: rhs fail на
+`)` → span-диагностика `+`…`)`, возврат lhs с ok=true — потреблённый `)`
+покрыт span, expressions его повторно не репортит.
 
-**Assertions**: ровно 2 diagnostics; якоря на разных токенах (span.Start !=
-diag2.Start); порядок по позиции (существующая сортировка).
+**Assertions**: ровно 2 diagnostics; якоря на разных токенах (`,` от №6 и
+span.Start №1 на `+`); порядок по позиции (существующая сортировка).
+Одиночный `create_land 1 + )` — ровно 1 диагностика: span покрывает
+потреблённый `)` (кейс в таблице `TestParse_OperandFailureDiagnostics`).
 
 **Sufficiency**: правило «один якорь на токен» — защита от решенного
 в-design риска дублирования при каскаде ok=false.
@@ -431,8 +461,10 @@ diag2.Start); порядок по позиции (существующая со�
 - Ни одного изменения: публичных сигнатур, форм AST, файлов вне
   `internal/rms/parse.go`, `internal/rms/CODEMANIFEST` (уже изменён),
   тестов.
-- EOF-токен: `r.next()` на EOF не двигает позицию (parse.go:1400) — span
-  End на EOF брать от EOF-позиции ридера, гард `pos == before` сохранить.
+- EOF-токен один — синтетический за концом слайса: нулевой диапазон,
+  `next()`/`peek()` его выдают и не продвигают позицию. Span End на EOF
+  деградирует до consumedEnd() (конец последнего потреблённого токена),
+  гард `pos == before` сохранить.
 - Тесты — под memory cap (`systemd-run ... MemoryMax=1500M`); коммиты
   атомарные, `docs:`/`fix:` стиль; PR `Fixes #96`; ветка
   `task/rms-operand-failure-diags`.
