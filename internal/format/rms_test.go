@@ -291,6 +291,35 @@ func TestRMS_RefusesReproducer96(t *testing.T) {
 	require.Positive(t, errs, "rms.Parse(%q) diagnostics = %v, want at least one error", src, diags)
 }
 
+// TestRMS_RefusesReproducer95 pins the issue #95 reproducer: the input
+// `create_land { #weird 1 }` once parsed without complaint (the `#`-word
+// in the attribute-name position silently vanished); with the parser
+// diagnostics (#95) the parse reports an error and the formatter refuses
+// — sentinel ErrParseErrors, empty output. The companion rms.Parse check
+// ties the refusal to its cause: at least one error-severity diagnostic.
+func TestRMS_RefusesReproducer95(t *testing.T) {
+	t.Parallel()
+
+	src := "create_land { #weird 1 }"
+
+	got, err := RMS(src, Options{})
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrParseErrors), "err = %v, want ErrParseErrors", err)
+	require.Empty(t, got, "refusal output = %q, want empty", got)
+
+	_, diags := rms.Parse(src, "t.rms")
+
+	errs := 0
+
+	for _, d := range diags {
+		if d.Severity == common.SeverityError {
+			errs++
+		}
+	}
+
+	require.Positive(t, errs, "rms.Parse(%q) diagnostics = %v, want at least one error", src, diags)
+}
+
 // TestRMS_ZeroOptions checks that the zero Options format like the
 // default width: TabSize 0 means 4.
 func TestRMS_ZeroOptions(t *testing.T) {
