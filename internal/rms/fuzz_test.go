@@ -27,6 +27,10 @@ func FuzzParse(f *testing.F) {
 	f.Add("create_land f(1, 2")
 	f.Add("create_land , 5")
 
+	// hash-attribute seed (issue #95): the inline-block hash word must
+	// stay panic-free while reporting on its reproducer.
+	f.Add("create_land { #weird 1 }")
+
 	seedFuzzFixtures(f, "testdata", ".rms")
 	seedFuzzFixtures(f, filepath.Join("..", "..", ".corpus"), ".rms")
 

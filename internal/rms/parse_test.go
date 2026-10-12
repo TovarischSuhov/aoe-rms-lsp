@@ -1411,3 +1411,195 @@ func TestParse_EmptyCallIsValid(t *testing.T) {
 		End:   common.Pos{Line: 0, Column: 15, Offset: 15},
 	}, call.Range)
 }
+
+// attrShape is the AST expectation of one attribute in the
+// hash-attribute tests: Attribute projected into a comparable shape
+// (flag attributes keep the zero exprShape).
+type attrShape struct {
+	name  string
+	value exprShape
+	span  common.Range
+}
+
+// attrShapes projects attributes into the attrShape form; empty input
+// stays nil so the table literals can spell "no attributes" as nil.
+func attrShapes(attrs []Attribute) []attrShape {
+	if len(attrs) == 0 {
+		return nil
+	}
+
+	out := make([]attrShape, 0, len(attrs))
+	for _, a := range attrs {
+		out = append(out, attrShape{
+			name:  a.Name,
+			value: exprShape{kind: a.Value.Kind, value: a.Value.Value, span: a.Value.Range},
+			span:  a.Range,
+		})
+	}
+
+	return out
+}
+
+// TestParse_HashAttributeDiagnostic pins the #-word handling inside a
+// one-line attribute block (issue #95): the lexer folds `#` into a word,
+// so `#weird` looks like an attribute name and a format-then-reparse
+// cycle silently drops the line. The i-loop reports exactly once on the
+// hash word and keeps it in the AST as the recovery form; a `#` in value
+// position (multi-line attribute value, command argument) is untouched,
+// and the existing unexpected path for `#weird(1)` stays as-is.
+func TestParse_HashAttributeDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		src      string
+		want     []common.Diagnostic
+		attrs    []attrShape
+		args     []exprShape
+		comments []common.Range
+	}{
+		{
+			// The reproducer: `#weird` reaches the i-loop as a word, so
+			// the new hash check anchors it; the recovery form keeps the
+			// attribute (value tail absorbed) so reparse is stable.
+			name: "inline block hash attribute",
+			src:  "create_land { #weird 1 }\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 20, Offset: 20}},
+				Severity: common.SeverityError,
+				Message:  `"#weird" is not an attribute name: #-lines are comments`,
+				Code:     "syntax",
+			}},
+			attrs: []attrShape{{
+				name: "#weird",
+				value: exprShape{
+					kind:  KindNumber,
+					value: "1",
+					span:  common.Range{Start: common.Pos{Line: 0, Column: 21, Offset: 21}, End: common.Pos{Line: 0, Column: 22, Offset: 22}},
+				},
+				span: common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 22, Offset: 22}},
+			}},
+		},
+		{
+			// A real attribute precedes the hash word: only the hash word
+			// is anchored, and the valueless recovery attribute follows
+			// base_size in the AST.
+			name: "trailing hash flag attribute",
+			src:  "create_land { base_size 2 #tag }\n",
+			want: []common.Diagnostic{{
+				Range:    common.Range{Start: common.Pos{Line: 0, Column: 26, Offset: 26}, End: common.Pos{Line: 0, Column: 30, Offset: 30}},
+				Severity: common.SeverityError,
+				Message:  `"#tag" is not an attribute name: #-lines are comments`,
+				Code:     "syntax",
+			}},
+			attrs: []attrShape{
+				{
+					name: "base_size",
+					value: exprShape{
+						kind:  KindNumber,
+						value: "2",
+						span:  common.Range{Start: common.Pos{Line: 0, Column: 24, Offset: 24}, End: common.Pos{Line: 0, Column: 25, Offset: 25}},
+					},
+					span: common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 25, Offset: 25}},
+				},
+				{
+					name:  "#tag",
+					value: exprShape{},
+					span:  common.Range{Start: common.Pos{Line: 0, Column: 26, Offset: 26}, End: common.Pos{Line: 0, Column: 30, Offset: 30}},
+				},
+			},
+		},
+		{
+			// A `#` line inside a multi-line block is a comment: the run
+			// loop consumes it before the lexer sees it — no diagnostics,
+			// the extent lands in RmsFile.Comments.
+			name:     "hash comment line inside a block",
+			src:      "create_land {\n    # plain comment\n    base_size 2\n}\n",
+			comments: []common.Range{{Start: common.Pos{Line: 1, Column: 4, Offset: 18}, End: common.Pos{Line: 1, Column: 19, Offset: 33}}},
+		},
+		{
+			// Boundary: the hash check lives in inlineAttributes only — a
+			// `#`-word in value position of a multi-line attribute line
+			// parses as a plain ident, no new diagnostics.
+			name: "hash word as attribute value in a multiline block",
+			src:  "create_land {\n    base_size #tag\n}\n",
+			attrs: []attrShape{{
+				name: "base_size",
+				value: exprShape{
+					kind:  KindIdent,
+					value: "#tag",
+					span:  common.Range{Start: common.Pos{Line: 1, Column: 14, Offset: 28}, End: common.Pos{Line: 1, Column: 18, Offset: 32}},
+				},
+				span: common.Range{Start: common.Pos{Line: 1, Column: 4, Offset: 18}, End: common.Pos{Line: 1, Column: 18, Offset: 32}},
+			}},
+		},
+		{
+			// Boundary: a `#`-word as a command argument is a value too.
+			name: "hash word as command argument",
+			src:  "create_land #tag\n",
+			args: []exprShape{{
+				kind:  KindIdent,
+				value: "#tag",
+				span:  common.Range{Start: common.Pos{Line: 0, Column: 12, Offset: 12}, End: common.Pos{Line: 0, Column: 16, Offset: 16}},
+			}},
+		},
+		{
+			// `#weird(1)` fails startsAttribute (next token is `(`), so the
+			// gate reports before the hash check can — the existing
+			// unexpected path, unchanged, one report per token.
+			name: "hash word before a call parenthesis keeps the unexpected path",
+			src:  "create_land { #weird(1) }\n",
+			want: []common.Diagnostic{
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 14, Offset: 14}, End: common.Pos{Line: 0, Column: 20, Offset: 20}},
+					Severity: common.SeverityError,
+					Message:  `unexpected "#weird"`,
+					Code:     "syntax",
+				},
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 20, Offset: 20}, End: common.Pos{Line: 0, Column: 21, Offset: 21}},
+					Severity: common.SeverityError,
+					Message:  `unexpected "("`,
+					Code:     "syntax",
+				},
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 21, Offset: 21}, End: common.Pos{Line: 0, Column: 22, Offset: 22}},
+					Severity: common.SeverityError,
+					Message:  `unexpected "1"`,
+					Code:     "syntax",
+				},
+				{
+					Range:    common.Range{Start: common.Pos{Line: 0, Column: 22, Offset: 22}, End: common.Pos{Line: 0, Column: 23, Offset: 23}},
+					Severity: common.SeverityError,
+					Message:  `unexpected ")"`,
+					Code:     "syntax",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			file, diags := Parse(tt.src, "test.rms")
+
+			require.NotNil(t, file)
+			require.Len(t, file.Sections[0].Statements, 1)
+
+			assert.Equal(t, tt.want, diags)
+
+			if tt.attrs != nil {
+				assert.Equal(t, tt.attrs, attrShapes(file.Sections[0].Statements[0].Attributes))
+			}
+
+			if tt.args != nil {
+				assert.Equal(t, tt.args, argShapes(file.Sections[0].Statements[0].Args))
+			}
+
+			if tt.comments != nil {
+				assert.Equal(t, tt.comments, file.Comments)
+			}
+		})
+	}
+}

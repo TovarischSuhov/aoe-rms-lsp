@@ -1075,10 +1075,9 @@ func (p *printer) directiveLine(line int) string {
 // attribute prints one attribute line: name and first value from the AST,
 // the values past it cut from the source — the AST keeps only the first,
 // and the rest are data the printer must not lose. A name starting with
-// '#' is the one spelling that cannot round-trip: only the single-line
-// `{ #x 1 }` form lexes into an attribute, and the printed multi-line
-// form re-parses as a plain #-comment (issue #95) — RMS attribute names
-// never start with '#'.
+// '#' never reaches the printer from a fresh parse: inlineAttributes
+// reports it as an error syntax and RMS refuses with ErrParseErrors
+// (issue #95, pinned by TestRMS_RefusesReproducer95).
 func (p *printer) attribute(attr rms.Attribute) string {
 	out := attr.Name
 

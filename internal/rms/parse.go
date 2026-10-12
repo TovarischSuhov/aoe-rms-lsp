@@ -358,6 +358,16 @@ func (p *parser) inlineAttributes(stmt *node, toks []token) {
 			continue
 		}
 
+		// The lexer folds `#` into a word, so a `#weird` flag here looks
+		// like an attribute name and silently vanishes on a
+		// format-then-reparse cycle (#95): report it, but keep the
+		// attribute and absorb the value tail so the input yields
+		// exactly one diagnostic.
+		if strings.HasPrefix(toks[i].text, "#") {
+			p.reportf(toks[i].at, common.SeverityError, "syntax",
+				"%q is not an attribute name: #-lines are comments", toks[i].text)
+		}
+
 		j := i + 1
 		for j < len(toks) && !startsAttribute(toks, j) {
 			j++
