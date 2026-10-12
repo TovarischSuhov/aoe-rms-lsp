@@ -64,6 +64,13 @@ generated:
   (+16–20% allocs на BenchmarkParse). Пины: `TestParse_OperandFailureDiagnostics`,
   `TestParse_OperandFailure_NoDuplicateAnchors`, `TestParse_EmptyCallIsValid`,
   fuzz-семена путей эмиттеров (`internal/rms/fuzz_test.go`).
+  Частный случай — `#`-слово в позиции имени инлайн-атрибута (#95):
+  ошибка `syntax` («#-lines are comments»), recovery-атрибут остаётся
+  в AST (хвост значений поглощён — ровно одна диагностика); проверка
+  живёт в i-цикле `inlineAttributes`, а не в `startsAttribute`, иначе
+  сдвинулось бы разбиение значений j-циклом. Форматтер такой вход
+  отказывает (`ErrParseErrors`); пины: `TestParse_HashAttributeDiagnostic`,
+  `TestRMS_RefusesReproducer95`, fuzz-семя `create_land { #weird 1 }`.
 
 ## Форматтер
 

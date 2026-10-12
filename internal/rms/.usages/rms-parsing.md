@@ -133,7 +133,12 @@ Preconditions:
 RmsFile.Comments carries every comment extent of the file — /* … */
 (including multi-line), //… and #-lines that are not directives —
 sorted by position. The parser does not keep comment texts: extract
-them from the source by range.
+them from the source by range. A whole #-line — inside a multi-line
+block included — is always such a comment. The exception is a
+`#`-word in the attribute-name position of a one-line block: there it
+is not a comment but an error `syntax` diagnostic (issue #95); the
+attribute stays in the AST as the recovery form (value tail
+absorbed), and the formatter refuses the input (`ErrParseErrors`).
 
 ```go
 file, _ := rms.Parse(text, uri)
