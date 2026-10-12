@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var updateGolden = flag.Bool("update", false, "update golden files")
@@ -216,20 +218,77 @@ func TestRMS_EmptyInput(t *testing.T) {
 
 // TestRMS_RefusalOnError checks the refusal contract: error-severity
 // diagnostics answer the sentinel and an empty formatted value, never a
-// partial print.
+// partial print. The former golden fixtures case27 and case30 live in the
+// table now: the operand-failure diagnostics (#96) make both inputs
+// errors — case27 is the plan's literal T3 reproducer, and case30's golden
+// pinned the silent `}` loss the task turns into a diagnostic.
 func TestRMS_RefusalOnError(t *testing.T) {
 	t.Parallel()
 
-	src := "<LAND_GENERATION>\n}\ncreate_object @@@\n</LAND_GENERATION>\n"
-
-	got, err := RMS(src, Options{TabSize: 4})
-	if !errors.Is(err, ErrParseErrors) {
-		t.Fatalf("RMS error = %v, want ErrParseErrors", err)
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "mixed",
+			src:  "<LAND_GENERATION>\n}\ncreate_object @@@\n</LAND_GENERATION>\n",
+		},
+		{
+			// unary minus without an operand — the plan's T3 input
+			name: "case27",
+			src:  "<LAND_GENERATION>\ncreate_land -\n</LAND_GENERATION>\n",
+		},
+		{
+			// a `}` glued to the if condition — the byte the old golden
+			// silently lost
+			name: "case30",
+			src:  "<LAND_GENERATION>\nif TURF 1}\nbase_terrain GRASS\nendif,\n</LAND_GENERATION>\n",
+		},
 	}
 
-	if got != "" {
-		t.Errorf("RMS refusal output = %q, want empty", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := RMS(tt.src, Options{TabSize: 4})
+			if !errors.Is(err, ErrParseErrors) {
+				t.Fatalf("RMS error = %v, want ErrParseErrors", err)
+			}
+
+			if got != "" {
+				t.Errorf("RMS refusal output = %q, want empty", got)
+			}
+		})
 	}
+}
+
+// TestRMS_RefusesReproducer96 pins the issue #96 reproducer: the input
+// `end_random. ('150% (` once formatted without complaint (the formatter
+// silently dropped content); with the operand-failure diagnostics (#96)
+// the parse reports an error and the formatter refuses — sentinel
+// ErrParseErrors, empty output. The companion rms.Parse check ties the
+// refusal to its cause: at least one error-severity diagnostic.
+func TestRMS_RefusesReproducer96(t *testing.T) {
+	t.Parallel()
+
+	src := "end_random. ('150% ("
+
+	got, err := RMS(src, Options{})
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrParseErrors), "err = %v, want ErrParseErrors", err)
+	require.Empty(t, got, "refusal output = %q, want empty", got)
+
+	_, diags := rms.Parse(src, "t.rms")
+
+	errs := 0
+
+	for _, d := range diags {
+		if d.Severity == common.SeverityError {
+			errs++
+		}
+	}
+
+	require.Positive(t, errs, "rms.Parse(%q) diagnostics = %v, want at least one error", src, diags)
 }
 
 // TestRMS_ZeroOptions checks that the zero Options format like the
