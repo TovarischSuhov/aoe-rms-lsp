@@ -1,0 +1,18 @@
+// c44-lead
+#include "c44_head.inc";
+int frameCount = 0;
+
+event(frame_ready) {
+// c44-in-event
+frameCount = frameCount + 1;
+}
+
+event(game_started);
+
+includeDuno "c44_duno.inc";
+#include "c44_tail.inc"; // c44-include-tail
+#include "c44_pair.inc"; /* c44-pair-first */ /* c44-pair-spill
+pair-tail */
+int c44_after = 1;
+#include "c44_pair2a.inc";#include "c44_pair2b.inc";
+include"" /*

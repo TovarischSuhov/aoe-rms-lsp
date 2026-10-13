@@ -1,0 +1,25 @@
+// c43-top
+/* c43-block-open */
+
+rule firstArrival inactive min-interval 3 {
+xsChat("arrived");
+}
+
+rule secondWave
+	inactive
+	minInterval 25
+{
+// c43-in-second-body
+xsChat("wave");
+}
+
+rule /* c43-mid-header */ thirdRule {
+xsChat("third"); // c43-side-third
+}
+
+rule fourthRule inactive // c43-in-multiline-header
+	minInterval 30
+{
+/* c43-in-fourth */
+xsChat("fourth");
+}

@@ -14,7 +14,7 @@ import (
 // diagnostics, so the AST is not a faithful enough base to re print from —
 // recovered text could come out valid-looking and wrong. Classify with
 // errors.Is; formatted is empty.
-var ErrParseErrors = errors.New("rms source has error-severity diagnostics")
+var ErrParseErrors = errors.New("source has error-severity diagnostics")
 
 // Kinds of stream element.
 const (

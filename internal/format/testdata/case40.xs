@@ -1,0 +1,8 @@
+// crlf fixture
+int one() {
+return 1;
+}
+
+int two(int x = 2) {
+return x;
+}
