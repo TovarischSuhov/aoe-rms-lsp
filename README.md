@@ -14,7 +14,8 @@ Definitive Edition languages:
 - **XS** — External Subroutines (C-like scripting used inside RMS and scenarios)
 
 The server is editor-agnostic; a VS Code extension ships in-tree
-([`editors/vscode`](editors/vscode)) and Neovim wiring is documented below.
+([`editors/vscode`](editors/vscode)), and Neovim and Notepad++ wiring is
+documented below.
 Editor-integration details (capabilities, settings, cross-file specifics):
 [`internal/server/.usages/lifecycle.md`](internal/server/.usages/lifecycle.md).
 
@@ -44,6 +45,8 @@ a pre-DE grammar, and fresh editor extensions provide highlighting only.
   command/attribute/constant names and XS identifiers.
 - **Folding ranges** — every outline node spanning more than one line (RMS
   sections, XS declarations).
+- **Formatting** — canonical full-document formatting for RMS (indentation,
+  section layout); XS formatting is in development.
 - **Live config** — settings changes re-publish diagnostics without a
   restart; file watchers force-reload changed on-disk includes.
 
@@ -51,18 +54,21 @@ a pre-DE grammar, and fresh editor extensions provide highlighting only.
 
 ```
 cmd/            thin entrypoints: aoe2-lsp (server), kbgen (KB regeneration),
-                corpus (corpus-gate runner)
+                corpus (corpus-gate runner), newscheck (release-notes
+                monitor), tmgen (TextMate grammar generator)
 internal/
   common/       positions, ranges, diagnostics, outline symbols, tokens
                 (shared data types)
   kb/           knowledge base: embedded JSON (XS functions, constants, RMS
                 commands) + data pipeline (GenKB extraction from docs/ref)
+  news/         AoE2DE release-notes feed feeding KB freshness
   rms/          RMS parser (lexer → AST with error recovery)
   xs/           XS parser (C-like grammar, rules/events, externs)
   analysis/     semantic checks (unknown symbols, arity, value types,
                 semantic tokens)
   hints/        signature-help computation (protocol-agnostic)
   complete/     completion candidates (protocol-agnostic)
+  format/       full-document formatter (RMS; XS in development)
   include/      #include/#includeXS closure, cross-file navigation
   corpus/       running the LSP binary over a sample of real maps
   server/       LSP server over go.lsp.dev/protocol (stdio)
@@ -107,7 +113,10 @@ published maps with attribution.
 Prebuilt binaries (Windows, Linux, macOS Intel/Apple Silicon) are attached to
 [GitHub Releases](https://github.com/TovarischSuhov/aoe-rms-lsp/releases) —
 archives plus `SHA256SUMS`; releases are built and published by CI when a
-`v*` tag is pushed. Check the version with `aoe2-lsp --version`.
+`v*` tag is pushed. Check the version with `aoe2-lsp --version`. The VS
+Code extension ships with each release too: the `.vsix` is attached to the
+release assets and published to
+[Open VSX](https://open-vsx.org/extension/tovarischsuhov/aoe2-lsp).
 
 Cutting a release (from a clean, synced master): `make release BUMP=patch`
 (or `VERSION=vX.Y.Z`) — the script prepends the changelog built from the
@@ -150,8 +159,9 @@ apart from errors.
 
 ## Editor setup
 
-Both editors talk to the same binary over stdio and share the `aoe2lsp`
-settings section:
+All three editors talk to the same binary over stdio; VS Code and Neovim
+share the `aoe2lsp` settings section (the Notepad++ route has a caveat —
+see its section below):
 
 ```jsonc
 {
@@ -175,14 +185,21 @@ lspconfig `settings` table.
 ### VS Code (bundled extension)
 
 The extension in `editors/vscode/` registers the `aoe2rms`/`aoe2xs` languages
-(brackets, comments), launches the binary and forwards the settings. It is
-not on the Marketplace yet — package and install it locally:
+(brackets, comments), launches the binary and forwards the settings. Install
+it from [Open VSX](https://open-vsx.org/extension/tovarischsuhov/aoe2-lsp),
+or grab the `.vsix` attached to each GitHub Release:
+
+```sh
+code --install-extension aoe2-lsp-<version>.vsix
+```
+
+A local build is packaged the usual way:
 
 ```sh
 cd editors/vscode
 npm install
-npm run package            # dist/extension.js + aoe2-lsp-0.1.0.vsix
-code --install-extension aoe2-lsp-0.1.0.vsix
+npm run package            # dist/extension.js + aoe2-lsp-<version>.vsix
+code --install-extension aoe2-lsp-<version>.vsix
 ```
 
 A prebuilt `.vsix` is also attached to every CI run (artifact
