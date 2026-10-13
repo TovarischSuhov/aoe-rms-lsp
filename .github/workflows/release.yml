@@ -115,3 +115,29 @@ jobs:
           for f in dist/*; do
             verify "$(basename "$f")"
           done
+
+      # #47: publish the .vsix built above to the Marketplace and Open VSX.
+      # Gate on secrets (v1-final-mile slot 4): without VSCE_PAT/OVSX_PAT
+      # the release ships without publishing and CI stays green.
+      - name: Publish extension (Marketplace + Open VSX)
+        working-directory: editors/vscode
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VSCE_PAT:-}" ] || [ -z "${OVSX_PAT:-}" ]; then
+            echo "::notice::VSCE_PAT/OVSX_PAT secrets are not set — shipping without extension publish"
+            exit 0
+          fi
+
+          # package.json version is already the tag (release.sh), so this
+          # publishes the release version; repackages the built tree.
+          npx @vscode/vsce publish --no-dependencies
+
+          # The Open VSX namespace exists after the first publish; let
+          # create-namespace fail on that — ovsx publish below is the gate.
+          npx --yes ovsx create-namespace \
+            "$(node -p "require('./package.json').publisher")" || true
+          npx --yes ovsx publish \
+            "../../dist/aoe2-lsp-${GITHUB_REF_NAME#v}.vsix"
