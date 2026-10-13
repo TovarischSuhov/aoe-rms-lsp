@@ -239,6 +239,45 @@ vim.filetype.add({
 })
 ```
 
+### Notepad++ (NppLspClient)
+
+Notepad++ has no built-in LSP support; the third-party
+[NppLspClient](https://github.com/Ekopalypse/NppLspClient) plugin
+provides it. The plugin is explicitly experimental (requires Notepad++
+8.7.7+ and its supported feature set is still evolving), and this
+combination has not been verified end-to-end yet — treat this section
+as a starting point.
+
+Install the plugin per its README (release zip into `Notepad++\plugins`)
+and get the `aoe2-lsp.exe` Windows binary from
+[GitHub Releases](https://github.com/TovarischSuhov/aoe-rms-lsp/releases).
+The server is configured in the plugin's TOML config (Plugins →
+NppLspClient → Open configuration). The section key is the Notepad++
+language name of the buffer; since `.rms`/`.xs` have no built-in
+language, create User Defined Languages with those exact names first
+(the plugin docs show the same pattern for Terraform):
+
+```toml
+[lspservers.aoe2rms]
+mode = "io"
+executable = 'C:\tools\aoe2-lsp\aoe2-lsp.exe'
+
+[lspservers.aoe2xs]
+mode = "io"
+executable = 'C:\tools\aoe2-lsp\aoe2-lsp.exe'
+```
+
+Start the server on an open script via "Start server for current
+language" (or set `auto_start_server = true`). Plugin caveats that
+matter for map scripts: open the maps folder in Folder as Workspace, so
+`rootUri` points at the script tree — without it the plugin falls back
+to the opened file's own directory, which can miss sibling `#include`
+targets; reload externally changed files through the plugin menu, not
+Notepad++'s builtin reload. The `aoe2lsp` settings section
+(`includeRoots`, `severityOverrides`) is delivered over LSP workspace
+settings; whether the plugin forwards them is unverified — until
+checked, assume server defaults apply.
+
 ## Development
 
 Go 1.26+, stdlib first. The standard pre-completion check sequence:
