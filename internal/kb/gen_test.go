@@ -1,11 +1,15 @@
 package kb
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -156,6 +160,50 @@ create_elevation N
 
 	err := GenKB(refDir, t.TempDir(), nil)
 	require.ErrorContains(t, err, "duplicate")
+}
+
+// TestGenKB_MissingGuideKeepsCommands covers the optional-guide path: the
+// Zetnus export is not vendored, so a ref dir without it still regenerates
+// the XS files (with a WARN), while rms-commands.json is never created and
+// never overwritten.
+func TestGenKB_MissingGuideKeepsCommands(t *testing.T) {
+	t.Parallel()
+
+	t.Run("keeps the committed commands file untouched", func(t *testing.T) {
+		t.Parallel()
+
+		refDir := genFixture(t)
+		require.NoError(t, os.Remove(filepath.Join(refDir, guideFile)))
+
+		dataDir := t.TempDir()
+		kept := filepath.Join(dataDir, "rms-commands.json")
+		require.NoError(t, os.WriteFile(kept, []byte(`[{"name":"kept"}]`), 0o644))
+
+		var buf bytes.Buffer
+		require.NoError(t, GenKB(refDir, dataDir, slog.New(slog.NewTextHandler(&buf, nil))))
+
+		raw, err := os.ReadFile(kept)
+		require.NoError(t, err)
+
+		assert.Equal(t, `[{"name":"kept"}]`, string(raw))
+		assert.Contains(t, buf.String(), "guide", "the skipped source is reported")
+	})
+
+	t.Run("writes the XS files only", func(t *testing.T) {
+		t.Parallel()
+
+		refDir := genFixture(t)
+		require.NoError(t, os.Remove(filepath.Join(refDir, guideFile)))
+
+		dataDir := t.TempDir()
+		require.NoError(t, GenKB(refDir, dataDir, nil))
+
+		require.FileExists(t, filepath.Join(dataDir, "xs-functions.json"))
+		require.FileExists(t, filepath.Join(dataDir, "xs-constants.json"))
+
+		_, err := os.Stat(filepath.Join(dataDir, "rms-commands.json"))
+		assert.True(t, errors.Is(err, os.ErrNotExist), "no commands file without the guide")
+	})
 }
 
 // replaceGenFile overwrites rel under root.

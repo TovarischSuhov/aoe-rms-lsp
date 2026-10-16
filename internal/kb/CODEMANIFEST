@@ -5,7 +5,9 @@ Usages:
     - xs-functions.json  — adapted from docs/ref/ugc-guide/xs/functions/functions.json
       (categories flattened; fields: name, category, return_type, params[], desc, since_update)
     - xs-constants.json — from constants/constants.json (fields: name, section, value, desc, since_update)
-    - rms-commands.json — extracted from docs/ref/zetnus-rms-guide.txt
+    - rms-commands.json — committed data file, extracted from the Zetnus guide
+      (referenced, not vendored: the local docs/ref/zetnus-rms-guide.txt export
+      is gitignored; regeneration keeps the committed file when it is absent)
       (fields: name, section, args[], attributes[], desc, game_versions, since_update)
     since_update sourced from docs/ref/aoe2de-xs-rms-changelog.md; empty string when unknown.
     Names must be unique within each file — validated on load.
@@ -226,7 +228,8 @@ Annotations: |
     Разовое извлечение RMS-команд из текстового экспорта гайда Zetnus
     в rms-commands.json (формат по `kbdata`).
 
-    `path`: путь к docs/ref/zetnus-rms-guide.txt
+    `path`: путь к экспорту гайда; в репозитории его нет (гайд не
+    вендорится), у мейнтейнера — локальная копия docs/ref/zetnus-rms-guide.txt
     `log`: инжектированный логгер сборки (в Go — *slog.Logger; nil → slog.Default())
     `commands`: извлечённые команды; `err`: ошибки чтения/разбора
 

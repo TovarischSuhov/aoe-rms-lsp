@@ -105,6 +105,10 @@ type update struct {
 // under refDir, writing them to dataDir — see the kbdata annotation for
 // the layout of both sides.
 //
+// The Zetnus guide is an optional source (it is not vendored — see
+// guideFile): without it GenKB regenerates the XS files but leaves the
+// committed rms-commands.json untouched.
+//
 // It is a one-shot data-build utility; the server never calls it at
 // runtime. log receives the skip-WARNs of the extraction pass, the
 // desc-coverage report and the summary line; nil selects slog.Default().
@@ -132,29 +136,31 @@ func GenKB(refDir, dataDir string, log *slog.Logger) error {
 		return err
 	}
 
-	commands, err := ExtractRmsCommands(filepath.Join(refDir, "zetnus-rms-guide.txt"), log)
-	if err != nil {
-		return fmt.Errorf("extract rms commands: %w", err)
-	}
-
-	overlay, err := readOverlay(refDir, log)
+	commands, err := extractGuideCommands(refDir, log)
 	if err != nil {
 		return err
 	}
 
-	applyOverlay(commands, overlay)
+	if commands != nil {
+		overlay, err := readOverlay(refDir, log)
+		if err != nil {
+			return err
+		}
 
-	cov := descCoverage(commands)
+		applyOverlay(commands, overlay)
 
-	log.Info("desc coverage",
-		"attributes_filled", cov.attrsFilled,
-		"attributes_total", cov.attrsTotal,
-		"args_filled", cov.argsFilled,
-		"args_total", cov.argsTotal,
-	)
+		cov := descCoverage(commands)
 
-	for _, name := range cov.emptyNames {
-		log.Warn("attribute without desc", "attribute", name)
+		log.Info("desc coverage",
+			"attributes_filled", cov.attrsFilled,
+			"attributes_total", cov.attrsTotal,
+			"args_filled", cov.argsFilled,
+			"args_total", cov.argsTotal,
+		)
+
+		for _, name := range cov.emptyNames {
+			log.Warn("attribute without desc", "attribute", name)
+		}
 	}
 
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
@@ -169,31 +175,59 @@ func GenKB(refDir, dataDir string, log *slog.Logger) error {
 		return err
 	}
 
-	wire := make([]commandJSON, 0, len(commands))
-	for _, cmd := range commands {
-		wire = append(wire, commandJSON{
-			Name:         cmd.Name,
-			Section:      cmd.Section,
-			Args:         argsToJSON(cmd.Args),
-			Attributes:   argsToJSON(cmd.Attributes),
-			Desc:         cmd.Desc,
-			GameVersions: cmd.GameVersions,
-			SinceUpdate:  cmd.SinceUpdate,
-		})
-	}
+	if commands != nil {
+		wire := make([]commandJSON, 0, len(commands))
+		for _, cmd := range commands {
+			wire = append(wire, commandJSON{
+				Name:         cmd.Name,
+				Section:      cmd.Section,
+				Args:         argsToJSON(cmd.Args),
+				Attributes:   argsToJSON(cmd.Attributes),
+				Desc:         cmd.Desc,
+				GameVersions: cmd.GameVersions,
+				SinceUpdate:  cmd.SinceUpdate,
+			})
+		}
 
-	if err := writeJSON(filepath.Join(dataDir, "rms-commands.json"), wire); err != nil {
-		return err
+		if err := writeJSON(filepath.Join(dataDir, "rms-commands.json"), wire); err != nil {
+			return err
+		}
 	}
 
 	log.Info("knowledge base generated",
 		"functions", len(functions),
 		"constants", len(constants),
-		"commands", len(wire),
+		"commands", len(commands),
 		"dir", dataDir,
 	)
 
 	return nil
+}
+
+// extractGuideCommands extracts the RMS commands from the local Zetnus-guide
+// export under refDir. The export is not part of the repository (the guide
+// ships no explicit license), so a missing file is a normal setup: nil
+// commands tell GenKB to leave the committed rms-commands.json alone, and a
+// WARN names the path.
+func extractGuideCommands(refDir string, log *slog.Logger) ([]Command, error) {
+	path := filepath.Join(refDir, guideFile)
+
+	if _, err := os.Stat(path); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("stat zetnus guide: %w", err)
+		}
+
+		log.Warn("zetnus guide not found, keeping existing rms-commands.json", "path", path)
+
+		return nil, nil
+	}
+
+	commands, err := ExtractRmsCommands(path, log)
+	if err != nil {
+		return nil, fmt.Errorf("extract rms commands: %w", err)
+	}
+
+	return commands, nil
 }
 
 // coverageReport is the desc coverage of one generated kb pass. Attributes

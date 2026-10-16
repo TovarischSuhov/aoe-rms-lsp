@@ -16,7 +16,7 @@ import (
 // carries a description.
 func TestExtractRmsCommands_GlossaryFillsAttrDescs(t *testing.T) {
 	t.Parallel()
-	commands, err := ExtractRmsCommands(zetnusGuide, nil)
+	commands, err := ExtractRmsCommands(zetnusGuide(t), nil)
 	require.NoError(t, err)
 
 	byName := make(map[string]Command, len(commands))
@@ -106,7 +106,7 @@ func TestExtractRmsCommands_GlossaryFillsAttrDescs(t *testing.T) {
 // section match the first record of the name does.
 func TestExtractRmsCommands_VariantsBySection(t *testing.T) {
 	t.Parallel()
-	commands, err := ExtractRmsCommands(zetnusGuide, nil)
+	commands, err := ExtractRmsCommands(zetnusGuide(t), nil)
 	require.NoError(t, err)
 
 	byName := make(map[string]Command, len(commands))
@@ -169,7 +169,7 @@ func TestExtractRmsCommands_VariantsBySection(t *testing.T) {
 // records, so the command descriptions of the committed data stay put.
 func TestExtractRmsCommands_CommandDescUnchanged(t *testing.T) {
 	t.Parallel()
-	commands, err := ExtractRmsCommands(zetnusGuide, nil)
+	commands, err := ExtractRmsCommands(zetnusGuide(t), nil)
 	require.NoError(t, err)
 	require.Len(t, commands, 53)
 
@@ -191,7 +191,7 @@ func TestExtractRmsCommands_CommandDescUnchanged(t *testing.T) {
 // the command desc, the game versions and both positional args.
 func TestExtractRmsCommands_RndDoc(t *testing.T) {
 	t.Parallel()
-	commands, err := ExtractRmsCommands(zetnusGuide, nil)
+	commands, err := ExtractRmsCommands(zetnusGuide(t), nil)
 	require.NoError(t, err)
 
 	byName := make(map[string]Command, len(commands))
