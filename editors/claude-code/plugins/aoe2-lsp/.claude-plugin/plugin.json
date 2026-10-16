@@ -1,0 +1,8 @@
+{
+  "name": "aoe2-lsp",
+  "description": "AoE2 DE RMS + XS code intelligence for Claude Code: go-to-definition, references, hover, document symbols, diagnostics (via the aoe2-lsp language server)",
+  "version": "0.1.0",
+  "author": {
+    "name": "Ilya Sukhov"
+  }
+}
