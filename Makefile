@@ -1,4 +1,4 @@
-.PHONY: all build test lint fmt check corpus clean release
+.PHONY: all build test lint fmt check corpus corpus-official clean release
 
 all: build
 
@@ -24,6 +24,14 @@ corpus: build
 		scripts/corpus-fetch.sh .corpus; \
 	fi
 	go run ./cmd/corpus -bin aoe2-lsp -dir .corpus
+
+# Local-only corpus built from the installed game's own scripts. The
+# content is Microsoft-copyrighted: it stays in gitignored .corpus-official
+# and is never committed (see scripts/corpus-official.sh).
+corpus-official:
+	go build -o aoe2-lsp ./cmd/aoe2-lsp
+	scripts/corpus-official.sh .corpus-official
+	go run ./cmd/corpus -bin ./aoe2-lsp -dir .corpus-official
 
 fmt:
 	golangci-lint fmt

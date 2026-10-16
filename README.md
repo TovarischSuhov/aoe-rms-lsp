@@ -103,6 +103,13 @@ the paragraph after the table).
 | **Official AoE2 DE release notes** (World's Edge) | version metadata ("since update N") for KB entries (`docs/ref/aoe2de-xs-rms-changelog.md`) | quoted factually | [ageofempires.com/news](https://www.ageofempires.com/news/) |
 | **aoe2map.net / snippets** (siegeengineers) | real-world RMS/XS corpus: parser fixtures, the corpus gate sample, research notes | community content | [aoe2map.net](https://aoe2map.net/) · [snippets.aoe2map.net](https://snippets.aoe2map.net/) |
 
+Not listed above: the game's own RMS/XS scripts
+(`scripts/corpus-official.sh`) — they are used **locally only**, staged from
+a machine with AoE2DE installed, and never vendored, committed or shipped.
+They are Microsoft-copyrighted (the game is licensed, not sold, and its EULA
+forbids copying beyond the license or publishing), so they stay in a
+gitignored directory.
+
 Derived knowledge-base files (`internal/kb/data/xs-functions.json`,
 `internal/kb/data/xs-constants.json`) are adapted from the UGC Guide and are
 covered by GPL-3.0 accordingly. Corpus-derived research (undocumented
@@ -321,6 +328,10 @@ Two gates beyond unit tests:
   of 100 published RMS/XS scripts (`scripts/corpus-fetch.sh` downloads the
   pinned pool on first use; CI caches it). A parser regression on
   real-world scripts fails the gate.
+- `make corpus-official` — a local-only corpus: stages the installed game's
+  own maps, includes and XS scripts (`scripts/corpus-official.sh`, found via
+  the Steam install; `AOE2DE_DIR` overrides) and runs the binary over them.
+  Microsoft-copyrighted content — gitignored, never committed.
 - CI (`.github/workflows/ci.yml`) — goimports/gofumpt, `go test -race`,
   golangci-lint, govulncheck, VS Code extension type-check + `.vsix`
   packaging, and the corpus gate on master pushes.

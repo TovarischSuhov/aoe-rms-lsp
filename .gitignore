@@ -9,6 +9,9 @@
 .corpus/
 .corpus-ext/
 
+# local-only official game scripts (scripts/corpus-official.sh) — the
+# content is Microsoft-copyrighted and must never be committed
+.corpus-official/
 # local Zetnus-guide export — the guide ships no explicit license, so only the
 # derived internal/kb/data/rms-commands.json is committed; the full text stays
 # on the maintainer's disk (see docs/kb-refresh.md)
