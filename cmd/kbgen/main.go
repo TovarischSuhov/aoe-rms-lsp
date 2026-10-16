@@ -10,10 +10,12 @@ package main
 
 import (
 	"aoe2-lsp/internal/kb"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -55,12 +57,46 @@ func runDiff(refDir string, outDir string) error {
 		return fmt.Errorf("regenerate: %w", err)
 	}
 
+	if err := seedKeptFile(outDir, tmp, "rms-commands.json"); err != nil {
+		return err
+	}
+
 	report, err := kb.DiffKB(outDir, tmp)
 	if err != nil {
 		return fmt.Errorf("diff: %w", err)
 	}
 
 	fmt.Print(report.Render())
+
+	return nil
+}
+
+// seedKeptFile copies name from srcDir into dstDir when regeneration did not
+// produce it and the current data dir has it. The Zetnus guide is not
+// vendored, so a regeneration without a local export leaves the committed
+// rms-commands.json alone; seeding it keeps the diff at "no command changes"
+// instead of reporting every command as removed.
+func seedKeptFile(srcDir, dstDir, name string) error {
+	dst := filepath.Join(dstDir, name)
+
+	if _, err := os.Stat(dst); err == nil {
+		return nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("stat %s: %w", dst, err)
+	}
+
+	src := filepath.Join(srcDir, name)
+
+	raw, err := os.ReadFile(src)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("read %s: %w", src, err)
+	}
+
+	if err := os.WriteFile(dst, raw, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", dst, err)
+	}
 
 	return nil
 }

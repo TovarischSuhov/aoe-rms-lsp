@@ -13,6 +13,11 @@ import (
 // changelogFile is the sibling changelog used for since_update enrichment.
 const changelogFile = "aoe2de-xs-rms-changelog.md"
 
+// guideFile is the local Zetnus-guide export feeding RMS command extraction.
+// It is not vendored (the guide has no explicit license), so it may be absent
+// — see GenKB.
+const guideFile = "zetnus-rms-guide.txt"
+
 // sectionHeadingRe matches RMS section headings like <LAND_GENERATION>.
 var sectionHeadingRe = regexp.MustCompile(`^<([A-Z_]+)>$`)
 
@@ -37,8 +42,9 @@ var backtickRe = regexp.MustCompile("`([^`]+)`")
 var wordRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
 
 // ExtractRmsCommands extracts RMS commands from the text export of the
-// Zetnus guide (docs/ref/zetnus-rms-guide.txt) into the rms-commands.json
-// shape described by the kbdata annotation. Attributes are enriched from
+// Zetnus guide (the maintainer's local docs/ref/zetnus-rms-guide.txt copy;
+// the guide is not vendored) into the rms-commands.json shape described by
+// the kbdata annotation. Attributes are enriched from
 // the guide's glossary blocks; when a name has several section-specific
 // variants, the block whose Example names the command's section is merged.
 //

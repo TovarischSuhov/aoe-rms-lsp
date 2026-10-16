@@ -142,8 +142,8 @@ RMS snippets are a declarative contribution: `snippets/aoe2rms.json`
 referenced from `contributes.snippets` for language `aoe2rms`. No client
 code — VS Code resolves prefixes from the JSON alone.
 
-- Content sources: the new-map skeleton (Zetnus guide,
-  `docs/ref/zetnus-rms-guide.txt`) and frequent blocks from
+- Content sources: the new-map skeleton (Zetnus guide — not vendored; see
+  README.md) and frequent blocks from
   `docs/ref/map-scripting-practices.md` (create_object with fields,
   start_random, base_terrain, sections).
 - Bodies use placeholders (`${1:default}`, choice `${1|a,b|}`); `$0` is

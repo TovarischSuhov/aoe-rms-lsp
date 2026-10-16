@@ -92,12 +92,14 @@ RMS/XS grammars, go.lsp.dev patterns).
 ## Data sources
 
 All sources are vendored locally under `docs/ref/` (no network at build or
-runtime).
+runtime). One exception: the Zetnus guide is not vendored (it ships no
+explicit license) — only its derived `rms-commands.json` is committed (see
+the paragraph after the table).
 
 | Source | What it provides | License | Link |
 |---|---|---|---|
 | **AoE2DE UGC Guide** (Divy1211 et al.) | `xs-functions.json` (204 XS functions), `xs-constants.json` (27 sections), `prelude.xs` dump, XS language docs | **GPL-3.0** | [github.com/Divy1211/AoE2DE_UGC_Guide](https://github.com/Divy1211/AoE2DE_UGC_Guide) · [ugc.aoe2.rocks](https://ugc.aoe2.rocks/general/xs/) |
-| **Zetnus — Definitive Random Map Scripting Guide** | RMS commands/attributes reference (Syntax Skeleton, Constant Reference) | no explicit license; used factually with attribution | [Google Doc](https://docs.google.com/document/d/1jnhZXoeL9mkRUJxcGlKnO98fIwFKStP_OBozpr0CHXo/edit) · [forum thread](https://forums.ageofempires.com/t/definitive-random-map-scripting-guide/104902) |
+| **Zetnus — Definitive Random Map Scripting Guide** | RMS commands/attributes reference (Syntax Skeleton, Constant Reference); only the derived `rms-commands.json` is committed — the full text is not vendored (no explicit license) | derived facts, used with attribution | [Google Doc](https://docs.google.com/document/d/1jnhZXoeL9mkRUJxcGlKnO98fIwFKStP_OBozpr0CHXo/edit) · [forum thread](https://forums.ageofempires.com/t/definitive-random-map-scripting-guide/104902) |
 | **Official AoE2 DE release notes** (World's Edge) | version metadata ("since update N") for KB entries (`docs/ref/aoe2de-xs-rms-changelog.md`) | quoted factually | [ageofempires.com/news](https://www.ageofempires.com/news/) |
 | **aoe2map.net / snippets** (siegeengineers) | real-world RMS/XS corpus: parser fixtures, the corpus gate sample, research notes | community content | [aoe2map.net](https://aoe2map.net/) · [snippets.aoe2map.net](https://snippets.aoe2map.net/) |
 
@@ -114,6 +116,12 @@ covered by GPL-3.0 accordingly. Corpus-derived research (undocumented
 real-map nuances, authoring practices — `docs/ref/real-map-nuances.md`,
 `docs/ref/map-scripting-practices.md`) is the project's own, collected from
 published maps with attribution.
+
+The Zetnus guide export (`docs/ref/zetnus-rms-guide.txt`) is **not** part of
+the repository: it is gitignored and kept as a local, optional copy so a
+maintainer can still regenerate the RMS commands. Without it `kbgen`
+regenerates only the XS files and leaves the committed `rms-commands.json`
+alone (see `docs/kb-refresh.md`).
 
 ## Install & run
 
@@ -337,7 +345,9 @@ The embedded knowledge base is regenerated from `docs/ref/` with
 
 The project is licensed under GPL-3.0 as a whole because its embedded
 knowledge-base data derives from the GPL-3.0 AoE2DE UGC Guide. Zetnus guide
-material is used factually (command/attribute structure) with attribution.
+material is used factually (command/attribute structure) with attribution;
+the guide text itself is not vendored, only the derived `rms-commands.json`
+is committed.
 
 Age of Empires II: Definitive Edition is a product of World's Edge / Xbox Game
 Studios; this project is not affiliated with or endorsed by them.

@@ -1,8 +1,9 @@
 # RMS Grammar — AoE2 Definitive Edition
 
 Domain: the Random Map Script language structure. Target audience: implementers
-of the rms, analysis and kb cells. Sources: docs/ref/zetnus-rms-guide.txt
-(canonical), docs/ref/aoe2de-xs-rms-changelog.md (versioning).
+of the rms, analysis and kb cells. Sources: the Zetnus guide (canonical, not
+vendored — distilled into internal/kb/data/rms-commands.json; see README.md),
+docs/ref/aoe2de-xs-rms-changelog.md (versioning).
 
 ## File structure
 

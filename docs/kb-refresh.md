@@ -16,7 +16,7 @@
 |---|---|---|---|
 | Release notes AoE2 DE | новые/изменённые функции, константы, команды; версионность `since_update` | `docs/ref/aoe2de-xs-rms-changelog.md` | ageofempires.com/news (посты Update/Hotfix) |
 | UGC Guide | `functions.json`, `constants.json` | `docs/ref/ugc-guide/xs/{functions,constants}/` | ugc.aoe2.rocks |
-| Zetnus-гайд (Definitive Random Map Scripting Guide) | RMS-команды (Syntax Skeleton) | `docs/ref/zetnus-rms-guide.txt` | гугл-док Zetnus, текстовый экспорт |
+| Zetnus-гайд (Definitive Random Map Scripting Guide) | RMS-команды (Syntax Skeleton) | `docs/ref/zetnus-rms-guide.txt` — **не в репозитории** (gitignored, локальная копия) | гугл-док Zetnus, текстовый экспорт (File → Download → Plain text) |
 | attribute-descs overlay | ручные desc для пробелов гайда (сейчас пуст) | `docs/ref/attribute-descs.json` | проектный файл, не зеркало |
 
 Шаги независимы — процесс переживает задержки внешних мейнтейнеров:
@@ -24,10 +24,14 @@
 1. **Release notes — первичны.** Дополнить changelog-док (регламент — в его
    шапке). Уже этого достаточно, чтобы дифф показал новые `since_update`.
 2. **UGC Guide** — если обновился, переложить оба JSON как есть.
-3. **Zetnus-гайд** — если обновился, переэкспортировать текст. Гайд может
-   задержаться: функции/константы и версионность обновятся без него;
-   новые RMS-команды до обновления гайда в базу не попадут (осознанное
-   ограничение: команды извлекаются только из него).
+3. **Zetnus-гайд** — если обновился, переэкспортировать текст в
+   `docs/ref/zetnus-rms-guide.txt` (файл локальный и не коммитится: у гайда
+   нет явной лицензии, в репозитории держим только производный
+   `rms-commands.json`). Гайд может задержаться: функции/константы и
+   версионность обновятся без него; новые RMS-команды до обновления гайда
+   в базу не попадут, а `kbgen` без локального файла оставит закоммиченный
+   `rms-commands.json` как есть (осознанное ограничение: команды
+   извлекаются только из него).
 
 ## Процесс
 
