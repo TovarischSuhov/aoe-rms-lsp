@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: Пайплайн данных базы знаний
-description: Регенерация embedded JSON (internal/kb/data) из локальных источников docs/ref/ через kbgen, полудифф-режим kbgen -diff, патч-день (docs/kb-refresh.md, ночной kb-monitor + news), лицензионные следствия GPL-3.0.
+description: Регенерация embedded JSON (internal/kb/data) из локальных источников docs/ref/ через kbgen (гайд Zetnus — необязательный, не вендорится), полудифф-режим kbgen -diff, патч-день (docs/kb-refresh.md, ночной kb-monitor + news), лицензионные следствия GPL-3.0.
 sources:
   - resource: internal/kb/.usages/data-pipeline.md
   - resource: docs/kb-refresh.md
@@ -14,6 +14,8 @@ generated:
 verified:
   - by: claude-code/glm-5.3
     at: 2026-09-22T07:12:06Z
+  - by: claude-code/claude-sonnet-4-6
+    at: 2026-10-17T00:00:00Z
 ---
 
 # Пайплайн данных базы знаний
@@ -28,7 +30,7 @@ completion и signature help. Генерируется из локальных �
 |---|---|
 | `ugc-guide/xs/functions/functions.json` (204 функции) | `xs-functions.json` |
 | `ugc-guide/xs/constants/constants.json` (27 секций) | `xs-constants.json` |
-| `zetnus-rms-guide.txt` (Syntax Skeleton) | `rms-commands.json` (via ExtractRmsCommands) |
+| `zetnus-rms-guide.txt` (Syntax Skeleton) — **не вендорится** (`docs/ref/zetnus-rms-guide.txt` в `.gitignore`; у мейнтейнера — локальная копия) | `rms-commands.json` (via ExtractRmsCommands; отсутствует гайд → файл не перегенерируется, WARN, остаётся закоммиченный) |
 | `aoe2de-xs-rms-changelog.md` | обогащение `since_update` |
 | `attribute-descs.json` | опциональный desc-overlay (файл проекта; пустой — норма, отсутствует → WARN, битый → падение сборки) |
 
@@ -46,6 +48,12 @@ go run ./cmd/kbgen
 Семантика майнинга описан (glossary → mining → overlay, fill-when-empty,
 идемпотентность load-пути) в `internal/kb/.usages/data-pipeline.md` —
 при правке пайплайна читать его.
+
+Гайд Zetnus — **необязательный** источник: его нет в репозитории (нет явной
+лицензии), поэтому `GenKB` при отсутствии `docs/ref/zetnus-rms-guide.txt`
+перегенерирует только `xs-functions.json` и `xs-constants.json`, а
+закоммиченный `rms-commands.json` оставляет как есть (WARN в логе). Новые
+RMS-команды попадают в базу только из локальной копии гайда.
 
 ## Обновление на патчах игры
 
@@ -68,7 +76,9 @@ Update/Hotfix/…») заводит issue с напоминанием обнов
 
 Проект целиком GPL-3.0, потому что производные данные KB — адаптация
 GPL-3.0 UGC Guide. Материал гайда Zetnus используется фактически
-(структура команд/атрибутов) с атрибуцией. Корпусные исследования
+(структура команд/атрибутов) с атрибуцией, а сам текст гайда (без явной
+лицензии) в репозитории не вендорится: в `docs/ref/` лежит только ссылка,
+полный экспорт — локальная копия вне git. Корпусные исследования
 (`docs/ref/real-map-nuances.md`, `map-scripting-practices.md`) —
 собственные, с атрибуцией опубликованных карт. Менять источники данных
 без проверки лицензионных следствий нельзя.

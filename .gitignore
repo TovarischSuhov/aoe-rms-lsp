@@ -9,5 +9,10 @@
 .corpus/
 .corpus-ext/
 
+# local Zetnus-guide export — the guide ships no explicit license, so only the
+# derived internal/kb/data/rms-commands.json is committed; the full text stays
+# on the maintainer's disk (see docs/kb-refresh.md)
+docs/ref/zetnus-rms-guide.txt
+
 # codegraph index (codegraph init)
 .codegraph/
