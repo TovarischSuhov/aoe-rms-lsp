@@ -22,10 +22,15 @@ Annotations: |
   Parser never fails hard: every problem becomes a Diagnostic; recovery
   resynchronizes to the next statement/section. Every AST node carries a Range.
 
-  Директивы подключений по `rms_grammar` (Directives): #include → Includes;
-  #includeXS с аргументом → XsIncludes + переключение в inline-XS режим
-  (блок после директивы — в XsBlocks); bare #includeXS → только XsBlock.
-  Путь без аргумента — синтаксическая Diagnostic, Include не создаётся.
+  Директивы подключений по `rms_grammar` (Directives): #include и
+  #include_drs с аргументом → Includes; #includeXS с аргументом →
+  XsIncludes + переключение в inline-XS режим (блок после директивы — в
+  XsBlocks); bare #includeXS → только XsBlock. Путь без аргумента —
+  синтаксическая Diagnostic, Include не создаётся.
+
+  #undefine и #cost — тоже директивы (не комментарии): обе остаются
+  видимыми как statements; #cost (опечатка #const) дополнительно даёт
+  warning code="unknown-directive" с подсказкой did-you-mean.
 
   Канонические значения Kind (Statement, Expr) экспортированы как
   Go-константы Kind* (например KindCommand, KindBinary).
@@ -42,7 +47,7 @@ Annotations: |
 
     Algorithm:
     1. Лексер: токены по `rms_grammar` (слова, числа, проценты, строки,
-       комментарии, директивы #include/#includeXS, секции <...>);
+       комментарии, директивы #include/#include_drs/#includeXS, секции <...>);
        гашение комментариев не затрагивает содержимое строковых
        литералов (кавычки учитываются)
     2. Построить список секций; вне секций — глобальные statements
@@ -50,12 +55,17 @@ Annotations: |
        последующие атрибуты прикреплять к текущей команде (позиционная семантика)
     4. Блоки start_random/percent_chance и if/elseif/else вкладывать в Children
     5. Директивы: #include с аргументом-путём → Include в Includes
-       (Range = аргумент-путь); #includeXS с аргументом → Include в XsIncludes
-       и начало XsBlock; bare #includeXS → только XsBlock; собирать строки
-       блока до следующей директивы/секции или конца файла; пустой
-       inline-регион (терминатор на следующей же строке) у #includeXS
-       с аргументом XsBlock не создаёт; bare #includeXS создаёт блок
-       всегда (включая пустой в конце файла)
+       (Range = аргумент-путь); #include_drs с аргументом → Include в
+       Includes тоже (Path = первый пробельный токен, Range = span этого
+       токена, хвостовой legacy-id — не часть аргумента; bare #include_drs
+       → error code="syntax"); #undefine и #cost остаются statements
+       (#cost — плюс warning code="unknown-directive" did-you-mean);
+       #includeXS с аргументом → Include в XsIncludes и начало XsBlock; bare
+       #includeXS → только XsBlock; собирать строки блока до следующей
+       директивы/секции или конца файла; пустой inline-регион (терминатор
+       на следующей же строке) у #includeXS с аргументом XsBlock не
+       создаёт; bare #includeXS создаёт блок всегда (включая пустой в
+       конце файла)
     6. При ошибке: Diagnostic с диапазоном токена, sync на следующий
        statement/секцию, продолжить разбор; неявное закрытие незакрытого
        вложенного блока (end_* при открытых внутренних) — Diagnostic
@@ -130,7 +140,9 @@ Annotations: |
       в синтетическую секцию "global" (материализуется только если непуста);
       в грамматике RMS такой секции нет.
     "Includes -> []Include": |
-      Директивы #include (путь + диапазон аргумента).
+      Директивы подключения RMS-файлов — #include и #include_drs (путь +
+      диапазон аргумента). У #include_drs Path — первый пробельный токен,
+      а хвостовой legacy-id в Path и Range не входит.
     "XsIncludes -> []Include": |
       Внешние XS-скрипты (#includeXS с аргументом); inline-код — в XsBlocks.
     "XsBlocks -> []XsBlock": |
@@ -280,7 +292,8 @@ Annotations: |
       Algorithm:
       1. Ближайший statement, объемлющий/предшествующий `pos` — семантика
          StatementAt, включая хвостовые позиции и незакрытые блоки; нет
-         (директивы #const/#include, заголовки секций, вне всего) → found=false
+         (директивы #const/#include/#include_drs, заголовки секций, вне
+         всего) → found=false
       2. `pos` внутри строки или комментария → found=false
       3. `pos` на токене имени команды → kind=none
       4. `pos` внутри значения N-го позиционного аргумента (Args[N]) →

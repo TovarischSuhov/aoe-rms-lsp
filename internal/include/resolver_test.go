@@ -77,6 +77,47 @@ func TestResolver_ClosureDFSAndMissing(t *testing.T) {
 	assert.True(t, c.Missing[0].Range.Start.Before(c.Missing[0].Range.End))
 }
 
+// TestResolver_IncludeDrsClosure pins the #include_drs integration: the
+// directive materializes in file.Includes, so the closure resolves the
+// .inc next to the map and reports exactly one MissingInclude per absent
+// target. The trailing legacy DRS id is not part of the path — a leaked
+// id would both miss the resolve and widen the Range.
+func TestResolver_IncludeDrsClosure(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	uris := writeTree(t, dir, map[string]string{
+		"main.rms":             "#include_drs includes/scaling.inc 54201\n#include_drs missing.inc 54202\n",
+		"includes/scaling.inc": "base_terrain GRASS\n",
+	})
+
+	r := NewResolver(fakeSource{})
+	c := r.Closure(context.Background(), uris["main.rms"])
+
+	// The .inc next to the map joins the RMS closure in DFS order.
+	require.Len(t, c.Rms, 2)
+	assert.Equal(t, uris["main.rms"], c.Rms[0].URI)
+	assert.Equal(t, uris["includes/scaling.inc"], c.Rms[1].URI)
+
+	// One resolved directive: the owner's path resolves from the map dir.
+	require.Len(t, c.Resolved, 1)
+	assert.Equal(t, uris["main.rms"], c.Resolved[0].Owner)
+	assert.Equal(t, uris["includes/scaling.inc"], c.Resolved[0].Target)
+	assert.Equal(t, "includes/scaling.inc", c.Resolved[0].Inc.Path)
+
+	// The absent target yields exactly one MissingInclude. Path is the
+	// bare path (no trailing id) and Range slices that same token out of
+	// the owner's line.
+	require.Len(t, c.Missing, 1)
+	miss := c.Missing[0]
+	require.Equal(t, "missing.inc", miss.Path)
+	assert.Equal(t, uris["main.rms"], miss.Owner)
+
+	line := "#include_drs missing.inc 54202"
+	require.Equal(t, uint32(1), miss.Range.Start.Line)
+	require.LessOrEqual(t, miss.Range.End.Column, uint32(len(line)))
+	assert.Equal(t, "missing.inc", line[miss.Range.Start.Column:miss.Range.End.Column])
+}
+
 // TestResolver_EditorStateWinsOverDisk checks that an open document's
 // text overrides its disk copy.
 func TestResolver_EditorStateWinsOverDisk(t *testing.T) {

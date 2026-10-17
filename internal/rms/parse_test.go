@@ -271,22 +271,121 @@ func TestParse_IncludesAndXs(t *testing.T) {
 		"attributes outside braces attach to the create_* command")
 }
 
-// TestParse_NeverNil checks the total-garbage path.
-// TestParse_IncludeDrs covers the #include_drs directive and dotted
-// file arguments — published maps use it in 45% of the corpus sample.
+// TestParse_IncludeDrs pins FR1–FR3 (issue #146): #include_drs is a
+// full include — the path lands in file.Includes with its own range — not
+// a plain #-command statement. The path is the first whitespace-separated
+// token after the directive: a trailing legacy numeric id is dropped from
+// both Path and Range. Published maps use the directive in 45% of the
+// corpus sample.
 func TestParse_IncludeDrs(t *testing.T) {
 	t.Parallel()
 
-	src := "#include_drs random_map.def 54000\n#const ROCKS 40\n"
+	tests := []struct {
+		name string
+		src  string
+		path string
+		rng  common.Range
+	}{
+		{
+			// AC1: "/" is not a word byte to the lexer, so a word-token
+			// implementation would answer "includes" — the whole
+			// whitespace-delimited token is the path.
+			name: "slash path is not cut at the non-word slash",
+			src:  "#include_drs includes/scaling.inc\n",
+			path: "includes/scaling.inc",
+			rng: common.Range{
+				Start: common.Pos{Line: 0, Column: 13, Offset: 13},
+				End:   common.Pos{Line: 0, Column: 33, Offset: 33},
+			},
+		},
+		{
+			// AC2: the trailing legacy id is ignored — a rest-of-line
+			// implementation would answer "Arabia.rms 54201".
+			name: "trailing legacy id is dropped",
+			src:  "#include_drs Arabia.rms 54201\n",
+			path: "Arabia.rms",
+			rng: common.Range{
+				Start: common.Pos{Line: 0, Column: 13, Offset: 13},
+				End:   common.Pos{Line: 0, Column: 23, Offset: 23},
+			},
+		},
+		{
+			// AC3: quoted path — quotes stripped in Path, the quoted
+			// token keeps its whole span in Range.
+			name: "quoted path keeps the quoted token span",
+			src:  "#include_drs \"file.inc\" 54201\n",
+			path: "file.inc",
+			rng: common.Range{
+				Start: common.Pos{Line: 0, Column: 13, Offset: 13},
+				End:   common.Pos{Line: 0, Column: 23, Offset: 23},
+			},
+		},
+	}
 
-	file, diags := Parse(src, "drs.rms")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	require.Empty(t, diags)
+			file, diags := Parse(tt.src, "drs.rms")
 
-	global := file.Sections[0]
-	require.Len(t, global.Statements, 2)
-	assert.Equal(t, "#include_drs", global.Statements[0].Name)
-	assert.Equal(t, "#const", global.Statements[1].Name)
+			assert.Empty(t, diags, tt.name)
+
+			require.Len(t, file.Includes, 1, tt.name)
+			assert.Equal(t, tt.path, file.Includes[0].Path, tt.name)
+			assert.Equal(t, tt.rng, file.Includes[0].Range, tt.name)
+
+			// the directive no longer stays a KindCommand statement
+			for _, sec := range file.Sections {
+				for _, st := range sec.Statements {
+					assert.NotEqual(t, "#include_drs", st.Name,
+						"the directive must not survive as a statement")
+				}
+			}
+		})
+	}
+}
+
+// TestParse_IncludeDrs_WithoutPath pins FR4/AC4: bare #include_drs is a
+// syntax error naming the directive (like #include) and creates no
+// Include entry.
+func TestParse_IncludeDrs_WithoutPath(t *testing.T) {
+	t.Parallel()
+
+	file, diags := Parse("#include_drs\n", "drs.rms")
+
+	assert.Empty(t, file.Includes, "a bare directive owns no include")
+
+	require.Len(t, diags, 1)
+	assert.Equal(t, common.SeverityError, diags[0].Severity)
+	assert.Equal(t, "syntax", diags[0].Code)
+	assert.Equal(t, "#include_drs needs a file name", diags[0].Message)
+}
+
+// TestRmsFile_ArgAt_IncludeDrs pins requirement 5/AC5: the whole
+// #include_drs line is excluded, so ArgAt answers found=false on its path
+// argument — signature help never fires there.
+func TestRmsFile_ArgAt_IncludeDrs(t *testing.T) {
+	t.Parallel()
+
+	file, _ := Parse("#include_drs includes/scaling.inc\n", "drs.rms")
+
+	// inside the path token "includes/scaling.inc" (cols 13–31)
+	pathPos := common.Pos{Line: 0, Column: 18, Offset: 18}
+
+	_, found := file.ArgAt(pathPos)
+	assert.False(t, found, "the include path argument is not an argument site")
+
+	// the line is excluded, so no position on it owns a statement
+	excluded := false
+	for _, r := range file.excluded {
+		if r.Contains(pathPos) {
+			excluded = true
+
+			break
+		}
+	}
+
+	assert.True(t, excluded, "the #include_drs line must be recorded in file.excluded")
 }
 
 // TestParse_ConditionalSpansSections checks that if/elseif chains may
@@ -422,6 +521,7 @@ func TestParse_QuotesInsideCommentAreBlanked(t *testing.T) {
 	assert.Empty(t, stmts[0].Args, "comment bytes never become arguments")
 }
 
+// TestParse_NeverNil checks the total-garbage path.
 func TestParse_NeverNil(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -1600,6 +1700,110 @@ func TestParse_HashAttributeDiagnostic(t *testing.T) {
 			if tt.comments != nil {
 				assert.Equal(t, tt.comments, file.Comments)
 			}
+		})
+	}
+}
+
+// diagShape is the acceptance-relevant projection of a diagnostic: the
+// triple the #cost pin keys on. Range is deliberately left out — the
+// acceptance criteria name severity, code and message, and a correct
+// implementation may anchor the warning on the directive or the whole
+// line; pinning the span would reject a merely differently-anchored one.
+type diagShape struct {
+	severity int
+	code     string
+	message  string
+}
+
+// diagShapes projects diagnostics into the diagShape form for table
+// comparison.
+func diagShapes(diags []common.Diagnostic) []diagShape {
+	out := make([]diagShape, 0, len(diags))
+
+	for _, d := range diags {
+		out = append(out, diagShape{severity: d.Severity, code: d.Code, message: d.Message})
+	}
+
+	return out
+}
+
+// statementNames flattens the direct statement names of every section in
+// file order — enough to pin that a #-line survived into the AST.
+func statementNames(file RmsFile) []string {
+	var out []string
+
+	for _, sec := range file.Sections {
+		for _, st := range sec.Statements {
+			out = append(out, st.Name)
+		}
+	}
+
+	return out
+}
+
+// TestParse_UndefineIsDirective pins AC1 (FR6, issue #147): #undefine is a
+// directive line of the grammar, not a hash comment. The engine ignores it
+// (no-op), so the parser adds no semantics — but the line must be
+// classified as a directive: it neither lands in file.Comments nor
+// disappears. The isDirectiveLine assertion pins the vocabulary the walk
+// keys on; the Comments+AST pair pins the two observable consequences a
+// missing directiveWords entry would produce — the line would become a
+// hash-comment extent and own no statement.
+func TestParse_UndefineIsDirective(t *testing.T) {
+	t.Parallel()
+
+	file, diags := Parse("#undefine X\n", "undefine.rms")
+
+	assert.True(t, isDirectiveLine("#undefine X"), "#undefine must be a directive word")
+	assert.Empty(t, diags, "the no-op directive reports nothing")
+	assert.Empty(t, file.Comments, "a directive line is not a #-comment")
+	assert.Equal(t, []string{"#undefine"}, statementNames(file),
+		"the directive stays visible as a #undefine statement")
+}
+
+// TestParse_CostTypoDiagnostic pins AC2 (FR7, issue #148): #cost is a
+// misspelling of #const. The line yields exactly one warning with code
+// "unknown-directive" and a message naming the correction, and it is not
+// dropped — it survives as a #cost statement. Severity is Warning, not
+// Error (AC3): format.RMS's refuse() only stops on SeverityError, so a
+// Warning keeps the file formattable. The table covers a #cost alone, next
+// to a command (never a doubled unknown-command report) and inside a
+// #const run.
+func TestParse_CostTypoDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "typo alone",
+			src:  "#cost SOIL4 1\n",
+		},
+		{
+			name: "typo next to a normal command",
+			src:  "#cost SOIL4 1\ncreate_land TERRAIN_GRASS\n",
+		},
+		{
+			name: "typo in a #const run",
+			src:  "#const SOIL1 1\n#cost SOIL4 1\n#const SOIL2 2\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			file, diags := Parse(tt.src, "cost.rms")
+
+			require.Equal(t, []diagShape{{
+				severity: common.SeverityWarning,
+				code:     "unknown-directive",
+				message:  `unknown directive "#cost"; did you mean "#const"?`,
+			}}, diagShapes(diags), tt.name)
+
+			assert.Contains(t, statementNames(file), "#cost",
+				"the mistyped line is kept as a statement, not dropped: %s", tt.name)
 		})
 	}
 }
