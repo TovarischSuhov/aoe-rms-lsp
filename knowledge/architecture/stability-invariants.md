@@ -8,6 +8,8 @@ sources:
   - resource: Makefile
   - resource: internal/include/source.go
   - resource: internal/rms/parse.go
+  - resource: internal/analysis/analyzer.go
+  - resource: internal/common/diagnostic.go
   - resource: .goga/history/2026/task-xs-comment-scan/arch.md
   - resource: internal/xs/parse.go
   - resource: internal/server/server.go
@@ -16,8 +18,8 @@ sources:
   - resource: .goga/history/2026/task-format-unclosed-block/task.md
   - resource: .goga/history/2026/task-rms-operand-failure-diags/design.md
 generated:
-  by: claude-code/claude-sonnet-4-6
-  at: 2026-10-06T00:00:00Z
+  by: claude-code/claude-haiku-4-5
+  at: 2026-10-17T00:00:00Z
 ---
 
 # Инварианты стабильности
@@ -116,8 +118,13 @@ generated:
 ## Диагностика
 
 - **Коды правил стабильны между релизами** (`unknown-command`,
-  `undefined-symbol`, `bad-arity`, …) — на них опираются тесты и
-  пользовательские `severityOverrides` в настройках. Код — это контракт.
+  `undefined-symbol`, `bad-arity`, `unknown-directive`, …) — на них
+  опираются тесты и пользовательские `severityOverrides` в настройках.
+  Код — это контракт. Единого реестра кодов нет: код живёт либо именованной
+  константой ячейки (`analysis` — `CodeUnknownCommand`…`CodeBadArity`,
+  `server` — `codeMissingInclude`), либо строковым литералом в месте эмита
+  (`rms` — `"syntax"`, `"unknown-directive"`). Совпадение эмиттера и
+  настройки держится соглашением, не типом.
 - Значения severity следуют нумерации LSP 1..4; новых значений нет.
 - **Error-диагностики парсера отказывают форматтер** (#96):
   `format.RMS` на входе с хотя бы одной error-диагностикой возвращает
