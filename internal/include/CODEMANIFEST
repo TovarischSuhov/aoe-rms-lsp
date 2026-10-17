@@ -68,7 +68,7 @@ Annotations: |
     - ctx уважает отмену
   methods:
     "Closure(ctx: Context, uriArg: string) -> closure: Closure": |
-      Замыкание #include/#includeXS от корня.
+      Замыкание #include/#include_drs/#includeXS от корня.
 
       `ctx`: контекст отмены; `uriArg`: корневой документ
 
@@ -78,12 +78,12 @@ Annotations: |
          списками
       2. Расширение → парс: .rms → `Parse` по `rms-parsing`, .xs →
          `XsParse` по `xs-parsing`; entry в visit-set по каноническому пути
-      3. Для каждого RmsEntry: Includes и XsIncludes по `includes` — резолв
-         относительно директории owner-файла по `lsp-protocol`, затем по
-         настроенным корням (SetRoots) в порядке приоритета; файл
-         существует, является обычным файлом и лежит внутри директории
-         корневого документа или одного из корней → ResolvedInclude и
-         target в очередь;
+      3. Для каждого RmsEntry: Includes (#include/#include_drs) и XsIncludes
+         по `includes` — резолв относительно директории owner-файла по
+         `lsp-protocol`, затем по настроенным корням (SetRoots) в порядке
+         приоритета; файл существует, является обычным файлом и лежит
+         внутри директории корневого документа или одного из корней →
+         ResolvedInclude и target в очередь;
          иначе (нет файла, директория, выход за границу) → MissingInclude
       4. Повторный канонический путь не разворачивается (циклы A→B→A
          безопасны); лимит глубины 64 и лимит файлов 1024: при превышении
@@ -293,5 +293,5 @@ Annotations: |
 Author: Goga
 CreatedAt: 07/09/26
 Description: |
-  Include-замыкание документов: резолв #include/#includeXS, дисковая загрузка,
-  кросс-файловая навигация.
+  Include-замыкание документов: резолв #include/#include_drs/#includeXS, дисковая
+  загрузка, кросс-файловая навигация.

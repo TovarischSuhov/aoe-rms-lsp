@@ -26,7 +26,8 @@ a pre-DE grammar, and fresh editor extensions provide highlighting only.
 
 - **Diagnostics** — syntax (error-recovery parsers) and semantic (unknown
   commands/attributes/symbols, arity, value types); missing
-  `#include`/`#includeXS` targets are reported on the directive's path.
+  `#include`/`#include_drs`/`#includeXS` targets are reported on the
+  directive's path.
   Per-code severity overrides via settings (`none` suppresses a diagnostic).
 - **Quick fixes** — "Change to X" renames suggested from the diagnostic
   message for unknown identifiers, `effect_percent` → `effect_amount`
@@ -69,7 +70,7 @@ internal/
   hints/        signature-help computation (protocol-agnostic)
   complete/     completion candidates (protocol-agnostic)
   format/       full-document formatter (RMS; XS in development)
-  include/      #include/#includeXS closure, cross-file navigation
+  include/      #include/#include_drs/#includeXS closure, cross-file navigation
   corpus/       running the LSP binary over a sample of real maps
   server/       LSP server over go.lsp.dev/protocol (stdio)
 editors/vscode/ VS Code extension (language configs + LSP client wiring)
@@ -182,7 +183,10 @@ see its section below):
 {
   "aoe2lsp": {
     "diagnostics": {
-      "severityOverrides": { "undefined-symbol": "hint" }  // code → error|warning|info|hint|none
+      "severityOverrides": {
+        "undefined-symbol": "hint",   // code → error|warning|info|hint|none
+        "unknown-directive": "none"   // e.g. silence the #cost typo warning
+      }
     },
     // extra #include search dirs, e.g. the game's resource folders:
     "includeRoots": [

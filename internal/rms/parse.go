@@ -168,12 +168,12 @@ func (p *parser) recordExcluded(idx int) {
 }
 
 // isExcludedDirective reports whether the trimmed line is an
-// #include/#includeXS directive (the line classes that materialize no
-// statement; #const/#define/#include_drs do and stay owned).
+// #include/#includeXS/#include_drs directive (the line classes that
+// materialize no statement; #const/#define do and stay owned).
 func isExcludedDirective(trimmed string) bool {
 	word := strings.Fields(trimmed)[0]
 
-	return word == "#include" || word == "#includeXS"
+	return word == "#include" || word == "#includeXS" || word == "#include_drs"
 }
 
 // closeAll finalizes the trailing section, XS block and open constructs,
@@ -577,6 +577,13 @@ func (p *parser) directive(line string, idx int) {
 		}
 
 		p.file.Includes = append(p.file.Includes, inc)
+	case "#include_drs":
+		inc, ok := p.includeDrsArg(directive, line, idx)
+		if !ok {
+			return
+		}
+
+		p.file.Includes = append(p.file.Includes, inc)
 	case "#includeXS":
 		inc, ok := p.includeArg(directive, line, idx)
 		if ok {
@@ -586,8 +593,17 @@ func (p *parser) directive(line string, idx int) {
 		p.xsArg = ok
 		p.inXs = true
 		p.xsStart = idx + 1
+	case "#cost":
+		// #cost is a misspelling of #const seen in the official corpus
+		// (issue #148). Warn, then keep the line as a statement so it is
+		// not silently dropped — the engine treats the unknown directive
+		// as a no-op, and a Warning (not Error) keeps the file formattable
+		// (format.RMS refuses only on SeverityError).
+		p.reportf(directive.at, common.SeverityWarning, "unknown-directive",
+			"unknown directive %q; did you mean %q?", "#cost", "#const")
+		p.commandLine(directive, args)
 	default:
-		// #const / #define / #include_drs stay visible as statements.
+		// #const / #define / #undefine stay visible as statements.
 		p.commandLine(directive, args)
 	}
 }
@@ -622,6 +638,50 @@ func (p *parser) includeArg(directive token, line string, idx int) (inc Include,
 			Range: common.Range{Start: arg.at.Start, End: endPos},
 		}, true
 	}
+}
+
+// includeDrsArg extracts the path argument of an #include_drs directive:
+// the first whitespace-separated token after the directive name. A trailing
+// legacy numeric id is not part of the argument — neither in Path nor in the
+// range. A quoted argument behaves like #include's: the quotes are stripped
+// from Path and the range covers the quoted token whole. The token is cut by
+// hand, not by the lexer: "/" is not a word byte, so a word token would stop
+// at "includes" for "includes/scaling.inc". ok=false reports the
+// missing-argument syntax error (no Include is created in that case).
+func (p *parser) includeDrsArg(directive token, line string, idx int) (inc Include, ok bool) {
+	// Columns are byte offsets, so the directive token's end column is the
+	// start of the argument run.
+	start := int(directive.at.End.Column)
+	for start < len(line) && (line[start] == ' ' || line[start] == '\t' || line[start] == '\r') {
+		start++
+	}
+
+	if start >= len(line) {
+		p.reportf(directive.at, common.SeverityError, "syntax", "%s needs a file name", directive.text)
+
+		return Include{}, false
+	}
+
+	if line[start] == '"' {
+		end := start + 1
+		for end < len(line) && line[end] != '"' {
+			end++
+		}
+
+		path := line[start+1 : end]
+		if end < len(line) {
+			end++ // the closing quote belongs to the argument span
+		}
+
+		return Include{Path: path, Range: common.Range{Start: p.pos(idx, start), End: p.pos(idx, end)}}, true
+	}
+
+	end := start
+	for end < len(line) && line[end] != ' ' && line[end] != '\t' && line[end] != '\r' {
+		end++
+	}
+
+	return Include{Path: line[start:end], Range: common.Range{Start: p.pos(idx, start), End: p.pos(idx, end)}}, true
 }
 
 // endXsBlock finalizes the embedded XS block ending before line idx.
@@ -863,6 +923,8 @@ var directiveWords = map[string]bool{
 	"#include_drs": true,
 	"#const":       true,
 	"#define":      true,
+	"#undefine":    true,
+	"#cost":        true,
 }
 
 // sectionHeader recognizes "<name>" and "</name>" lines.

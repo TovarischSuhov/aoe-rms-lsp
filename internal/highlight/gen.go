@@ -35,8 +35,11 @@ const (
 )
 
 // directiveRe is the hand-written match for the #-directives; any other
-// #-line is a comment (mirrors rms.directiveWords).
-const directiveRe = `#(?:includeXS|include_drs|include|const|define)\b`
+// #-line is a comment. The vocabulary is deliberately not the parser's
+// rms.directiveWords table: the parser knows #cost and diagnoses it as a
+// typo of #const, so the grammar leaves #cost unhighlighted — it stays a
+// hash-comment rather than being colored as a (misspelled) directive.
+const directiveRe = `#(?:includeXS|include_drs|include|const|define|undefine)\b`
 
 // GenTmLanguage writes the RMS TextMate grammar to outPath: the
 // hand-written skeleton (comments, sections, #-directives, strings,
@@ -136,7 +139,7 @@ func buildGrammar(commands []string, attributes []string, constants []string) tm
 					spanRule{Name: scopeComment, Begin: `/\*`, End: `\*/`},
 					matchRule{Name: scopeLineSlash, Match: `//.*`},
 					// A #-line that is not a directive is a comment.
-					matchRule{Name: scopeLineHash, Match: `#(?!(?:includeXS|include_drs|include|const|define)\b).*$`},
+					matchRule{Name: scopeLineHash, Match: `#(?!(?:includeXS|include_drs|include|const|define|undefine)\b).*$`},
 				},
 			},
 			Sections:   matchRule{Name: scopeSection, Match: `(?i)</?[a-z_][a-z0-9_]*>`},
