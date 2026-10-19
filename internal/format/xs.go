@@ -312,11 +312,21 @@ func (p *xsPrinter) scanFirst(from int, want ...byte) (int, bool) {
 // the first argument over whitespace and comment extents to the last code
 // byte, which is the "(" itself. The callee — an identifier, a member or
 // index chain, an inner call — carries no closing parenthesis, so nothing
-// else can be the last code byte before an argument.
+// else can be the last code byte before an argument. A run of "("s means
+// the inner ones wrap the argument — groupings the parser drops — and the
+// outermost of the run is the argument list's own opener: a callee cannot
+// end on "(" (it would open the list itself), so the walk settles on the
+// run's edge, never inside the callee.
 func (p *xsPrinter) openParenBefore(argStart int) (int, bool) {
-	i, ok := p.codeBefore(argStart)
-	if ok && p.src[i] == '(' {
-		return i, true
+	open, ok := p.codeBefore(argStart)
+
+	for ok && p.src[open] == '(' {
+		prev, more := p.codeBefore(open)
+		if !more || p.src[prev] != '(' {
+			return open, true
+		}
+
+		open = prev
 	}
 
 	return 0, false
@@ -373,8 +383,12 @@ func xsTokenStart(c byte) bool {
 // with the "(" before the start — and a "(" sitting right before the
 // start with its match past it, the group wrapping the operand the
 // extent opens on; a degenerate member or argument token can hold the
-// openers that cancel the net count. Both walk back one loop each, never
-// past a ";" or brace: the hard bound recovery junk cannot cross.
+// openers that cancel the net count. The immediate group qualifies only
+// when it closes before the call's own "(" (the to bound): a group whose
+// closer runs past that wraps the whole call, not the callee — walking
+// back would reprint its "(" while the reconstruction's own ")" never
+// carries its match. Both walk back one loop each, never past a ";" or
+// brace: the hard bound recovery junk cannot cross.
 func (p *xsPrinter) calleeStart(start, to int) int {
 	depth := 0
 
@@ -418,7 +432,7 @@ func (p *xsPrinter) calleeStart(start, to int) int {
 			}
 
 			closer, ok := p.matchBracket(b, '(', ')')
-			if !ok || closer <= start {
+			if !ok || closer <= start || closer > to {
 				return start
 			}
 
@@ -661,8 +675,17 @@ func (p *xsPrinter) warnSlice(s xs.Stmt) (int, bool) {
 // the parser closed after it is outside the extent while the statement's
 // bytes run through it. The unmatched opens are counted over the cut's own
 // code bytes and closed one closer at a time; a source that runs out first
-// keeps the extent's end.
-func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) int {
+// keeps the extent's end. A bracket opening at or past the extent's own
+// end is not the statement's — the empty `{}` a body's last statement can
+// be ends the extent right on its opener — so the walk steps over such
+// pairs whole and spends only a closer nothing out there owns: spending
+// the pair's `}` would close the statement's brace with a block it does
+// not contain and leave the cut ending inside its own body. The second
+// answer reports whether the loop moved the end — it always lands strictly
+// past the extent (the scan starts on the end itself), so the callers can
+// tell a cut that already consumed its own body's closing brace from one
+// stopped short of every brace it owns.
+func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 	end := s.Range.End.Offset
 	depth := 0
 
@@ -677,14 +700,52 @@ func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) int {
 		return false
 	})
 
+	extended := false
+
 	for depth > 0 {
-		closer, ok := p.scanFirst(end, ')', ']', '}')
+		outer := 0
+
+		closer, ok := p.xsFind(end, len(p.src), func(_ int, c byte) bool {
+			switch c {
+			case '(', '[', '{':
+				outer++
+			case ')', ']', '}':
+				if outer > 0 {
+					outer--
+					return false
+				}
+
+				return true
+			}
+
+			return false
+		})
 		if !ok {
 			break
 		}
 
 		end = closer + 1
 		depth--
+		extended = true
+	}
+
+	return end, extended
+}
+
+// emptyBodyEnd extends a verbatim cut's end through an empty body block's
+// brace pair when the extent stops right on its opener: blockEnd has no
+// statement to reach past it, and nothing but the brace may follow an
+// accepted statement's end. Skipping the call is the caller's gate — a cut
+// the closer loop already extended past its own body's brace sits right
+// before a sibling's, and swallowing that one prints the sibling out of
+// another statement's slice and again from its own node.
+func (p *xsPrinter) emptyBodyEnd(end int) int {
+	if open, ok := p.xsFind(end, len(p.src), func(_ int, _ byte) bool {
+		return true
+	}); ok && p.src[open] == '{' {
+		if closer, ok := p.matchBracket(open, '{', '}'); ok {
+			return closer + 1
+		}
 	}
 
 	return end
@@ -695,7 +756,10 @@ func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) int {
 // so only the bytes keep the lost operands — and the warning range is the
 // parser's own record of where the collapsed region sits. The cut opens at
 // the warning (warnSlice), closes through the braces the extent leaves out
-// (warnCutEnd) and keeps the line breaks: a // comment inside must stay
+// (warnCutEnd), through an empty body's pair under the same gate
+// (emptyBodyEnd) — a statement whose body is the zero-width block ends its
+// extent on the brace's opener, and the cut without the pair does not
+// reparse — and keeps the line breaks: a // comment inside must stay
 // line-bound. Comments starting with the cut ride it once — stmt anchors
 // against the slice's start, not the extent's. Declarations join the same
 // family through warnInit, so every level a warning can reach prints its
@@ -706,7 +770,11 @@ func (p *xsPrinter) warnVerbatim(s xs.Stmt) (string, bool) {
 		return "", false
 	}
 
-	end := p.warnCutEnd(from, s)
+	end, extended := p.warnCutEnd(from, s)
+	if !extended {
+		end = p.emptyBodyEnd(end)
+	}
+
 	out := p.blockText(from, end)
 	p.dropBefore(end)
 
@@ -885,8 +953,35 @@ func (p *xsPrinter) openStringVerbatim(from, to int) bool {
 // (openStringVerbatim), a chain whose member name came off a
 // non-identifier token (degenerateExprs) — take the whole line, the bytes
 // being their own fixed point. Trailing line breaks trim: a degenerate
-// name's EOF token ends the extent past the page's own ending.
+// name's EOF token ends the extent past the page's own ending. A grouping
+// the parser dropped can leave the extent ending inside it — the closer
+// sits past it — and the cut follows the closer out, the same discipline
+// the warn family's cuts take (warnCutEnd, warnInit): the line without
+// the pair does not reparse.
 func (p *xsPrinter) declVerbatim(from, to int) {
+	balance := 0
+
+	_, _ = p.xsFind(from, to, func(_ int, c byte) bool {
+		switch c {
+		case '(', '[', '{':
+			balance++
+		case ')', ']', '}':
+			balance--
+		}
+
+		return false
+	})
+
+	for balance > 0 {
+		closer, ok := p.scanFirst(to, ')', ']', '}')
+		if !ok {
+			break
+		}
+
+		to = closer + 1
+		balance--
+	}
+
 	p.line(0, strings.TrimRight(p.blockText(from, to), " \t\r\n"))
 	p.dropBefore(to)
 }
@@ -1305,19 +1400,15 @@ func (p *xsPrinter) stmts(list []xs.Stmt, level int) {
 // would have to synthesize — have no canonical print that reparses, so
 // the bytes are the fixed point. The cut closes through the braces the
 // extent leaves out (warnCutEnd), and through an empty body block's pair
-// when the extent stops right on its opener — blockEnd has no statement
-// to reach past it, and nothing but the brace may follow an accepted
-// statement's end.
+// (emptyBodyEnd) — but only when the closer loop stood still: a cut it
+// already extended past its own body's brace sits right before a
+// sibling's, and the extension would swallow the sibling into this
+// statement's slice while its own node prints it again.
 func (p *xsPrinter) stmtVerbatim(s xs.Stmt, level int) {
 	from := s.Range.Start.Offset
-	end := p.warnCutEnd(from, s)
-
-	if open, ok := p.xsFind(end, len(p.src), func(_ int, _ byte) bool {
-		return true
-	}); ok && p.src[open] == '{' {
-		if closer, ok := p.matchBracket(open, '{', '}'); ok {
-			end = closer + 1
-		}
+	end, extended := p.warnCutEnd(from, s)
+	if !extended {
+		end = p.emptyBodyEnd(end)
 	}
 
 	p.line(level, strings.TrimRight(p.blockText(from, end), " \t\r\n"))
@@ -1911,7 +2002,7 @@ func (p *xsPrinter) unary(e xs.Expr, minPrec int) string {
 // call's "(" — found by walking back from the first argument, or ahead
 // of the extent when there are none — so it never doubles the
 // parenthesis a re-collapse would keep; a grouped callee opens the cut at
-// its own "(" (groupedCalleeStart), or the group's ")" would ride the
+// its own "(" (calleeStart), or the group's ")" would ride the
 // cut while its opener went missing.
 func (p *xsPrinter) call(e xs.Expr) string {
 	callee := e.Callee

@@ -445,6 +445,103 @@ func TestXS_SliceCommentsOnce(t *testing.T) {
 	}
 }
 
+// TestXS_WarnEmptyBody checks the empty-body brace contract on the
+// warning statements whose extent ends on a zero-width block (blockEnd
+// answers the brace's own start): the verbatim cut must carry the body's
+// {} pair — an output that drops it does not reparse. Each row formats,
+// reparses its own output and checks the fixed point, the three
+// properties the fuzz target pins, plus the pair's presence itself.
+func TestXS_WarnEmptyBody(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			// a wrong-arity vector condition over an empty while body
+			name: "while",
+			src:  "void f(){while((0,0)){}}",
+		},
+		{
+			// the same vector in a for header, both sections empty
+			name: "for",
+			src:  "void f(){for((0,0);;){}}",
+		},
+		{
+			// the then pair rides the cut's bytes; the else pair is the
+			// one the extent's end leaves outside
+			name: "if-else",
+			src:  "void f(){if((0,0)){}else{}}",
+		},
+		{
+			// a non-empty then leaves the cut's brackets balanced, so the
+			// empty else pair is the extension's to carry — the gate's
+			// open edge
+			name: "if-else-empty-else",
+			src:  "void f(){if((0,0)){1;}else{}}",
+		},
+		{
+			// a non-empty else turns its brace into the closer loop's own
+			// closer — the gate's closed edge, the pair must not double
+			name: "if-else-empty-then",
+			src:  "void f(){if((0,0)){}else{2;}}",
+		},
+		{
+			// an empty block as the body's last statement ends the extent
+			// right on its opener: the closer loop must step over the
+			// pair whole and still reach the statement's own closing
+			// brace — or the cut ends inside the body
+			name: "nested-empty-block",
+			src:  "void f(){if((0,0)){ {} }}",
+		},
+		{
+			// the same boundary shape with an inner warning if as the
+			// last statement: its empty body's pair is the boundary one
+			name: "nested-if",
+			src:  "void f(){if((0,0)){ if((1,1)){} }}",
+		},
+		{
+			// the while form of the nested-if boundary
+			name: "nested-while",
+			src:  "void f(){while((0,0)){ while((1,1)){} }}",
+		},
+		{
+			// the for form: the body's last statement ends the extent on
+			// its empty body's opener
+			name: "nested-for-if",
+			src:  "void f(){for((0,0);;){ if((1,1)){} }}",
+		},
+		{
+			// both branches of the boundary statement must survive: the
+			// then pair is the boundary one, the else pair rides behind
+			// the statement's own closer
+			name: "nested-if-else",
+			src:  "void f(){if((0,0)){ if((1,1)){}else{} }}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if twice != once || !strings.Contains(once, "{}") {
+				t.Errorf("XS(%q) = %q (reprint %q): empty body braces lost or unstable", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_EOLDominance checks the line-ending contract: the dominant EOL of
 // the input survives to the output, and exactly one final newline closes
 // the document.
