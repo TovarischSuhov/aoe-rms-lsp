@@ -412,8 +412,9 @@ diagnostics (the parse-level refusal, not analyzer findings such as
 unknown-command — those documents format normally) answers
 `[]protocol.TextEdit{}` — an empty slice, not nil, never a JSON-RPC
 error; the client keeps its text and the reason is already visible in
-the published diagnostics. Non-matching documents (e.g. .xs) answer an
-empty slice the same way.
+the published diagnostics. The printer is selected per document by URI
+suffix — .rms and .xs both format in this server; a document in neither
+language answers an empty slice the same way.
 
 ## Cross-file Navigation Results
 
