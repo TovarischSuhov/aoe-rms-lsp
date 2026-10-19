@@ -376,6 +376,246 @@ func xsTokenStart(c byte) bool {
 		strings.IndexByte("+-*/%=<>!&|^~?:;,(){}[].", c) >= 0
 }
 
+// xsIdentStart and xsIdentPart mirror the scanner's identifier rule: a
+// token walk that splits `a.b` differently than the parser did would see
+// member names where the parser saw none — and miss the real ones.
+func xsIdentStart(c byte) bool {
+	return c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+}
+
+func xsIdentPart(c byte) bool {
+	return xsIdentStart(c) || c >= '0' && c <= '9'
+}
+
+// xsNumberEnd returns the exclusive end of the number token starting at i,
+// the scanner's own scanNumber: a hex literal, or a decimal whose
+// fractional dot rides along only with a digit behind it — `1.5` is one
+// token, while the dot of `1.x` belongs to the member operator that
+// follows.
+func xsNumberEnd(src string, i, limit int) int {
+	if src[i] == '0' && i+1 < len(src) && (src[i+1] == 'x' || src[i+1] == 'X') {
+		i += 2
+
+		for i < limit && i < len(src) && xsHexDigit(src[i]) {
+			i++
+		}
+
+		return i
+	}
+
+	for i < limit && i < len(src) && src[i] >= '0' && src[i] <= '9' {
+		i++
+	}
+
+	if i < limit && i+1 < len(src) && src[i] == '.' && src[i+1] >= '0' && src[i+1] <= '9' {
+		i++
+
+		for i < limit && i < len(src) && src[i] >= '0' && src[i] <= '9' {
+			i++
+		}
+	}
+
+	return i
+}
+
+func xsHexDigit(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F'
+}
+
+// xsMultiCharOps mirrors the scanner's own operator spellings (longest
+// first there, order preserved here): a token walk must see `++` as one
+// operator, not as a member name waiting to happen after a dot.
+var xsMultiCharOps = []string{
+	"<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
+	"+=", "-=", "*=", "/=", "%=", "++", "--",
+}
+
+// xsOpLen returns the operator token's length at i, 0 when the byte starts
+// no operator — the single-character set is the scanner's own.
+func xsOpLen(src string, i int) int {
+	for _, op := range xsMultiCharOps {
+		if i+len(op) <= len(src) && src[i:i+len(op)] == op {
+			return len(op)
+		}
+	}
+
+	if strings.IndexByte("+-*/%=<>!&|^~?:;,(){}[].", src[i]) >= 0 {
+		return 1
+	}
+
+	return 0
+}
+
+// xsMemberNames walks the code tokens of [from, to) with the scanner's own
+// discipline — comments and string literals transparent, numbers and
+// identifiers whole, the operator spellings exact — and returns the byte
+// ranges of the member-name tokens that follow a "." operator and are not
+// identifiers. The parser takes any token as the member name (parsePostfix
+// "."), so such a name's bytes have no canonical spelling; a postfix call
+// on the chain then swallows the whole construct into its callee, and the
+// bytes are the degenerate shape's only record — degenerateExprs sees the
+// AST-visible names alone. The ranges also mark the names' brackets as
+// nobody's: a "(" that is a name is not an opener its region owes a closer
+// for.
+func (p *xsPrinter) xsMemberNames(from, to int) []common.Range {
+	src := p.src
+	var names []common.Range
+
+	ci := 0 // first comment not fully passed; the extents are sorted and disjoint
+	afterDot := false
+
+	for i := from; i < to && i < len(src); {
+		for ci < len(p.comments) && p.comments[ci].End.Offset <= i {
+			ci++
+		}
+
+		if ci < len(p.comments) && p.comments[ci].Start.Offset <= i {
+			i = p.comments[ci].End.Offset
+
+			continue // a comment is no token: the name hunt crosses it
+		}
+
+		c := src[i]
+
+		if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
+			i++
+
+			continue // whitespace separates tokens; the hunt crosses it too
+		}
+
+		start := i
+		ident := false
+
+		switch {
+		case c == '"':
+			for i++; i < to && i < len(src); i++ {
+				if src[i] == '\\' && i+1 < len(src) {
+					i++
+
+					continue
+				}
+
+				if src[i] == '"' || src[i] == '\n' {
+					i++
+
+					break
+				}
+			}
+		case xsIdentStart(c):
+			ident = true
+
+			for i < to && i < len(src) && xsIdentPart(src[i]) {
+				i++
+			}
+		case c >= '0' && c <= '9':
+			i = xsNumberEnd(src, i, to)
+		default:
+			n := xsOpLen(src, i)
+
+			if n == 0 {
+				i++ // a byte the scanner skips silently is no token
+
+				continue
+			}
+
+			i += n
+
+			if n == 1 && c == '.' {
+				if afterDot {
+					// the parser's member slot takes the next token
+					// verbatim (parsePostfix): a dot right after a dot
+					// is that name itself, not another separator
+					names = append(names, common.Range{
+						Start: common.Pos{Offset: start},
+						End:   common.Pos{Offset: i},
+					})
+
+					afterDot = false
+
+					continue
+				}
+
+				afterDot = true
+
+				continue
+			}
+		}
+
+		if afterDot && !ident {
+			names = append(names, common.Range{
+				Start: common.Pos{Offset: start},
+				End:   common.Pos{Offset: i},
+			})
+		}
+
+		afterDot = false
+	}
+
+	return names
+}
+
+// inNames reports whether the byte offset falls inside one of the degenerate
+// member-name ranges, advancing the walk's index past the ranges it has
+// already left.
+func inNames(ni *int, i int, names []common.Range) bool {
+	for *ni < len(names) && names[*ni].End.Offset <= i {
+		*ni++
+	}
+
+	return *ni < len(names) && names[*ni].Start.Offset <= i
+}
+
+// xsBracketDepth counts the net bracket depth of [from, to) over code bytes
+// — comments and string literals transparent, the xsFind discipline —
+// stepping over degenerate member names whole.
+func (p *xsPrinter) xsBracketDepth(from, to int, names []common.Range) int {
+	depth := 0
+	ni := 0
+
+	_, _ = p.xsFind(from, to, func(i int, c byte) bool {
+		if inNames(&ni, i, names) {
+			return false
+		}
+
+		switch c {
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		}
+
+		return false
+	})
+
+	return depth
+}
+
+// matchBracketNames is matchBracket over code bytes with the degenerate
+// member names stepped over whole: a name's "(" opens nothing, so its ")"
+// closes nothing either.
+func (p *xsPrinter) matchBracketNames(from int, openB, closeB byte, names []common.Range) (int, bool) {
+	depth := 0
+	ni := 0
+
+	return p.xsFind(from, len(p.src), func(i int, c byte) bool {
+		if inNames(&ni, i, names) {
+			return false
+		}
+
+		switch c {
+		case openB:
+			depth++
+		case closeB:
+			depth--
+			if depth == 0 {
+				return true
+			}
+		}
+
+		return false
+	})
+}
+
 // calleeStart finds where a callee cut opens: the collapsed extent starts
 // inside the groupings the parser drops, so a cut from the extent would
 // keep their ")" bytes while losing their "(". Two shapes carry one: a
@@ -516,6 +756,55 @@ func (p *xsPrinter) matchBracket(from int, openB, closeB byte) (int, bool) {
 
 		return false
 	})
+}
+
+// cutArgsEnd extends a verbatim cut's end through the argument brackets a
+// callee-stopped call left outside the extent: a degenerate member chain
+// ending in a call records only the callee bytes, so the call's own "("
+// sits right at the cut's end — a cut without the pair does not reparse
+// (the synthesized ";" would feed back as the next member name or glue
+// into the "("). The extension stops at a cut that already closed on its
+// own ";" or "}": the first code byte past a complete statement is the
+// next statement's, never this line's. The pair is matched with the
+// degenerate names stepped over — a nested chain's "(" is a name, not an
+// opener (matchBracketNames) — and chains: a call on a call's result owes
+// its own pair too.
+func (p *xsPrinter) cutArgsEnd(from, to int) int {
+	names := p.xsMemberNames(from, len(p.src))
+
+	for {
+		last, ok := p.codeBefore(to)
+		if !ok || p.src[last] == ';' || p.src[last] == '}' {
+			break
+		}
+
+		open, ok := p.xsFind(to, len(p.src), func(_ int, _ byte) bool {
+			return true
+		})
+		if !ok {
+			break
+		}
+
+		var closeB byte
+
+		switch p.src[open] {
+		case '(':
+			closeB = ')'
+		case '[':
+			closeB = ']'
+		default:
+			return to
+		}
+
+		closer, ok := p.matchBracketNames(open, p.src[open], closeB, names)
+		if !ok {
+			break
+		}
+
+		to = closer + 1
+	}
+
+	return to
 }
 
 // collapseWS flattens whitespace outside string literals to single
@@ -674,31 +963,22 @@ func (p *xsPrinter) warnSlice(s xs.Stmt) (int, bool) {
 // switch) end their extent at the last nested statement, so every brace
 // the parser closed after it is outside the extent while the statement's
 // bytes run through it. The unmatched opens are counted over the cut's own
-// code bytes and closed one closer at a time; a source that runs out first
-// keeps the extent's end. A bracket opening at or past the extent's own
-// end is not the statement's — the empty `{}` a body's last statement can
-// be ends the extent right on its opener — so the walk steps over such
-// pairs whole and spends only a closer nothing out there owns: spending
-// the pair's `}` would close the statement's brace with a block it does
-// not contain and leave the cut ending inside its own body. The second
-// answer reports whether the loop moved the end — it always lands strictly
-// past the extent (the scan starts on the end itself), so the callers can
-// tell a cut that already consumed its own body's closing brace from one
-// stopped short of every brace it owns.
+// code bytes — degenerate member names stepped over whole, a name's
+// brackets being its own text (xsBracketDepth) — and closed one closer at
+// a time; a source that runs out first keeps the extent's end. A bracket
+// opening at or past the extent's own end is not the statement's — the
+// empty `{}` a body's last statement can be ends the extent right on its
+// opener — so the walk steps over such pairs whole and spends only a
+// closer nothing out there owns: spending the pair's `}` would close the
+// statement's brace with a block it does not contain and leave the cut
+// ending inside its own body. The second answer reports whether the loop
+// moved the end — it always lands strictly past the extent (the scan
+// starts on the end itself), so the callers can tell a cut that already
+// consumed its own body's closing brace from one stopped short of every
+// brace it owns.
 func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 	end := s.Range.End.Offset
-	depth := 0
-
-	_, _ = p.xsFind(from, end, func(_ int, c byte) bool {
-		switch c {
-		case '(', '[', '{':
-			depth++
-		case ')', ']', '}':
-			depth--
-		}
-
-		return false
-	})
+	depth := p.xsBracketDepth(from, end, p.xsMemberNames(from, end))
 
 	extended := false
 
@@ -759,11 +1039,12 @@ func (p *xsPrinter) emptyBodyEnd(end int) int {
 // (warnCutEnd), through an empty body's pair under the same gate
 // (emptyBodyEnd) — a statement whose body is the zero-width block ends its
 // extent on the brace's opener, and the cut without the pair does not
-// reparse — and keeps the line breaks: a // comment inside must stay
-// line-bound. Comments starting with the cut ride it once — stmt anchors
-// against the slice's start, not the extent's. Declarations join the same
-// family through warnInit, so every level a warning can reach prints its
-// own bytes.
+// reparse — through a callee-stopped call's argument pair (cutArgsEnd),
+// and keeps the line breaks: a // comment inside must stay line-bound.
+// Comments starting with the cut ride it once — stmt anchors against the
+// slice's start, not the extent's. Declarations join the same family
+// through warnInit, so every level a warning can reach prints its own
+// bytes.
 func (p *xsPrinter) warnVerbatim(s xs.Stmt) (string, bool) {
 	from, ok := p.warnSlice(s)
 	if !ok {
@@ -774,6 +1055,8 @@ func (p *xsPrinter) warnVerbatim(s xs.Stmt) (string, bool) {
 	if !extended {
 		end = p.emptyBodyEnd(end)
 	}
+
+	end = p.cutArgsEnd(from, end)
 
 	out := p.blockText(from, end)
 	p.dropBefore(end)
@@ -951,26 +1234,21 @@ func (p *xsPrinter) openStringVerbatim(from, to int) bool {
 // declVerbatim prints a declaration line as its own bytes: the shapes with
 // no canonical print that reparses — an unterminated literal
 // (openStringVerbatim), a chain whose member name came off a
-// non-identifier token (degenerateExprs) — take the whole line, the bytes
-// being their own fixed point. Trailing line breaks trim: a degenerate
-// name's EOF token ends the extent past the page's own ending. A grouping
-// the parser dropped can leave the extent ending inside it — the closer
-// sits past it — and the cut follows the closer out, the same discipline
-// the warn family's cuts take (warnCutEnd, warnInit): the line without
-// the pair does not reparse.
+// non-identifier token (degenerateExprs, degenerateRange) — take the whole
+// line, the bytes being their own fixed point. Trailing line breaks trim:
+// a degenerate name's EOF token ends the extent past the page's own
+// ending. A grouping the parser dropped can leave the extent ending inside
+// it — the closer sits past it — and the cut follows the closer out, the
+// same discipline the warn family's cuts take (warnCutEnd, warnInit); the
+// balance counts degenerate member names as no region's brackets, and a
+// callee-stopped call's argument pair — sitting right at the extent's end
+// — rides ahead of it (cutArgsEnd): the line without its pair does not
+// reparse.
 func (p *xsPrinter) declVerbatim(from, to int) {
-	balance := 0
+	to = p.cutArgsEnd(from, to)
 
-	_, _ = p.xsFind(from, to, func(_ int, c byte) bool {
-		switch c {
-		case '(', '[', '{':
-			balance++
-		case ')', ']', '}':
-			balance--
-		}
-
-		return false
-	})
+	names := p.xsMemberNames(from, to)
+	balance := p.xsBracketDepth(from, to, names)
 
 	for balance > 0 {
 		closer, ok := p.scanFirst(to, ')', ']', '}')
@@ -1058,9 +1336,10 @@ func (p *xsPrinter) declGroup(group []xs.Decl) {
 	}
 
 	// so does a degenerate member name: its bytes are the line's own
-	// fixed point (degenerateExprs)
+	// fixed point (degenerateExprs, degenerateRange — the swallowed
+	// chains the AST no longer records)
 	for _, d := range group {
-		if len(d.Body) > 0 && degenerateExprs(d.Body[0].Exprs) {
+		if len(d.Body) > 0 && degenerateExprs(d.Body[0].Exprs) || p.degenerateRange(d.Range) {
 			p.declVerbatim(group[0].Range.Start.Offset, group[len(group)-1].Range.End.Offset)
 
 			return
@@ -1173,7 +1452,7 @@ func (p *xsPrinter) extern(d xs.Decl) {
 			return
 		}
 
-		if len(d.Body) > 0 && degenerateExprs(d.Body[0].Exprs) {
+		if len(d.Body) > 0 && degenerateExprs(d.Body[0].Exprs) || p.degenerateRange(d.Range) {
 			p.declVerbatim(d.Range.Start.Offset, d.Range.End.Offset)
 
 			return
@@ -1212,7 +1491,7 @@ func (p *xsPrinter) variable(d xs.Decl) {
 		return
 	}
 
-	if len(d.Body) > 0 && degenerateExprs(d.Body[0].Exprs) {
+	if len(d.Body) > 0 && degenerateExprs(d.Body[0].Exprs) || p.degenerateRange(d.Range) {
 		p.declVerbatim(d.Range.Start.Offset, d.Range.End.Offset)
 
 		return
@@ -1372,7 +1651,12 @@ func (p *xsPrinter) include(d xs.Decl) {
 		}
 	}
 
-	p.line(0, collapseWS(p.cutBytes(from, end)))
+	// a lone trailing \r is the page-ending artifact an unterminated
+	// literal carries out of its line (blockText's own rule): the scanner
+	// re-absorbs it into the token on the reparse, while letting it ride
+	// would glue the page's fresh ending after it and grow the line every
+	// pass
+	p.line(0, strings.TrimRight(collapseWS(p.cutBytes(from, end)), "\r"))
 	p.dropBefore(end)
 }
 
@@ -1399,17 +1683,36 @@ func (p *xsPrinter) stmts(list []xs.Stmt, level int) {
 // header the parser took without the parentheses its canonical print
 // would have to synthesize — have no canonical print that reparses, so
 // the bytes are the fixed point. The cut closes through the braces the
-// extent leaves out (warnCutEnd), and through an empty body block's pair
+// extent leaves out (warnCutEnd), through an empty body block's pair
 // (emptyBodyEnd) — but only when the closer loop stood still: a cut it
 // already extended past its own body's brace sits right before a
 // sibling's, and the extension would swallow the sibling into this
-// statement's slice while its own node prints it again.
+// statement's slice while its own node prints it again — and through a
+// callee-stopped call's argument pair (cutArgsEnd). The extent starts on
+// the operand a dropped grouping wrapped, so the cut opens at the
+// grouping's own "(" (calleeStart): without it the closing ")" would
+// arrive unowned and end the statement early.
 func (p *xsPrinter) stmtVerbatim(s xs.Stmt, level int) {
-	from := s.Range.Start.Offset
-	end, extended := p.warnCutEnd(from, s)
+	end, extended := p.warnCutEnd(s.Range.Start.Offset, s)
 	if !extended {
 		end = p.emptyBodyEnd(end)
 	}
+
+	end = p.cutArgsEnd(s.Range.Start.Offset, end)
+
+	if end <= s.Range.Start.Offset {
+		// a subject-less switch with an empty body carries a zero-width
+		// extent — the keyword is all the AST kept, its block sits past
+		// it, and an empty cut prints an indent-only line the next pass
+		// drops: the cut takes the block whole
+		if open, ok := p.scanFirst(s.Range.Start.Offset, '{'); ok {
+			if closer, ok := p.matchBracket(open, '{', '}'); ok {
+				end = closer + 1
+			}
+		}
+	}
+
+	from := p.calleeStart(s.Range.Start.Offset, end)
 
 	p.line(level, strings.TrimRight(p.blockText(from, end), " \t\r\n"))
 	p.dropBefore(end)
@@ -1446,9 +1749,11 @@ func (p *xsPrinter) stmt(s xs.Stmt, level int) {
 
 	// a chain with a degenerate member name takes the whole statement:
 	// the name's own bytes are what keeps the reparse from feeding the
-	// synthesized ";" back as the name (degenerateExprs). A for loop's
-	// typed init prints inside the header, so its expressions count too
-	if degenerateExprs(s.Exprs) ||
+	// synthesized ";" back as the name (degenerateExprs) — and a chain a
+	// trailing call swallowed into its callee left the AST clean, so the
+	// extent's bytes answer too (degenerateRange). A for loop's typed
+	// init prints inside the header, so its expressions count too
+	if degenerateExprs(s.Exprs) || p.degenerateRange(s.Range) ||
 		(s.Kind == xs.StmtFor && len(s.Body) > 0 && degenerateExprs(s.Body[0].Exprs)) {
 		p.stmtVerbatim(s, level)
 
@@ -1909,7 +2214,9 @@ func identText(text string) bool {
 // bytes — a ";", a number — into whatever the page prints next, while a
 // cut without the name would feed the synthesized ";" back as the name
 // and eat the head of what follows. The construct prints as its own
-// bytes instead (stmtVerbatim, declVerbatim).
+// bytes instead (stmtVerbatim, declVerbatim). The check walks the AST
+// alone: a chain a postfix call swallowed into its callee left no nodes
+// behind — degenerateRange reads those from the bytes.
 func degenerateExprs(list []xs.Expr) bool {
 	for _, e := range list {
 		if e.Kind == xs.ExprBinary && e.Value == "." && len(e.Children) == 2 &&
@@ -1923,6 +2230,15 @@ func degenerateExprs(list []xs.Expr) bool {
 	}
 
 	return false
+}
+
+// degenerateRange reports whether the region's code tokens carry a member
+// name that is not an identifier — degenerateExprs' byte twin over the
+// statement's own extent: a degenerate chain capped by a postfix call
+// dies inside the callee (the Call node keeps the name alone), so the
+// bytes are the shape's only record there.
+func (p *xsPrinter) degenerateRange(r common.Range) bool {
+	return len(p.xsMemberNames(r.Start.Offset, r.End.Offset)) > 0
 }
 
 // paren wraps out when its binding power is below the context minimum —

@@ -542,6 +542,255 @@ func TestXS_WarnEmptyBody(t *testing.T) {
 	}
 }
 
+// TestXS_DegenerateChains checks the degenerate member-name contract: a
+// chain whose name after "." came off a non-identifier token has no
+// canonical spelling, so the construct prints as a byte-exact slice of its
+// own source. The swallowed shape is the crux — a postfix call on the
+// chain replaces the nodes with one Call whose callee name is empty, so
+// the AST-based gate alone sees nothing and the canonical fallback glues
+// the callee cut with synthesized "()" into output that no longer parses.
+// The structural-closer rows pin the other half: a name's "(" is not an
+// opener, so the verbatim cuts must not spend the body's "}" closing it.
+// Each row formats, requires the slice's bytes in the output, reparses
+// the output and checks the fixed point — the fuzz target's properties.
+func TestXS_DegenerateChains(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		src   string
+		slice string
+	}{
+		{
+			// two degenerate names deep, the trailing empty-args call
+			// swallowing the chain into its callee; the initializer
+			// declaration carries it
+			name:  "decl-vector",
+			src:   "vector A=(0).(.(()",
+			slice: "vector A=(0).(.(()",
+		},
+		{
+			// the same shape on a plain int initializer
+			name:  "decl-int",
+			src:   "int A=(0).(.(()",
+			slice: "int A=(0).(.(()",
+		},
+		{
+			// the extern initializer form of the same chain
+			name:  "decl-extern",
+			src:   "extern int A=(0).(.(();",
+			slice: "extern int A=(0).(.(();",
+		},
+		{
+			// a comma-adjacent declarator group rides one line; the
+			// swallowed chain belongs to its last declarator
+			name:  "decl-group",
+			src:   "int a=1, b=(0).(.(();",
+			slice: "int a=1, b=(0).(.(();",
+		},
+		{
+			// the assignment statement form: the statement extent reaches
+			// its own ";", the chain bytes stay whole
+			name:  "stmt-assign",
+			src:   "void f(){x=(0).(.(();}",
+			slice: "x=(0).(.(();",
+		},
+		{
+			// the bare statement starts on the operand a dropped grouping
+			// wrapped: the cut must open at the grouping's own "(" or its
+			// ")" arrives unowned
+			name:  "stmt-bare-grouped",
+			src:   "void f(){(0).(.(();}",
+			slice: "(0).(.(();",
+		},
+		{
+			// no ";" behind the call: the expectSemi recovery leaves the
+			// argument pair outside the extent and the cut follows it out
+			name:  "stmt-callee-stopped",
+			src:   "void f(){x=(0).(.(()}",
+			slice: "x=(0).(.(()",
+		},
+		{
+			// a single degenerate name: the pinned neighbor of the
+			// swallowed family, now byte-exact like its deeper kin
+			name:  "decl-one-name",
+			src:   "vector A=(0).(()",
+			slice: "vector A=(0).(()",
+		},
+		{
+			// degenerate names nested inside the swallowed call's
+			// arguments: the pair matching steps over them
+			name:  "nested-names",
+			src:   "vector A=(0).((0).(()",
+			slice: "vector A=(0).((0).(()",
+		},
+		{
+			// the name's "(" must not count as an opener: the body's
+			// closing brace is the block's own, never the slice's
+			name:  "stmt-closer-theft",
+			src:   "void A(){0.( }",
+			slice: "0.(",
+		},
+		{
+			// a warning statement carrying a degenerate name: the warn
+			// cut's closer accounting takes the same name discipline
+			name:  "warn-chain",
+			src:   "void f(){x=(0,0).(()}",
+			slice: "x=(0,0).(()",
+		},
+		{
+			// a dot right after a dot is the member name itself (the
+			// parser's slot takes the next token verbatim) and the call
+			// after it swallows the chain: the mirror reading the second
+			// dot as another separator turns the call's "(" into a
+			// nobody's name and the output stops parsing
+			name:  "decl-dot-dot",
+			src:   "vector A=(0)..((0))",
+			slice: "vector A=(0)..((0))",
+		},
+		{
+			// the bare-statement form of the dot-dot chain: the cut opens
+			// on the grouping's own "(" with the name-dot accounted
+			name:  "stmt-dot-dot",
+			src:   "void f(){(0)..((0));}",
+			slice: "(0)..((0));",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			if !strings.Contains(once, tt.slice) {
+				t.Errorf("XS(%q) = %q: the construct's own bytes are not a byte-exact slice of the output", tt.src, once)
+			}
+
+			_, diags := xs.XsParse(once, "")
+			for _, d := range diags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not idempotent: first pass %q, second pass %q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
+// TestXS_ZeroExtentSwitch checks the zero-width-extent switch contract: a
+// subject-less switch with an empty body keeps only its keyword in the
+// AST — the extent starts and ends on it while the block sits past — and
+// a verbatim cut without the block prints an indent-only line the next
+// pass drops. Each row pins the block's presence, the reparse and the
+// fixed point; the case-label row pins the closer loop's own path, where
+// the switch's "{" already counts inside the extent.
+func TestXS_ZeroExtentSwitch(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		src   string
+		slice string
+	}{
+		{
+			name:  "empty-body",
+			src:   "void A(){switch{}}",
+			slice: "switch{}",
+		},
+		{
+			// a sibling statement behind the empty block: the cut must
+			// stop at the block's own closer
+			name:  "empty-body-with-sibling",
+			src:   "void f(){switch{}x=1;}",
+			slice: "switch{}",
+		},
+		{
+			// a case label ends the extent past the "{", so the closer
+			// loop spends the "}" — the shape that already worked
+			name:  "case-only-body",
+			src:   "void f(){switch{case 1:}}",
+			slice: "switch{case 1:}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			if !strings.Contains(once, tt.slice) {
+				t.Errorf("XS(%q) = %q: the switch's own bytes are not a byte-exact slice of the output", tt.src, once)
+			}
+
+			_, diags := xs.XsParse(once, "")
+			for _, d := range diags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not idempotent: first pass %q, second pass %q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
+// TestXS_IncludeTrailingCR checks the include line's page-ending rule: a
+// lone \r an unterminated literal carries out of its line is the page's
+// own artifact, not the string's content — the scanner re-absorbs it into
+// the token on the reparse, so the printed line trims it and stays a
+// fixed point instead of growing one \r per pass.
+func TestXS_IncludeTrailingCR(t *testing.T) {
+	t.Parallel()
+
+	tests := []string{
+		"include\"\r",
+		"include \"a\r",
+	}
+
+	for _, src := range tests {
+		t.Run(fmt.Sprintf("%q", src), func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%q", err, once)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not idempotent: first pass %q, second pass %q", src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_EOLDominance checks the line-ending contract: the dominant EOL of
 // the input survives to the output, and exactly one final newline closes
 // the document.

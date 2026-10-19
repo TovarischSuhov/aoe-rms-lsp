@@ -51,6 +51,9 @@ func FuzzXS(f *testing.F) {
 	f.Add(`void f(){while((0,0)){ while((1,1)){} }}`)
 	f.Add(`void f(){for((0,0);;){ if((1,1)){} }}`)
 	f.Add(`void f(){if((0,0)){ if((1,1)){}else{} }}`)
+	f.Add(`vector A=(0).(.(()`)
+	f.Add(`vector A=(0)..((0))`)
+	f.Add(`void A(){0.( }`)
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")
