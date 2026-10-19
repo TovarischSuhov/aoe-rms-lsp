@@ -68,9 +68,23 @@ RMS additionally:
 
 XS additionally:
 - The formatted output reparses without error diagnostics, and its
-  tree is structurally equal to the input's. The XS convergence
-  contract has no known escapes: an XS divergence is a finding to
-  report, not to mask with a third pass.
+  tree is structurally equal to the input's.
+- Convergence has one documented open escape class — a doubled
+  synthesized `;` in warnInit (an unpaired bracket inside an
+  initializer block literal keeps the balance positive, the
+  separator search sees no `;` at zero depth and the cut swallows
+  the synthesized semicolon; repro `vector A=(0,0)%{(0}`). The
+  output grows pass over pass — no later pass converges, unlike
+  the RMS escapes. An XS divergence outside the open class is a
+  finding to report: not a bug in your calling code, not something
+  to mask with a third pass. Inputs hitting the open class never
+  enter the FuzzXS seed corpus — the seed corpus must stay green
+  (a diverging corpus .xs is removed from the sample, not pinned
+  as a seed). The include-CR escape (#150) is closed in the same
+  #120 change-set that introduced this printer: p.include trims
+  the lone trailing \r an unterminated include-path literal
+  carries out of its line — blockText's page-ending rule — pinned
+  by the TestXS_IncludeTrailingCR rows.
 
 The contracts are pinned by FuzzXS (any accepted input must reparse
 and be idempotent; seeds: golden fixtures, the .corpus sample, pinned

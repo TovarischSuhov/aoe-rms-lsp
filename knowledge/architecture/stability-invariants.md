@@ -16,6 +16,7 @@ sources:
   - resource: internal/format/fuzz_test.go
   - resource: internal/format/invariants_test.go
   - resource: internal/format/xs_invariants_test.go
+  - resource: internal/format/xs_test.go
   - resource: .goga/history/2026/task-format-unclosed-block/task.md
   - resource: .goga/history/2026/task-rms-operand-failure-diags/design.md
 generated:
@@ -26,6 +27,8 @@ verified:
     at: 2026-10-19T00:00:00Z
   - by: claude-code/claude-opus-4-6
     at: 2026-10-19T00:00:00Z
+  - by: claude-code/claude-opus-4-6
+    at: 2026-10-19T18:57:00Z
 ---
 
 # Инварианты стабильности
@@ -111,14 +114,20 @@ verified:
   пропуском чужих пар в closer-цикле (`internal/format/xs.go`), пины —
   nested-* ряды `TestXS_WarnEmptyBody` и сиды `FuzzXS`; расширение
   пустого тела гейтится «closer-цикл не двигал конец», иначе verbatim-срез
-  глотает соседний блок. Открытые escape-классы: include-CR (`include"\r`
-  — непарная `\r` внутри незакрытого литерала include-пути сохраняется
-  `collapseWS` и наращивается хвостовым EOL по проходам; фикс — в
-  `p.include`, по образцу blockText) и двойной `;` в `warnInit`
-  (`vector A=(0,0)%{(0}` — непарная скобка внутри блок-литерала
-  инициализатора держит баланс положительным, поиск разделителя не видит
-  `;` на нулевой глубине, cut захватывает синтезированную точку с запятой
-  и второй проход удваивает её; фикс — в `warnInit`).
+  глотает соседний блок. include-CR (#150; `include"\r` — непарная `\r`
+  внутри незакрытого литерала include-пути сохранялась `collapseWS` и
+  наращивалась хвостовым EOL по проходам) — закрыт 2026-10-19 тем же
+  изменением XS-принтера (задача #120): `p.include` урезает одиночный
+  хвостовой `\r` по правилу blockText — это page-ending-артефакт
+  строки, а не содержимое литерала, сканер на reparse впитывает его
+  обратно в токен; пины — ряды `TestXS_IncludeTrailingCR`
+  (`internal/format/xs_test.go`), закрытие перепроверено claude-code
+  на дереве задачи #120. Открытый escape-класс (единственный):
+  двойной `;` в `warnInit` (`vector A=(0,0)%{(0}` — непарная скобка
+  внутри блок-литерала инициализатора держит баланс положительным,
+  поиск разделителя не видит `;` на нулевой глубине, cut захватывает
+  синтезированную точку с запятой и второй проход удваивает её;
+  фикс — в `warnInit`).
   knownDivergent сознательно
   не перенесён (XS-расхождение — находка для репорта, а не повод для
   третьего прохода), механика финального якоря против #126-класса
@@ -135,7 +144,8 @@ verified:
   комментарии-один-раз, EOL-доминирование; золотые фикстуры + принятая
   часть корпуса). Пины: `TestXS_Invariant*`, `TestXS_WarnEmptyBody`
   (warning-вербатим с пустым телом обязан нести пару `{}` — без неё
-  вывод не репарсится), `TestXS_RefusalOnError`.
+  вывод не репарсится), `TestXS_IncludeTrailingCR`,
+  `TestXS_RefusalOnError`.
 - **Незакрытый-до-EOF `/*` не якорится перед синтезом.** Комментарий без
   `*/`, чей экстент кончается на EOF, проглатывает на reparse любой
   закрыватель, напечатанный после его начала, — поэтому принтер не
