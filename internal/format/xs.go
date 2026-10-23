@@ -1015,16 +1015,34 @@ func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 // emptyBodyEnd extends a verbatim cut's end through an empty body block's
 // brace pair when the extent stops right on its opener: blockEnd has no
 // statement to reach past it, and nothing but the brace may follow an
-// accepted statement's end. Skipping the call is the caller's gate — a cut
-// the closer loop already extended past its own body's brace sits right
-// before a sibling's, and swallowing that one prints the sibling out of
-// another statement's slice and again from its own node.
-func (p *xsPrinter) emptyBodyEnd(end int) int {
-	if open, ok := p.xsFind(end, len(p.src), func(_ int, _ byte) bool {
-		return true
-	}); ok && p.src[open] == '{' {
-		if closer, ok := p.matchBracket(open, '{', '}'); ok {
-			return closer + 1
+// accepted statement's end. The brace must belong to the statement — a
+// StmtBlock opening exactly at the end, reached down the brace-less body
+// chain the extent runs through (the zero-width block of an
+// `if (v(1,2,3,4)) while (c)` chain stops the if's own extent on its
+// opener just the same). Stopping on a `{` is not ownership: a `while;`
+// ends its extent on the sibling block's opener exactly where those
+// chains end it on their body's, and only the AST tells them apart —
+// swallowing the sibling prints it out of another statement's slice and
+// again from its own node, growing the document every pass (fuzz crasher
+// 6481cc9454be3769), while cutting short of an owned one loses its bytes.
+// Skipping the call is the caller's gate — a cut the closer loop already
+// extended past its own body's brace sits right before a sibling's.
+func (p *xsPrinter) emptyBodyEnd(s xs.Stmt, end int) int {
+	for _, b := range s.Body {
+		if b.Kind == xs.StmtBlock && b.Range.Start.Offset == end {
+			if closer, ok := p.matchBracket(end, '{', '}'); ok {
+				return closer + 1
+			}
+		}
+
+		// every element ending on the end descends — a brace-less chain
+		// carries the statement's extent on its innermost body's end, and
+		// the owner block can sit levels below (or beside a zero-width
+		// block ending on the same offset)
+		if b.Range.End.Offset == end {
+			if out := p.emptyBodyEnd(b, end); out != end {
+				return out
+			}
 		}
 	}
 
@@ -1039,8 +1057,13 @@ func (p *xsPrinter) emptyBodyEnd(end int) int {
 // (warnCutEnd), through an empty body's pair under the same gate
 // (emptyBodyEnd) — a statement whose body is the zero-width block ends its
 // extent on the brace's opener, and the cut without the pair does not
-// reparse — through a callee-stopped call's argument pair (cutArgsEnd),
-// and keeps the line breaks: a // comment inside must stay line-bound.
+// reparse — through a callee-stopped call's argument pair (cutArgsEnd) —
+// and rolls back to the dropped grouping's own "(" (calleeStart): the
+// extent starts inside the groupings the parser drops, so a cut opening
+// on the warning keeps their ")" bytes while losing their "(" — the outer
+// grouping's opener must survive, the same walk stmtVerbatim does, taken
+// only while the widened cut keeps its own brackets net non-positive. The
+// cut keeps the line breaks: a // comment inside must stay line-bound.
 // Comments starting with the cut ride it once — stmt anchors against the
 // slice's start, not the extent's. Declarations join the same family
 // through warnInit, so every level a warning can reach prints its own
@@ -1053,10 +1076,21 @@ func (p *xsPrinter) warnVerbatim(s xs.Stmt) (string, bool) {
 
 	end, extended := p.warnCutEnd(from, s)
 	if !extended {
-		end = p.emptyBodyEnd(end)
+		end = p.emptyBodyEnd(s, end)
 	}
 
 	end = p.cutArgsEnd(from, end)
+
+	// the final end bounds the walk back, so it runs strictly after
+	// cutArgsEnd — same order as stmtVerbatim. The walk-back is taken only
+	// when the cut it widens keeps its own brackets net non-positive: the
+	// immediate-group branch of calleeStart can land on a group whose ")"
+	// sits exactly at the cut's end — outside it — and a cut keeping that
+	// opener prints an unowned "(" for the next line to close, the mirror
+	// of the unowned ")" the walk exists to fix.
+	if back := p.calleeStart(from, end); p.xsBracketDepth(back, end, nil) <= 0 {
+		from = back
+	}
 
 	out := p.blockText(from, end)
 	p.dropBefore(end)
@@ -1695,7 +1729,7 @@ func (p *xsPrinter) stmts(list []xs.Stmt, level int) {
 func (p *xsPrinter) stmtVerbatim(s xs.Stmt, level int) {
 	end, extended := p.warnCutEnd(s.Range.Start.Offset, s)
 	if !extended {
-		end = p.emptyBodyEnd(end)
+		end = p.emptyBodyEnd(s, end)
 	}
 
 	end = p.cutArgsEnd(s.Range.Start.Offset, end)

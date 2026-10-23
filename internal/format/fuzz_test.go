@@ -54,6 +54,22 @@ func FuzzXS(f *testing.F) {
 	f.Add(`vector A=(0).(.(()`)
 	f.Add(`vector A=(0)..((0))`)
 	f.Add(`void A(){0.( }`)
+	f.Add(`void A(){((0,0));}`)
+	f.Add(`void A(){(((0,0)));}`)
+	// the zero-extent sibling crasher 6481cc9454be3769: the block behind
+	// the while's empty body must print once; the bare pair is refused at
+	// top level — the refusal path must stay panic-free too
+	f.Add(`int A(){{while;{}}}`)
+	f.Add(`while;{}`)
+	// the decl-path sibling crasher df7bb1183f5bb08 and its content
+	// variant: a rule header whose verbatim cut overruns its own extent
+	// drags the next declaration into the print — one extra rule block
+	// per format pass until fixed (TestXS_DeclAdjacentOnce pins the
+	// sibling-once shape)
+	f.Add(`rule """""""""0000000
+({}rule {}`)
+	f.Add(`rule """""""""0000000
+({}rule R {int x=1;}`)
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")

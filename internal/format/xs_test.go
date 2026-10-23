@@ -542,6 +542,65 @@ func TestXS_WarnEmptyBody(t *testing.T) {
 	}
 }
 
+// TestXS_WarnGroupedVectorStmt checks the grouped wrong-arity vector
+// contract: a bare statement whose vector rides inside dropped groupings
+// keeps every wrapping "(" in its verbatim cut — a cut opening on the
+// warning's own start leaves the group's ")" behind unowned and the
+// output stops parsing. Each row formats (the warning is accepted, never
+// refused), reparses its own output, checks the fixed point and the
+// grouping's presence — the fuzz target's properties plus the bytes the
+// AST alone cannot keep.
+func TestXS_WarnGroupedVectorStmt(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			// the fuzz crasher: one dropped grouping around the vector
+			name: "single-group",
+			src:  "void A(){((0,0));}",
+		},
+		{
+			// two groupings: the cut must open two parens back
+			name: "double-group",
+			src:  "void A(){(((0,0)));}",
+		},
+		{
+			// depth is parametric: every layer's "(" is its own to lose
+			name: "triple-group",
+			src:  "void A(){((((0,0))));}",
+		},
+		{
+			// whitespace inside the body: the gap between the body brace
+			// and the grouping still lies in the cut's reach
+			name: "space-before-group",
+			src:  "void A(){ ((0,0)); }",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS refused a warning-only input: %v", err)
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if twice != once || !strings.Contains(once, "((0,0))") {
+				t.Errorf("XS(%q) = %q (reprint %q): outer grouping lost or unstable", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_DegenerateChains checks the degenerate member-name contract: a
 // chain whose name after "." came off a non-identifier token has no
 // canonical spelling, so the construct prints as a byte-exact slice of its
@@ -838,6 +897,251 @@ func TestXS_EOLDominance(t *testing.T) {
 
 			if !dominant || !single {
 				t.Errorf("XS EOL handling:\n--- src ---\n%q\n--- out ---\n%q\n(dominant=%v, single-final=%v)", tt.src, out, dominant, single)
+			}
+		})
+	}
+}
+
+// TestXS_ZeroExtentSiblingOnce checks the zero-extent sibling contract: a
+// block the parser records with a zero-width extent (blockEnd finds an
+// empty body, so the extent ends on the block's own opener) standing right
+// behind a statement whose verbatim cut emptyBodyEnd widens through the
+// pair must print exactly once — through the cut or through its own
+// StmtBlock node, never both. The crasher row is the fuzz finding: every
+// pass printed the sibling twice, growing the document by one block. The
+// warn-chain rows pin the other half of the ownership walk: the zero-width
+// block owning a warning-carrying statement's extent can sit levels down a
+// brace-less body chain, and a cut that stops short of it loses its bytes —
+// the output must keep the whole chain and stay idempotent. The structural
+// assert is the primary discriminator: the doubling reparses without error
+// diagnostics and is byte-stable from the second pass on, so the reparse
+// check and the fixed point alone accept it — and a {} substring count
+// cannot see the synthesized node either, StmtBlock prints its braces on
+// separate lines.
+func TestXS_ZeroExtentSiblingOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			// the fuzz crasher 6481cc9454be3769: the sibling hides
+			// behind the while's empty body inside a declaration
+			name: "crasher",
+			src:  "int A(){{while;{}}}",
+		},
+		{
+			// the pair straight in a function body: the doubling does
+			// not need the crasher's extra nesting block (a truly bare
+			// top-level `while;{}` is refused before the printer runs —
+			// top level takes declarations only)
+			name: "body-while",
+			src:  "void A(){while;{}}",
+		},
+		{
+			// the ownership walk must descend: a wrong-arity vector in
+			// the head of a brace-less body chain leaves the chain's
+			// zero-width block levels below the warning-carrying
+			// statement, and a cut stopping short of it loses the pair —
+			// the output dropped the inner braces and no longer parsed.
+			// One warning per row is the parser's own verdict, the
+			// shapes stay accepted
+			name: "warn-chain-if-while",
+			src:  "void A(){if((1,2,3,4))while(c){}}",
+		},
+		{
+			name: "warn-chain-if-else-if",
+			src:  "void A(){if((1,2,3,4)){}else if(c){}}",
+		},
+		{
+			name: "warn-chain-if-if",
+			src:  "void A(){if((1,2,3,4))if(c){}}",
+		},
+		{
+			name: "warn-chain-while-while",
+			src:  "void A(){while((1,2,3,4))while(c){}}",
+		},
+		{
+			name: "warn-chain-for-while",
+			src:  "void A(){for(;(1,2,3,4);)while(c){}}",
+		},
+		{
+			name: "warn-chain-if-else-while",
+			src:  "void A(){if((1,2,3,4)){}else while(c){}}",
+		},
+		{
+			name: "warn-chain-if-for",
+			src:  "void A(){if((1,2,3,4))for(;;){}}",
+		},
+		{
+			name: "warn-chain-do-while",
+			src:  "void A(){do while((1,2,3,4)){}}",
+		},
+		{
+			// depth three: the walk crosses two brace-less bodies
+			name: "warn-chain-if-while-for",
+			src:  "void A(){if((1,2,3,4))while(c)for(;;){}}",
+		},
+		{
+			name: "warn-chain-if-elseif-while",
+			src:  "void A(){if((1,2,3,4)){}else if(c)while(d){}}",
+		},
+		{
+			// the do loop's accepted forms pin today's contract: the
+			// loop keeps its own closer after the body (`do{}while;`)
+			// or ends without one (`do;`, `do{}`) — none of them
+			// leaves a zero-extent sibling behind the body's extent
+			// for a cut to swallow
+			name: "do-while-empty-cond",
+			src:  "void A(){do{}while;}",
+		},
+		{
+			name: "do-empty-stmt-body",
+			src:  "void A(){do;}",
+		},
+		{
+			name: "do-block-body",
+			src:  "void A(){do{}}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			want, _ := xs.XsParse(tt.src, "")
+			got, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(want), xsTreeShape(got)); diff != "" || twice != once {
+				t.Errorf("XS(%q) prints the zero-extent sibling twice or grows:\n%s\n--- once ---\n%q\n--- twice ---\n%q", tt.src, diff, once, twice)
+			}
+		})
+	}
+
+	t.Run("do-with-sibling-refused", func(t *testing.T) {
+		t.Parallel()
+
+		// `do;` spends the loop's own `;` on the empty body statement,
+		// so the `{` behind it reports the parser error: the formatter
+		// cannot accept what the parser rejects — the do-plus-sibling
+		// shape refuses instead of printing, and the tie below keeps an
+		// implementation that refuses everything from passing
+		src := "void A(){do;{}}"
+
+		_, err := XS(src, Options{TabSize: 4})
+		if !errors.Is(err, ErrParseErrors) {
+			t.Fatalf("XS(%q) error = %v, want ErrParseErrors", src, err)
+		}
+
+		_, diags := xs.XsParse(src, "")
+
+		errs := 0
+
+		for _, d := range diags {
+			if d.Severity == common.SeverityError {
+				errs++
+			}
+		}
+
+		require.Positive(t, errs, "xs.XsParse(%q) diagnostics = %v, want at least one error", src, diags)
+	})
+}
+
+// TestXS_DeclAdjacentOnce checks the decl-path sibling contract: a rule
+// declaration printed through its verbatim header cut must own only its
+// own extent — the cut stops at the rule's closing brace, and the next
+// top-level declaration prints once through its own Decl, never both.
+// The crasher row is the fuzz finding df7bb1183f5bb08: the junk-string
+// header's cut ran through the neighbor rule's opener and body, and the
+// neighbor then printed again canonically — every format pass appended
+// one more rule block and the document grew without bound. The structural
+// assert is the primary discriminator: the duplicate reparses without
+// error diagnostics and the document is byte-stable from the second pass
+// on, so reparse and fixed point alone accept it. The count pins are
+// calibrated on the expected sibling-once fix shape: the input's two rule
+// keywords are the whole budget of the fixed output — today's output
+// carries a third (a fresh copy of the neighbor per pass), so the pins
+// are red until the fix lands and pin the growth, not today's bytes.
+func TestXS_DeclAdjacentOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		src   string
+		rules int
+	}{
+		{
+			// the fuzz crasher df7bb1183f5bb08: the neighbor is an empty
+			// rule whose body the cut swallows wholesale
+			name: "crasher",
+			src: `rule """""""""0000000
+({}rule {}`,
+			rules: 2,
+		},
+		{
+			// the same class with content in the neighbor: the duplicate
+			// carries the neighbor's body, so the growth reaches the
+			// declaration shape too
+			name: "adj5",
+			src: `rule """""""""0000000
+({}rule R {int x=1;}`,
+			rules: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			want, _ := xs.XsParse(tt.src, "")
+			got, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(want), xsTreeShape(got)); diff != "" || twice != once {
+				t.Errorf("XS(%q) prints the adjacent rule twice or grows:\n%s\n--- once ---\n%q\n--- twice ---\n%q", tt.src, diff, once, twice)
+			}
+
+			// calibrated on the sibling-once fix shape: two rule
+			// declarations in, two rule keywords out — the doubling pass
+			// printed a third
+			if n := strings.Count(once, "rule"); n != tt.rules {
+				t.Errorf("XS(%q) output carries %d rule declarations, want %d:\n%s", tt.src, n, tt.rules, once)
 			}
 		})
 	}
