@@ -119,6 +119,23 @@ elevation/terrain: значит на `create_object` они, скорее все
 Паттерн очевиден: авторы копируют атрибуты между `create_land` /
 `create_terrain` / `create_elevation` / `create_object` — движок глотает.
 
+### Кураторство (слот nuance-object-scaling, #99, 23.10.2026)
+
+`set_scale_by_size`/`set_scale_by_groups` на `create_object` — **подтверждённый
+no-op**, shipped как `noop_attributes` (hint «probably ignored»). Основания вне
+Зетнуса: официальный фичелист
+[RMS Features](https://www.forgottenempires.net/age-of-empires-ii-definitive-edition/rms-features)
+документирует `set_scale_by_size` только с `create_terrain`; на форуме World's
+Edge все упоминания пары — в terrain/elevation-контексте
+([пример](https://forums.ageofempires.com/t/random-map-scripts-how-can-i-prevent-bad-resource-spawns/137679));
+первоисточник RMSG.doc («set_scale_by_groups and set_scale_by_size all work»)
+— terrain/elevation. Семантика сходится: атрибуты скейлят
+`number_of_tiles`/`number_of_clumps`, которых у `create_object` нет; для числа
+объектов движок имеет собственный механизм (`set_scaling_to_map_size`).
+Корпус-улика: в KHR_WSVG_Meatballs_v2 13 блоков `create_object` с парой — и
+ни в одном не смешаны оба семейства масштабирования. Оставшийся риск —
+in-game тест (tiny vs giant), не проводился.
+
 `create_land N` с позиционным аргументом (8×,
 [!Infinite Forest!](https://github.com/dundass/rms-playground/blob/74471f709f52338918d2cae5a7a7ef1694fd0e5a/%21Infinite%20Forest%21%200.4%20AI%20Friendly%20by%20vjaz.rms))
 — гайд-скелет показывает `create_land {}` без аргументов (гайд:244) —

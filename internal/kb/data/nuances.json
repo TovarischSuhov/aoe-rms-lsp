@@ -1,5 +1,14 @@
 {
-  "noop_attributes": [],
+  "noop_attributes": [
+    {
+      "command": "create_object",
+      "attribute": "set_scale_by_size"
+    },
+    {
+      "command": "create_object",
+      "attribute": "set_scale_by_groups"
+    }
+  ],
   "aliases": [],
   "deprecated": [
     {
