@@ -5,28 +5,42 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 // Embedded knowledge base files; see the kbdata annotation in CODEMANIFEST
 // for the schema of each file. Regeneration is described in
-// kb/.usages/data-pipeline.md.
+// kb/.usages/data-pipeline.md; nuances.json is curated by hand and is not
+// regenerated.
 //
-//go:embed data/xs-functions.json data/xs-constants.json data/rms-commands.json
+//go:embed data/xs-functions.json data/xs-constants.json data/rms-commands.json data/nuances.json
 var dataFS embed.FS
 
 // Store is the loaded knowledge base; the single lookup point for all
 // consumers. Construct it once with NewStore and share it; after
 // construction the data is immutable and safe for concurrent reads.
 type Store struct {
-	functions       []Function
-	functionByName  map[string]Function
-	constants       []Constant
-	constantByName  map[string]Constant
-	constantsBySect map[string][]Constant
-	commands        []Command
-	commandByName   map[string]Command
-	commandsBySect  map[string][]Command
-	attrByKey       map[string]CommandArg
+	functions        []Function
+	functionByName   map[string]Function
+	constants        []Constant
+	constantByName   map[string]Constant
+	constantsBySect  map[string][]Constant
+	commands         []Command
+	commandByName    map[string]Command
+	commandsBySect   map[string][]Command
+	attrByKey        map[string]CommandArg
+	noopAttrByKey    map[string]bool
+	aliasByName      map[string]string
+	deprecatedByName map[string]marker
+	legacyByName     map[string]marker
+}
+
+// marker is a deprecated or legacy name entry from nuances.json: the
+// stable diagnostic code and the diagnostic text.
+type marker struct {
+	Code    string
+	Message string
 }
 
 // NewStore loads the embedded JSON files and validates their schema:
@@ -46,18 +60,57 @@ func NewStore() (*Store, error) {
 		return nil, fmt.Errorf("load rms-commands: %w", err)
 	}
 
+	if err := s.loadNuances(); err != nil {
+		return nil, fmt.Errorf("load nuances: %w", err)
+	}
+
+	return s, nil
+}
+
+// NewStoreFromDir loads the knowledge base from a directory of JSON data
+// files with the same schema as the embedded set (including nuances.json).
+// It serves synthetic-fixture tests and offline tooling; NewStore is the
+// runtime path. Validation is identical to NewStore.
+func NewStoreFromDir(dir string) (*Store, error) {
+	s := newStore()
+
+	files := []struct {
+		name  string
+		index func([]byte) error
+	}{
+		{"xs-functions.json", s.indexFunctions},
+		{"xs-constants.json", s.indexConstants},
+		{"rms-commands.json", s.indexCommands},
+		{"nuances.json", s.indexNuances},
+	}
+
+	for _, f := range files {
+		raw, err := os.ReadFile(filepath.Join(dir, f.name))
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", f.name, err)
+		}
+
+		if err := f.index(raw); err != nil {
+			return nil, err
+		}
+	}
+
 	return s, nil
 }
 
 // newStore returns an empty Store with initialized lookup maps.
 func newStore() *Store {
 	return &Store{
-		functionByName:  make(map[string]Function),
-		constantByName:  make(map[string]Constant),
-		constantsBySect: make(map[string][]Constant),
-		commandByName:   make(map[string]Command),
-		commandsBySect:  make(map[string][]Command),
-		attrByKey:       make(map[string]CommandArg),
+		functionByName:   make(map[string]Function),
+		constantByName:   make(map[string]Constant),
+		constantsBySect:  make(map[string][]Constant),
+		commandByName:    make(map[string]Command),
+		commandsBySect:   make(map[string][]Command),
+		attrByKey:        make(map[string]CommandArg),
+		noopAttrByKey:    make(map[string]bool),
+		aliasByName:      make(map[string]string),
+		deprecatedByName: make(map[string]marker),
+		legacyByName:     make(map[string]marker),
 	}
 }
 
@@ -113,6 +166,42 @@ func (s *Store) Attribute(command string, attr string) (CommandArg, bool) {
 	arg, found := s.attrByKey[attrKey(command, attr)]
 
 	return arg, found
+}
+
+// NoopAttribute reports whether the attribute is a documented no-op on
+// the command: the game most likely ignores it in this position.
+func (s *Store) NoopAttribute(command string, attr string) bool {
+	return s.noopAttrByKey[attrKey(command, attr)]
+}
+
+// Alias returns the correct spelling for a known typo alias;
+// found=false when the name is not an alias.
+func (s *Store) Alias(name string) (right string, found bool) {
+	right, found = s.aliasByName[name]
+
+	return right, found
+}
+
+// Deprecated returns the diagnostic code and text for a deprecated name;
+// found=false when the name is not marked deprecated.
+func (s *Store) Deprecated(name string) (code string, message string, found bool) {
+	m, ok := s.deprecatedByName[name]
+	if !ok {
+		return "", "", false
+	}
+
+	return m.Code, m.Message, true
+}
+
+// Legacy returns the diagnostic code and text for a legacy name kept for
+// compatibility; found=false when the name is not marked legacy.
+func (s *Store) Legacy(name string) (code string, message string, found bool) {
+	m, ok := s.legacyByName[name]
+	if !ok {
+		return "", "", false
+	}
+
+	return m.Code, m.Message, true
 }
 
 // attrKey builds the composite index key for a command attribute.
@@ -273,6 +362,87 @@ func validateName(name string) error {
 	return nil
 }
 
+// loadNuances reads and indexes nuances.json (hand-curated, never
+// regenerated — see the kbdata annotation).
+func (s *Store) loadNuances() error {
+	raw, err := dataFS.ReadFile("data/nuances.json")
+	if err != nil {
+		return fmt.Errorf("read data/nuances.json: %w", err)
+	}
+
+	return s.indexNuances(raw)
+}
+
+// indexNuances decodes and indexes nuances.json content: no-op
+// command-attribute pairs, typo aliases and deprecated/legacy markers.
+func (s *Store) indexNuances(raw []byte) error {
+	var wire nuancesWire
+
+	if err := decodeData("data/nuances.json", raw, &wire); err != nil {
+		return err
+	}
+
+	for _, wn := range wire.NoopAttributes {
+		if wn.Command == "" || wn.Attribute == "" {
+			return fmt.Errorf("empty noop command or attribute")
+		}
+
+		key := attrKey(wn.Command, wn.Attribute)
+		if s.noopAttrByKey[key] {
+			return fmt.Errorf("duplicate noop attribute %q of %q", wn.Attribute, wn.Command)
+		}
+
+		s.noopAttrByKey[key] = true
+	}
+
+	for _, wa := range wire.Aliases {
+		if wa.Wrong == "" || wa.Right == "" {
+			return fmt.Errorf("empty alias name")
+		}
+
+		if _, dup := s.aliasByName[wa.Wrong]; dup {
+			return fmt.Errorf("duplicate alias %q", wa.Wrong)
+		}
+
+		s.aliasByName[wa.Wrong] = wa.Right
+	}
+
+	for _, wd := range wire.Deprecated {
+		if err := indexMarker(s.deprecatedByName, wd, "deprecated"); err != nil {
+			return err
+		}
+	}
+
+	for _, wl := range wire.Legacy {
+		if err := indexMarker(s.legacyByName, wl, "legacy"); err != nil {
+			return err
+		}
+	}
+
+	for name := range s.deprecatedByName {
+		if _, clash := s.legacyByName[name]; clash {
+			return fmt.Errorf("name %q marked both deprecated and legacy", name)
+		}
+	}
+
+	return nil
+}
+
+// indexMarker validates and indexes one deprecated/legacy entry.
+func indexMarker(byName map[string]marker, w markerWire, class string) error {
+	if w.Name == "" || w.Code == "" || w.Message == "" {
+		return fmt.Errorf("empty %s name, code or message", class)
+	}
+
+	if _, dup := byName[w.Name]; dup {
+		return fmt.Errorf("duplicate %s name %q", class, w.Name)
+	}
+
+	byName[w.Name] = marker{Code: w.Code, Message: w.Message}
+
+	return nil
+}
+
 // mineCommandArg fills the empty Range and Kind of arg from its Desc
 // prose. Structured values win (provenance rule): only empty fields are
 // filled, so the helper never overwrites values from extraction and is
@@ -356,4 +526,31 @@ type argWire struct {
 	Range    ValueRange `json:"range"`
 	Required bool       `json:"required"`
 	Desc     string     `json:"desc"`
+}
+
+// nuancesWire is the JSON shape of nuances.json.
+type nuancesWire struct {
+	NoopAttributes []noopAttrWire `json:"noop_attributes"`
+	Aliases        []aliasWire    `json:"aliases"`
+	Deprecated     []markerWire   `json:"deprecated"`
+	Legacy         []markerWire   `json:"legacy"`
+}
+
+// noopAttrWire is one no-op command-attribute pair.
+type noopAttrWire struct {
+	Command   string `json:"command"`
+	Attribute string `json:"attribute"`
+}
+
+// aliasWire is one typo alias: the wrong spelling and the correct one.
+type aliasWire struct {
+	Wrong string `json:"wrong"`
+	Right string `json:"right"`
+}
+
+// markerWire is one deprecated/legacy name with its diagnostic code and text.
+type markerWire struct {
+	Name    string `json:"name"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }

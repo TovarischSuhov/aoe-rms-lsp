@@ -38,10 +38,36 @@ diags := analyzer.AnalyzeXs(xsFile, externals)
 | unknown-attribute | error | атрибут не принадлежит команде |
 | bad-argument | error | число/вид аргументов против спецификации |
 | bad-argument-value | error | значение аргумента вне диапазона (percent 0..100) |
-| deprecated-effect-percent | warning | effect_percent устарел в пользу операторов |
+| deprecated-effect-percent | warning | effect_percent устарел в пользу операторов (из kb nuances.json; будущие deprecated-имена получают свои коды из тех же данных) |
+| typo-alias | warning | имя — известная опечатка; сообщение называет правильное написание (данные kb nuances.json) |
+| probably-ignored | hint | атрибут — задокументированный no-op в этой позиции, игра его игнорирует (данные kb nuances.json) |
+| legacy-… | hint | #-директива устарела механически, но работает (код и текст из kb nuances.json) |
 | undefined-symbol | error | ident вне объявлений и kb |
 | bad-arity | error | неверное число аргументов вызова |
 | bad-type | error | несовместимый тип аргумента/присваивания/return |
+
+## Nuance ladder for unknown names
+
+Before reporting unknown-attribute / unknown-command, the analyzer checks
+the kb nuance data — soft diagnoses replace the error when the name is a
+documented mistake rather than a real unknown:
+
+```go
+// no-op pair → hint, the game ignores the attribute anyway
+// attribute "border_fuzziness" of "create_terrain" is probably ignored by the game
+// typo alias → warning naming the fix
+// unknown attribute "group_varience" of "create_object"; did you mean "group_variance"?
+```
+
+- no-op pairs are scoped to their command: the same attribute under
+  another command stays plain unknown-attribute
+- bare attribute lines outside braces attach to the previous command and
+  run the same ladder
+- deprecated/legacy markers are data entries (nuances.json): the code and
+  message come verbatim from the data, so new markers never need analyzer
+  changes
+- suppression is per code via the server's severityOverrides ("none"
+  hides the diagnostic) — no analyzer involvement
 
 ## Did-you-mean suggestions
 

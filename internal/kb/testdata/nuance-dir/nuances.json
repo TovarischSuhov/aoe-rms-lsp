@@ -1,0 +1,14 @@
+{
+  "noop_attributes": [
+    {"command": "create_terrain", "attribute": "border_fuzziness"}
+  ],
+  "aliases": [
+    {"wrong": "group_varience", "right": "group_variance"}
+  ],
+  "deprecated": [
+    {"name": "old_cmd", "code": "deprecated-old-cmd", "message": "old_cmd is deprecated"}
+  ],
+  "legacy": [
+    {"name": "#include_old", "code": "legacy-include-old", "message": "#include_old is legacy"}
+  ]
+}
