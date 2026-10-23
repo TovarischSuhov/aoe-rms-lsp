@@ -44,3 +44,32 @@ CommandArg carries structured Range (min/max strings, "" when unmined) and
 Kind filled at load when the extractor left it empty. Kind/Range are raw
 strings from the guide prose — consumers render them per their own contract
 (rendering rules live in the hints cell).
+
+## Nuance lookups (typo/no-op/deprecation checks)
+
+Four lookups serve the nuance rules of the analysis cell; the data lives in
+the hand-curated data/nuances.json (regeneration never touches it).
+
+```go
+if store.NoopAttribute("create_terrain", "border_fuzziness") {
+    // hint: the game ignores this attribute in this position
+}
+right, found := store.Alias("group_varience") // "group_variance", true
+code, message, found := store.Deprecated("effect_percent")
+// "deprecated-effect-percent", "effect_percent is deprecated; use effect_amount instead", true
+code, message, found = store.Legacy("#undefine") // #-directives; name keeps the #
+```
+
+Preconditions:
+- Deprecated/Legacy code and message are verbatim data — publish them as
+  the diagnostic text unchanged, keyed by the stable code.
+- NoopAttribute is scoped to the exact command×attribute pair.
+
+Testing against synthetic nuance data (no re-embedding):
+
+```go
+store, err := kb.NewStoreFromDir("testdata/my-kb") // same 4-file layout
+```
+
+Runtime code always uses NewStore(); NewStoreFromDir exists for tests and
+offline tooling.

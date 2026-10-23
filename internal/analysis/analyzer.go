@@ -30,6 +30,12 @@ const (
 	CodeBadType = "bad-type"
 	// CodeDeprecatedEffectPercent marks the legacy effect_percent command.
 	CodeDeprecatedEffectPercent = "deprecated-effect-percent"
+	// CodeProbablyIgnored marks a command attribute that is a documented
+	// no-op in its position: the game most likely ignores it.
+	CodeProbablyIgnored = "probably-ignored"
+	// CodeTypoAlias marks a name matching a known typo alias; the message
+	// names the correct spelling.
+	CodeTypoAlias = "typo-alias"
 	// CodeUndefinedSymbol marks an XS identifier that is neither declared
 	// nor known to the knowledge base.
 	CodeUndefinedSymbol = "undefined-symbol"
@@ -54,8 +60,9 @@ func NewAnalyzer(store *kb.Store) *Analyzer {
 }
 
 // AnalyzeRms checks one RMS file: unknown commands, sections and
-// attributes, argument-count mismatches and the deprecated effect_percent
-// form. The result is sorted by position.
+// attributes, argument-count mismatches, nuance-based hints and warnings
+// for documented no-op pairs and typos, and data-driven deprecation and
+// legacy markers. The result is sorted by position.
 func (a *Analyzer) AnalyzeRms(file rms.RmsFile) []common.Diagnostic {
 	var diags []common.Diagnostic
 
@@ -101,6 +108,31 @@ func (a *Analyzer) walkStmts(stmts []rms.Statement, diags []common.Diagnostic) [
 	return diags
 }
 
+// nuanceDiag checks an unknown attribute name against the kb nuances: a
+// documented no-op pair becomes a probably-ignored hint, a known typo
+// alias becomes a warning naming the correct spelling.
+func (a *Analyzer) nuanceDiag(owner string, name string, r common.Range) (common.Diagnostic, bool) {
+	if a.store.NoopAttribute(owner, name) {
+		return common.Diagnostic{
+			Range:    r,
+			Severity: common.SeverityHint,
+			Message:  fmt.Sprintf("attribute %q of %q is probably ignored by the game", name, owner),
+			Code:     CodeProbablyIgnored,
+		}, true
+	}
+
+	if right, ok := a.store.Alias(name); ok {
+		return common.Diagnostic{
+			Range:    r,
+			Severity: common.SeverityWarning,
+			Message:  fmt.Sprintf("unknown attribute %q of %q; did you mean %q?", name, owner, right),
+			Code:     CodeTypoAlias,
+		}, true
+	}
+
+	return common.Diagnostic{}, false
+}
+
 // checkBlockStmt checks a structural statement: known block commands keep
 // their positional args validated, then children are walked in place.
 func (a *Analyzer) checkBlockStmt(stmt *rms.Statement, diags []common.Diagnostic) []common.Diagnostic {
@@ -118,15 +150,24 @@ func (a *Analyzer) checkBlockStmt(stmt *rms.Statement, diags []common.Diagnostic
 // command.
 func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []common.Diagnostic) []common.Diagnostic {
 	if len(stmt.Name) > 0 && stmt.Name[0] == '#' {
+		if code, message, ok := a.store.Legacy(stmt.Name); ok {
+			diags = append(diags, common.Diagnostic{
+				Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
+				Severity: common.SeverityHint,
+				Message:  message,
+				Code:     code,
+			})
+		}
+
 		return diags // directives (#const, #include) are not commands
 	}
 
-	if stmt.Name == "effect_percent" {
+	if code, message, ok := a.store.Deprecated(stmt.Name); ok {
 		diags = append(diags, common.Diagnostic{
 			Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
 			Severity: common.SeverityWarning,
-			Message:  `effect_percent is deprecated; use effect_amount instead`,
-			Code:     CodeDeprecatedEffectPercent,
+			Message:  message,
+			Code:     code,
 		})
 	}
 
@@ -135,10 +176,26 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 		// a bare attribute line outside braces: known attribute of the
 		// previous command, not an unknown command — its value gets the
 		// same checks as an attribute inside braces
+		owner := ""
 		if *lastKnown != "" {
 			if spec, ok := a.store.Attribute(*lastKnown, stmt.Name); ok {
 				return a.checkArgValues(stmt.Args, []kb.CommandArg{spec}, diags)
 			}
+
+			owner = *lastKnown
+
+			if diag, reported := a.nuanceDiag(owner, stmt.Name, stmt.Range); reported {
+				return append(diags, diag)
+			}
+		}
+
+		if right, ok := a.store.Alias(stmt.Name); ok {
+			return append(diags, common.Diagnostic{
+				Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
+				Severity: common.SeverityWarning,
+				Message:  fmt.Sprintf("unknown command %q; did you mean %q?", stmt.Name, right),
+				Code:     CodeTypoAlias,
+			})
 		}
 
 		diags = append(diags, common.Diagnostic{
@@ -173,6 +230,12 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 
 		spec, known := a.store.Attribute(cmd.Name, attr.Name)
 		if !known {
+			if diag, reported := a.nuanceDiag(cmd.Name, attr.Name, attr.Range); reported {
+				diags = append(diags, diag)
+
+				continue
+			}
+
 			attrNames := make([]string, 0, len(cmd.Attributes))
 			for _, attrSpec := range cmd.Attributes {
 				attrNames = append(attrNames, attrSpec.Name)

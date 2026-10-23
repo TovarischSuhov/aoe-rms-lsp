@@ -72,26 +72,41 @@ Annotations: |
       1. Пройти все statement (вкл. Children блоков)
       2. Неизвестная команда/секция — lookup через `Store` по `lookups`;
          Diagnostic severity=error, code="unknown-command"/"unknown-section";
-         к unknown-command дописывается подсказка ближайшего имени из
-         Commands("") (Левенштейн без регистра, порог max(1, len/4)):
-         '; did you mean "X"?'; unknown-section — без подсказки
-      3. Для известных команд: неизвестные атрибуты через `Store` —
-         code="unknown-attribute" с той же подсказкой (кандидаты —
-         Attributes известной команды); несоответствие числа/вида
-         аргументов — code="bad-argument"
+         лестница перед ошибкой unknown-command: имя в Alias (`Store`) —
+         severity=warning, code="typo-alias", сообщение
+         'unknown command "X"; did you mean "Y"?'; иначе подсказка
+         ближайшего имени из Commands("") (Левенштейн без регистра, порог
+         max(1, len/4)): '; did you mean "X"?'; unknown-section — без
+         подсказки
+      3. Для известных команд: неизвестные атрибуты через `Store` — сначала
+         нюансы (в т.ч. для bare-атрибута вне скобок с owner=последняя
+         известная команда): no-op пара (NoopAttribute) — severity=hint,
+         code="probably-ignored"; опечатка (Alias) — severity=warning,
+         code="typo-alias", 'unknown attribute "X" of "Y"; did you mean
+         "Z"?'; без нюанса — code="unknown-attribute" с подсказкой
+         ближайшего имени (кандидаты — Attributes известной команды);
+         несоответствие числа/вида аргументов — code="bad-argument"
       4. Для каждого позиционного аргумента с имеющейся спецификацией и
          каждого атрибута вызвать `CheckRmsValue` с kind, value и
          диапазоном значения (значения с операндами — выражения и
          вызовы-хелперы — пропускаются); reported=true — добавить
          Diagnostic к результату
-      5. effect_percent — code="deprecated-effect-percent", severity=warning
-      6. Отсортировать diags по позиции
+      5. Имя в Deprecated (`Store`) — severity=warning, code и message
+         verbatim из данных nuances.json; диапазон нулевой ширины на
+         начале statement
+      6. #-директива в Legacy (`Store`) — severity=hint, code и message
+         verbatim из данных nuances.json; диапазон нулевой ширины на
+         начале statement
+      7. Отсортировать diags по позиции
 
       Requirements:
       - не дублировать синтаксические diags парсера
       - подсказка детерминирована: порог max(1, len/4), при равных
         дистанциях — лексикографически меньшее имя; нет кандидата в
         пороге — суффикса нет
+      - deprecated/legacy сообщения — данные verbatim, не форматируются;
+        no-op/alias сообщения форматируются с именами владельца и правого
+        написания
 
       Constraints:
       - не изменять входной AST
