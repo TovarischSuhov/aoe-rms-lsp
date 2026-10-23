@@ -134,7 +134,8 @@ Edge все упоминания пары — в terrain/elevation-контек�
 объектов движок имеет собственный механизм (`set_scaling_to_map_size`).
 Корпус-улика: в KHR_WSVG_Meatballs_v2 13 блоков `create_object` с парой — и
 ни в одном не смешаны оба семейства масштабирования. Оставшийся риск —
-in-game тест (tiny vs giant), не проводился.
+in-game тест (tiny vs giant), не проводился; карта проверки —
+[nuance-99-object-scaling.rms](nuance-maps/nuance-99-object-scaling.rms).
 
 `create_land N` с позиционным аргументом (8×,
 [!Infinite Forest!](https://github.com/dundass/rms-playground/blob/74471f709f52338918d2cae5a7a7ef1694fd0e5a/%21Infinite%20Forest%21%200.4%20AI%20Friendly%20by%20vjaz.rms))
