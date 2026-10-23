@@ -8,6 +8,7 @@ okf_version: "0.2"
 
 * [Архитектура aoe2-lsp](/architecture/overview.md) — слои и порядок зависимостей ячеек, entrypoints в cmd/, путь данных от LSP-запроса до парсеров и базы знаний
 * [Инварианты стабильности](/architecture/stability-invariants.md) — правила, которые проект сознательно поддерживает: recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтера, покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, данные без сети
+* [Резолюция #include_drs в AoE2 DE](/architecture/include-drs-resolution.md) — движок резолвит по имени из resources/_common/drs/gamedata_x2/ и по относительным путям; id — легаси AoC/HD; опора include-замыкания и game-detect includeRoots
 
 ## Контракты
 

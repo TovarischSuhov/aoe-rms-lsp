@@ -1,0 +1,51 @@
+/*
+	nuance-98-include-drs — карта проверки слота nuance-rules #98.
+
+	Проверяем: #include_drs <файл> <id> в AoE2 DE.
+	Вердикт кураторства: директива работает — движок резолвит цель
+	по имени из resources/_common/drs/gamedata_x2/ (первушка: в
+	установке DE там лежат random_map.def, std_resources.inc и ещё
+	~300 .inc/.def). Прежний вердикт «легаси, фактически no-op»
+	опровергнут; см. docs/ref/real-map-nuances.md, раздел 1.
+
+	Что делать: положить файл в resources/_common/random-map-scripts/
+	и сгенерировать карту в skirmish (2 игрока). Карта сама не ставит
+	ни ратуши, ни жителей — их может дать только include.
+
+	Шаг 1 — резолюция по имени:
+	  ожидание (вердикт верен): у каждого игрока есть ратуша, 3 жителя,
+	  скаут; на карте 5 реликвий — это содержимое std_resources.inc
+	  (спецресурсы Gold Rush / Crater Lake).
+	  Опровержение (директива игнорируется): ратуши нет — номад-старт.
+
+	Шаг 2 — числовой id (легаси-адресация DRS-архива AoC/HD):
+	  поменять 54101 на 99999 и сгенерировать снова.
+	  Если ратуха по-прежнему появляется — id игнорируется, поиск по
+	  имени; если ратуха пропала — id участвует в резолюции.
+	  Результат шага 2 решить, нужен ли отдельный нюанс-hint на id.
+*/
+
+#include_drs std_resources.inc 54101
+
+<PLAYER_SETUP>
+	random_placement
+
+<LAND_GENERATION>
+	base_terrain GRASS
+
+	create_land
+	{
+		terrain_type GRASS
+		land_percent 100
+		base_size 8
+		other_zone_avoidance_distance 5
+	}
+
+<OBJECTS_GENERATION>
+	/* маркер живости карты; всё остальное — из include */
+	create_object DEER
+	{
+		number_of_objects 5
+		min_distance_to_players 10
+		max_distance_to_players 20
+	}
