@@ -1,0 +1,65 @@
+/*
+	nuance-99-object-scaling — карта проверки слота nuance-rules #99.
+
+	Проверяем: set_scale_by_size / set_scale_by_groups на create_object.
+	Вердикт кураторства: no-op (движок молча игнорирует; см.
+	docs/ref/real-map-nuances.md, раздел «Кураторство #99»).
+
+	Что делать: положить файл в resources/_common/random-map-scripts/
+	и сгенерировать карту дважды — TINY (2 игрока) и GIANT (2 игрока),
+	затем посчитать животных в редакторе.
+
+	Ожидание (вердикт no-op верен):
+	  овцы    (set_scale_by_size)   — ровно 20 на любом размере;
+	  козы    (set_scale_by_groups) — ровно 20 на любом размере;
+	  олени   (контроль)            — ровно 20.
+	Опровержение: число овец/коз различается между TINY и GIANT
+	(признак того, что масштабирование на create_object работает).
+
+	Формулировка alibi-карты: все три вида ставятся с одинаковыми
+	дистанциями и без случайности (никаких start_random), поэтому
+	единственная переменная между прогонами — размер карты.
+*/
+
+<PLAYER_SETUP>
+	random_placement
+
+<LAND_GENERATION>
+	base_terrain GRASS
+
+	create_land
+	{
+		terrain_type GRASS
+		land_percent 100
+		base_size 8
+		other_zone_avoidance_distance 5
+	}
+
+<OBJECTS_GENERATION>
+	/* A: set_scale_by_size — задокументирован только для terrain/elevation */
+	create_object SHEEP
+	{
+		number_of_objects 20
+		set_scale_by_size
+		min_distance_to_players 10
+		max_distance_to_players 20
+	}
+
+	/* B: set_scale_by_groups — 10 групп по 2, масштабируется число групп */
+	create_object GOAT
+	{
+		number_of_groups 10
+		number_of_objects 2
+		set_scale_by_groups
+		group_placement_radius 3
+		min_distance_to_players 10
+		max_distance_to_players 20
+	}
+
+	/* C: контроль — без масштабирования, ровно 20 на любом размере */
+	create_object DEER
+	{
+		number_of_objects 20
+		min_distance_to_players 10
+		max_distance_to_players 20
+	}
