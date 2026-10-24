@@ -645,13 +645,17 @@ func eolCut(line string) int {
 // CR run — a byte a pass, and the document never reaches a fixed point.
 // Whatever trails the range on its own line is then a run of "\r" bytes,
 // and all but one ride with the comment, the page adding the last one.
-// A run broken by code (`/* c */ code`) is not the comment's to take.
+// A run the extent already carries (the scanner ends at the raw line's
+// tail — an EOF-clipped block, a // to the line's end) trims the same
+// way: a trailing "\r" is a line-ending byte the reparse collapses, and
+// the page adds its own. A run broken by code (`/* c */ code`) is not
+// the comment's to take.
 func (p *printer) commentText(r common.Range) string {
 	if r.End.Column == 0 && r.End.Line > 0 && int(r.End.Line) < len(p.doc.lines) {
 		r.End = common.Pos{Line: r.End.Line - 1, Column: uint32(eolCut(p.doc.lines[r.End.Line-1]))}
 	}
 
-	text := p.doc.text(r)
+	text := strings.TrimRight(p.doc.text(r), "\r")
 
 	if int(r.End.Line) >= len(p.doc.lines) {
 		return text

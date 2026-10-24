@@ -191,6 +191,44 @@ func TestRMS_UnclosedCommentConvergence(t *testing.T) {
 	}
 }
 
+// TestRMS_UnclosedBlockAtHashEOF pins the last RMS convergence escape
+// (#135): a flat #-line whose unterminated /* EOF clips exactly at the
+// line's end. The parser now cuts the #-extent at the comment's start,
+// so pass one prints the split form and every later pass is identical;
+// the closed block at EOF keeps its one-comment print.
+func TestRMS_UnclosedBlockAtHashEOF(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{name: "unterminated clipped by eof", src: "#tail /* oops"},
+		{name: "unterminated with cr tail", src: "#tail /* oops\r"},
+		{name: "closed at eof stays one comment", src: "#tail /* oops */"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := RMS(tt.src, Options{})
+			if err != nil {
+				t.Fatalf("RMS: %v", err)
+			}
+
+			twice, err := RMS(once, Options{})
+			if err != nil {
+				t.Fatalf("RMS(formatted): %v", err)
+			}
+
+			if twice != once {
+				t.Errorf("RMS does not converge from the first pass:\n--- src ---\n%s\n--- pass 1 ---\n%s\n--- pass 2 ---\n%s", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestRMS_EmptyInput checks that nothing printable answers nothing: the
 // empty document and whitespace-only text format to the empty string.
 func TestRMS_EmptyInput(t *testing.T) {

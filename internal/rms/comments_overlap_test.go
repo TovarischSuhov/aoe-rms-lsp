@@ -36,6 +36,24 @@ func TestRmsComments_UnterminatedBlockOnHashLine(t *testing.T) {
 				commentExtent(0, 5, 1, 10),
 			},
 		},
+		{
+			// #135: EOF clips the block exactly at the #-extent's end —
+			// the same truncation as the two rows above, not a swallow
+			name: "block comment clipped by eof at the line's end",
+			src:  "#foo /* start",
+			want: []common.Range{
+				commentExtent(0, 0, 0, 5),
+				commentExtent(0, 5, 0, 13),
+			},
+		},
+		{
+			// guard: a closed block ending with the line stays swallowed
+			name: "closed block ending with the line",
+			src:  "#foo /* done */",
+			want: []common.Range{
+				commentExtent(0, 0, 0, 15),
+			},
+		},
 	}
 
 	for _, tt := range tests {
