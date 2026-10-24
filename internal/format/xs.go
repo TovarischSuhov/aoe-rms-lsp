@@ -973,7 +973,11 @@ func (p *xsPrinter) warnSlice(s xs.Stmt) (int, bool) {
 // opener — so the walk steps over such pairs whole and spends only a
 // closer nothing out there owns: spending the pair's `}` would close the
 // statement's brace with a block it does not contain and leave the cut
-// ending inside its own body. The second answer reports whether the loop
+// ending inside its own body. The pairing is by kind — a closer pops the
+// opener of its own kind, and a closer nothing opened of its kind closes
+// the opener the depth counted: the parser tolerates an unclosed `(` inside
+// a block literal (`0.!%{(}`), and a typeless count would spend the
+// literal's own `}` on it, pushing the cut onto the enclosing body's brace. The second answer reports whether the loop
 // moved the end — it always lands strictly past the extent (the scan
 // starts on the end itself), so the callers can tell a cut that already
 // consumed its own body's closing brace from one stopped short of every
@@ -985,15 +989,15 @@ func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 	extended := false
 
 	for depth > 0 {
-		outer := 0
+		var opens []byte
 
 		closer, ok := p.xsFind(end, len(p.src), func(_ int, c byte) bool {
 			switch c {
 			case '(', '[', '{':
-				outer++
+				opens = append(opens, c)
 			case ')', ']', '}':
-				if outer > 0 {
-					outer--
+				if n := len(opens); n > 0 && opens[n-1] == xsOpener(c) {
+					opens = opens[:n-1]
 					return false
 				}
 
@@ -1012,6 +1016,18 @@ func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 	}
 
 	return end, extended
+}
+
+// xsOpener answers the opener byte c closes.
+func xsOpener(c byte) byte {
+	switch c {
+	case ')':
+		return '('
+	case ']':
+		return '['
+	}
+
+	return '{'
 }
 
 // emptyBodyEnd extends a verbatim cut's end through an empty body block's
