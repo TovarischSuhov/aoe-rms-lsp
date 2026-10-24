@@ -1727,11 +1727,11 @@ func lineRange(text string, line uint32) common.Range {
 
 // Formatting answers textDocument/formatting with a single full-document
 // edit whose text is the format cell's canonical print. Inputs the
-// printer refuses (error-severity parse diagnostics) and non-RMS
-// documents answer an empty slice — the refusal is already published as
-// diagnostics, so no JSON-RPC error is warranted. The range end sits
-// just past the last byte: ending on the last meaningful line would
-// leave a trailing newline outside the edit and double it once the
+// printer refuses (error-severity parse diagnostics) and documents in
+// other languages answer an empty slice — the refusal is already
+// published as diagnostics, so no JSON-RPC error is warranted. The range
+// end sits just past the last byte: ending on the last meaningful line
+// would leave a trailing newline outside the edit and double it once the
 // client applies the replacement.
 func (s *Server) Formatting(
 	ctx context.Context,
@@ -1739,22 +1739,29 @@ func (s *Server) Formatting(
 ) ([]protocol.TextEdit, error) {
 	text, name, _ := s.openDocument(params.TextDocument.URI) // editor state, not the FS
 
-	if !strings.HasSuffix(name, ".rms") {
-		return []protocol.TextEdit{}, nil
-	}
-
 	// TrimTrailingWhitespace and friends stay unread: the printer owns
 	// the whole canonical shape, indentation is the only per-request
 	// knob left to the client.
 	opts := format.Options{TabSize: int(params.Options.TabSize), IndentTabs: !params.Options.InsertSpaces}
 
-	formatted, err := format.RMS(text, opts)
+	var printer func(string, format.Options) (string, error)
+
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		printer = format.RMS
+	case strings.HasSuffix(name, ".xs"):
+		printer = format.XS
+	default:
+		return []protocol.TextEdit{}, nil
+	}
+
+	formatted, err := printer(text, opts)
 	if errors.Is(err, format.ErrParseErrors) {
 		return []protocol.TextEdit{}, nil
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("format %s: %w", name, err) // defensive: format.RMS returns no other errors today
+		return nil, fmt.Errorf("format %s: %w", name, err) // defensive: the printers return no other errors today
 	}
 
 	slog.DebugContext(ctx, "formatting", "uri", name, "bytes", len(formatted))

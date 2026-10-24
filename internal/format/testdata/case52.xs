@@ -1,0 +1,2 @@
+// c52-lead
+vector A=(0(0))
