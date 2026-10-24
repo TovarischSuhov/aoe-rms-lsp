@@ -1229,3 +1229,114 @@ func TestXS_DeclAdjacentOnce(t *testing.T) {
 		})
 	}
 }
+
+func TestXS_DeclSplitHeadOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// #162: the scanner skips the '#' byte, so the tail
+			// declarator's extent starts at its bare name and the
+			// gap is not a bare comma — the group test used to leave
+			// it standalone and the degenerate cut printed a bare
+			// statement. The gap still reduces to the comma: the
+			// pair groups and the line is its own fixed point.
+			name: "junk gap, degenerate init",
+			src:  `void A,#A=0.`,
+			want: "void A,#A=0.\n",
+		},
+		{
+			name: "junk gap with terminator",
+			src:  `void A,#A=0.;`,
+			want: "void A,#A=0.;\n",
+		},
+		{
+			// the name equals the type word: grouping is the only
+			// reparseable print (a standalone head would read both
+			// words as the type)
+			name: "junk gap, name is a type word",
+			src:  `void A,#void=1.`,
+			want: "void A,#void=1.\n",
+		},
+		{
+			name: "multi-byte junk gap",
+			src:  `void A,# @#B=0.;`,
+			want: "void A,# @#B=0.;\n",
+		},
+		{
+			// a clean initializer takes the canonical merged print;
+			// the invisible junk has no tree to preserve
+			name: "junk gap, clean init",
+			src:  `int A,#B=1;`,
+			want: "int A, B = 1;\n",
+		},
+		{
+			// a comment in the gap must anchor on its own line, so
+			// the split declarator prints standalone — the cut
+			// carries the synthesized type words ahead of its bytes
+			name: "comment gap, typed head",
+			src:  `void A,/*c*/B=0.;`,
+			want: "void A;\n\n/*c*/\nvoid B=0.;\n",
+		},
+		{
+			name: "comment gap before a group",
+			src:  `int A,/*c*/B,C=0.;`,
+			want: "int A;\n\n/*c*/\nint B,C=0.;\n",
+		},
+		{
+			name: "comment gap, unterminated literal",
+			src:  "int A,/*c*/B=\"x",
+			want: "int A;\n\n/*c*/\nint B=\"x\n",
+		},
+		{
+			// junk inside the first declarator's extent rides in the
+			// verbatim bytes — the extent opens at the type words
+			name: "junk before the first name",
+			src:  `void #A=0.;`,
+			want: "void #A=0.;\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			want, _ := xs.XsParse(tt.src, "")
+			got, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(want), xsTreeShape(got)); diff != "" {
+				t.Errorf("XS(%q) tree drift:\n%s\noutput:\n%s", tt.src, diff, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+		})
+	}
+}

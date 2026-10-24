@@ -108,6 +108,21 @@ XS additionally:
   TestXS_DeclAdjacentOnce (crasher df7bb1183f5bb08, adj5, partial),
   the FuzzXS seeds `int A(){{while;{}}}` / `while;{}` and the two
   decl crashers.
+- The split-declarator head (#162) is closed in the decl print paths:
+  the scanner skips an unknown byte silently, so a declaration list's
+  tail declarator starts its extent at the bare name and the gap around
+  the byte is not a bare comma. varGroup's gap test now reduces the
+  gap's visible bytes — a gap of a comma plus scanner-invisible junk
+  still groups the pair (the merged line is its own byte-exact fixed
+  point), and a split declarator that must print standalone (a comment
+  anchors in the gap) gets the type words synthesized ahead of its
+  verbatim bytes (declHead). Pins: TestXS_DeclSplitHeadOnce (nine rows)
+  and the FuzzXS seed `void A,#A=0.`. A residual stays open: a split
+  declarator whose NAME is a type word and whose gap carries a comment
+  (`void A,/*c*/void=1.`) has no reparseable standalone print — the
+  parser reads `void void` as two type words on any reparse — and only
+  comma re-attachment could print it, which the comment anchoring
+  forbids.
 - Convergence has known open escape classes — the list is not
   closed, fresh fuzzing keeps surfacing more (the grouped
   zero-call chain below surfaced in this run's fuzz re-check).
@@ -137,9 +152,6 @@ XS additionally:
   unwraps the grouping — `vector A = A();`; fixed point from
   pass 3, and neither the input nor any pass output carries a
   diagnostic — a silent byte change, the reparse never breaks),
-  the compact degenerate declaration head (`void A,#A=0.` —
-  pass 1 prints `void A;` plus a bare `A=0.` tail and the output
-  does not reparse, `unexpected identifier "A" at top level`),
   the warn-literal statement body (`void A(){0.!%{(}}` — the
   verbatim cut keeps both source `}` and the head prints its own,
   so a stray `}` reaches the top level and the output does not
@@ -149,9 +161,12 @@ XS additionally:
   own line; fixed point from pass 2, the reparse stays whole) and
   the paren-dropping zero-call chain (`vector A=0(0())()` —
   pass 1 prints `vector A = 0(0();`, one `)` short, and the output
-  does not reparse, `expected , or ) in argument list`; the four
-  members appended 2026-10-25 from the format-xs run's backlog,
-  each rechecked byte-for-byte on master).
+  does not reparse, `expected , or ) in argument list`; the three
+  remaining members appended 2026-10-25 from the format-xs run's
+  backlog, each rechecked byte-for-byte on master. The split
+  type-word-name residual above joins them as the batch's fourth
+  member — narrowed out of the closed #162 class on
+  task/xs-decl-head).
   An XS divergence outside this list is a finding to report
   just the same: not a bug in your calling code, not something
   to mask with a third pass.

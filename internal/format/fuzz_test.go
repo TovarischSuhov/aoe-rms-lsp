@@ -75,6 +75,11 @@ func FuzzXS(f *testing.F) {
 	// reached expectSemi's ";" and the head added its own — one ";" per
 	// pass (TestXS_WarnInitUnpairedBrace pins the fix)
 	f.Add(`vector A=(0,0)%{(0}`)
+	// the #162 junk-gap split: the scanner skips the unknown byte, the
+	// declarator extents split around it, and the gap test used to leave
+	// the tail declarator standalone — a bare statement at top level
+	// (TestXS_DeclSplitHeadOnce pins the group's own-bytes fixed point)
+	f.Add(`void A,#A=0.`)
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")
