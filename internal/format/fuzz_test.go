@@ -47,6 +47,7 @@ func FuzzXS(f *testing.F) {
 	// #164: the opener's own "*/" must not read the tail comment
 	// closed — the include line's cut stops before it
 	f.Add(`include"";include"";/*/0`)
+	f.Add(`include""/*/`)
 	f.Add(`vector A=(0(0))`)
 	f.Add(`vector A=(0(0));`)
 	f.Add(`void f(){while{x}{y}}`)

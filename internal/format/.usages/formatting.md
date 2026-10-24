@@ -134,14 +134,15 @@ XS additionally:
   bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
   seed `void A(){0.!%{(}}`.
 - The include tail-comment drift (#164) is closed: unclosedEOF's
-  byte check reads a closing `*/` only in the suffix — a `*/` short
-  of an EOF-clipped extent's end is other bytes' (the opener `/*/`
-  carries its own pair), so the include line's cut stops before the
-  unterminated tail instead of gluing it to the directive line, and
-  the comment anchors on its own line from the first pass. A closed
-  block at EOF still rides the line as written. Pins:
-  TestXS_IncludeTrailingCommentOnce (five rows) and the FuzzXS seed
-  `include"";include"";/*/0`.
+  byte check reads a closing `*/` only where a closer can be — the
+  suffix, with its `*` past the opener's own (the opener holds the
+  first two bytes, so `/*/` and `/*/0` both end short of a real
+  closer) — and the include line's cut stops before the unterminated
+  tail instead of gluing it to the directive line, so the comment
+  anchors on its own line from the first pass. A closed block at EOF
+  still rides the line as written. Pins:
+  TestXS_IncludeTrailingCommentOnce (six rows) and the FuzzXS seeds
+  `include"";include"";/*/0` / `include""/*/`.
 - Convergence has known open escape classes — the list is not
   closed, fresh fuzzing keeps surfacing more (the grouped
   zero-call chain below surfaced in this run's fuzz re-check).

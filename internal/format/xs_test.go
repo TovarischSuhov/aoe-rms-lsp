@@ -1054,6 +1054,13 @@ func TestXS_IncludeTrailingCommentOnce(t *testing.T) {
 			want: "int A;\n/*/0\n",
 		},
 		{
+			// the opener plus one byte ends on "*/" all the same —
+			// the closer's "*" must sit past the opener's
+			name: "unterminated opener-plus-one",
+			src:  `include""/*/`,
+			want: "include\"\"\n/*/\n",
+		},
+		{
 			name: "unterminated block with terminator bytes",
 			src:  `include"";/*/0;`,
 			want: "include\"\";\n/*/0;\n",
