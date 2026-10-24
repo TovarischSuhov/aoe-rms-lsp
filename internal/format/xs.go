@@ -1178,6 +1178,15 @@ func (p *xsPrinter) warnInit(d xs.Decl) (string, bool) {
 		out := p.blockText(eq+1, to)
 		p.dropBefore(to)
 
+		// the fallback end carries the terminator expectSemi consumed into
+		// the extent: the head synthesizes the declarator's own, and a cut
+		// that keeps it doubles on every reparse until the extent stops
+		// growing. The separator-found end cannot hold a ';' — a zero-depth
+		// one is found first — so the trim only ever fires on the fallback.
+		out = strings.TrimRight(out, " \t")
+		out = strings.TrimSuffix(out, ";")
+		out = strings.TrimRight(out, " \t")
+
 		// the cut opens right past the '='; the one space the join
 		// already prints is all the head needs
 		return strings.TrimLeft(out, " \t"), true

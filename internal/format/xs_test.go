@@ -601,6 +601,79 @@ func TestXS_WarnGroupedVectorStmt(t *testing.T) {
 	}
 }
 
+// TestXS_WarnInitUnpairedBrace pins the warnInit terminator rule (#151): a
+// block literal with an unpaired "(" keeps the bracket scan positive, the
+// separator search finds no end, and the fallback cut reaches the extent's
+// end — where expectSemi's consumed ";" rides. The cut must not carry it:
+// the head synthesizes the declarator's own, and a cut that kept one grew
+// the output by a ";" on every pass — fixed point from the third, never
+// idempotent, format-on-save growing the file.
+func TestXS_WarnInitUnpairedBrace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			// the fuzz find: no ';' in the source at all
+			name: "unterminated-init",
+			src:  "vector A=(0,0)%{(0}",
+		},
+		{
+			// the once-formatted shape: the consumed ';' is in the source
+			name: "consumed-terminator",
+			src:  "vector A = (0,0)%{(0};",
+		},
+		{
+			// a second declarator past the unbalanced literal: the region
+			// ends at the split, the terminator rule must hold there too
+			name: "second-declarator",
+			src:  "vector A=(0,0)%{(0},B=2;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS refused a warning-only input: %v", err)
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if twice != once {
+				t.Errorf("XS(XS(%q)) differs:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+
+			if strings.Contains(once, "};;") {
+				t.Errorf("XS(%q) synthesized a doubled terminator:\n%s", tt.src, once)
+			}
+
+			_, diags := xs.XsParse(once, "")
+			warned := false
+
+			for _, d := range diags {
+				switch d.Severity {
+				case common.SeverityError:
+					t.Fatalf("XS(%q) output carries an error: %s", tt.src, d.Message)
+				case common.SeverityWarning:
+					warned = true
+				}
+			}
+
+			if !warned {
+				t.Errorf("XS(%q) output lost the arity warning", tt.src)
+			}
+		})
+	}
+}
+
 // TestXS_DegenerateChains checks the degenerate member-name contract: a
 // chain whose name after "." came off a non-identifier token has no
 // canonical spelling, so the construct prints as a byte-exact slice of its

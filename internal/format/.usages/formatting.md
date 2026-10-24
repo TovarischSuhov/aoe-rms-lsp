@@ -106,14 +106,7 @@ XS additionally:
   the final tree (rechecked 2026-10-24) — and none of them enters
   the FuzzXS seed corpus: the seed corpus must stay green (a
   diverging corpus .xs is removed from the sample, not pinned as
-  a seed). warnInit's doubled
-  synthesized `;` (#151, a separate task): an unpaired bracket
-  inside an initializer block literal keeps the balance positive,
-  the separator search sees no `;` at zero depth and the cut
-  swallows the synthesized semicolon — repro
-  `vector A=(0,0)%{(0}`, pass 1 prints `(0};`, pass 2 doubles it,
-  growth ends there (fixed point from pass 3, the output reparses
-  with the arity warning only). The fuzzer's pre-existing classes:
+  a seed). The fuzzer's pre-existing classes:
   the degenerate declarator tail
   `vector A000000;extern A00 A000000=(0);int A0000000000000000000;int A00000000=(0),A="`
   (the first pass's output does not reparse — `unexpected
