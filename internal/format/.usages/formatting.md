@@ -131,12 +131,27 @@ XS additionally:
   is lost and the output does not reparse, `expected { after
   switch`), the grouped wrong-arity vector with a degenerate
   name (`void A(){((0.(,0));}` — the outer `(` is lost and
-  `(0.(,0));` does not reparse, `expected ;`) and the grouped
+  `(0.(,0));` does not reparse, `expected ;`), the grouped
   zero-call chain (`vector A=(A)()()` — pass 1 prints
   `vector A = (A)();`, one `()` pair short of the input; pass 2
   unwraps the grouping — `vector A = A();`; fixed point from
   pass 3, and neither the input nor any pass output carries a
-  diagnostic — a silent byte change, the reparse never breaks).
+  diagnostic — a silent byte change, the reparse never breaks),
+  the compact degenerate declaration head (`void A,#A=0.` —
+  pass 1 prints `void A;` plus a bare `A=0.` tail and the output
+  does not reparse, `unexpected identifier "A" at top level`),
+  the warn-literal statement body (`void A(){0.!%{(}}` — the
+  verbatim cut keeps both source `}` and the head prints its own,
+  so a stray `}` reaches the top level and the output does not
+  reparse, `unexpected "}" at top level`), the comment drift
+  behind a doubled include (`include"";include"";/*/0` — pass 1
+  glues `/*/0` to the second include line, pass 2 moves it to its
+  own line; fixed point from pass 2, the reparse stays whole) and
+  the paren-dropping zero-call chain (`vector A=0(0())()` —
+  pass 1 prints `vector A = 0(0();`, one `)` short, and the output
+  does not reparse, `expected , or ) in argument list`; the four
+  members appended 2026-10-25 from the format-xs run's backlog,
+  each rechecked byte-for-byte on master).
   An XS divergence outside this list is a finding to report
   just the same: not a bug in your calling code, not something
   to mask with a third pass.
