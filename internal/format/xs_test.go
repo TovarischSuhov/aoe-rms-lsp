@@ -1077,10 +1077,10 @@ func TestXS_ZeroExtentSiblingOnce(t *testing.T) {
 // assert is the primary discriminator: the duplicate reparses without
 // error diagnostics and the document is byte-stable from the second pass
 // on, so reparse and fixed point alone accept it. The count pins are
-// calibrated on the expected sibling-once fix shape: the input's two rule
-// keywords are the whole budget of the fixed output — today's output
-// carries a third (a fresh copy of the neighbor per pass), so the pins
-// are red until the fix lands and pin the growth, not today's bytes.
+// calibrated on the sibling-once fix shape: the input's two rule keywords
+// are the whole budget of the output — the pins were red until the fix
+// landed (the doubling pass printed a third, a fresh copy of the neighbor
+// per pass); on the fixed tree the output carries exactly two.
 func TestXS_DeclAdjacentOnce(t *testing.T) {
 	t.Parallel()
 
@@ -1104,6 +1104,16 @@ func TestXS_DeclAdjacentOnce(t *testing.T) {
 			name: "adj5",
 			src: `rule """""""""0000000
 ({}rule R {int x=1;}`,
+			rules: 2,
+		},
+		{
+			// the partial-overlap subclass: the junk header's cut used to
+			// stop strictly inside the neighbor — on the first closer past
+			// its head (`a[0]`'s bracket) — printing the head twice, once
+			// inside the cut and once from the neighbor's own node
+			name: "partial",
+			src: `rule """""""""0000000
+({}rule R {int x=a[0];}`,
 			rules: 2,
 		},
 	}

@@ -68,6 +68,8 @@ type xsPrinter struct {
 	warns    []common.Range
 	pending  int // index of the next comment not yet anchored
 	level    int // nesting level of the statement being printed; expression lifts read it
+
+	declLimit int // offset where the declaration being printed must end: the next declaration's start
 }
 
 // result joins the printed lines with the input's dominant EOL and ends
@@ -1277,16 +1279,24 @@ func (p *xsPrinter) openStringVerbatim(from, to int) bool {
 // balance counts degenerate member names as no region's brackets, and a
 // callee-stopped call's argument pair — sitting right at the extent's end
 // — rides ahead of it (cutArgsEnd): the line without its pair does not
-// reparse.
+// reparse. The closer hunt never crosses into the next declaration (decls
+// sets the boundary): bytes past it belong to the sibling, and a cut
+// taking them prints the sibling's head twice — once inside the cut, once
+// from its own node (the df7bb1183f5bb08 growth). A grouping whose closer
+// sits past the boundary is a recovery shape, and the line prints short of
+// it — the cut cannot own what the parse gave another declaration.
 func (p *xsPrinter) declVerbatim(from, to int) {
 	to = p.cutArgsEnd(from, to)
+	if to > p.declLimit {
+		to = p.declLimit
+	}
 
 	names := p.xsMemberNames(from, to)
 	balance := p.xsBracketDepth(from, to, names)
 
 	for balance > 0 {
 		closer, ok := p.scanFirst(to, ')', ']', '}')
-		if !ok {
+		if !ok || closer+1 > p.declLimit {
 			break
 		}
 
@@ -1316,7 +1326,10 @@ func (p *xsPrinter) declOwnEnd(from int) int {
 }
 
 // decls prints the file's declarations, one blank line between groups and
-// none inside one.
+// none inside one. Each group prints under a limit at the next
+// declaration's start: the verbatim cuts stop there — the bytes past it
+// belong to the sibling, and a cut taking them prints the sibling's head
+// twice (the df7bb1183f5bb08 growth).
 func (p *xsPrinter) decls(list []xs.Decl) {
 	for i := 0; i < len(list); {
 		p.separate()
@@ -1324,9 +1337,15 @@ func (p *xsPrinter) decls(list []xs.Decl) {
 		group := list[i:p.varGroup(list, i)]
 		p.flushBefore(group[0].Range.Start.Offset, 0)
 		p.level = 0
-		p.declGroup(group)
 
 		i += len(group)
+		if i < len(list) {
+			p.declLimit = list[i].Range.Start.Offset
+		} else {
+			p.declLimit = len(p.src)
+		}
+
+		p.declGroup(group)
 	}
 }
 
