@@ -70,6 +70,11 @@ func FuzzXS(f *testing.F) {
 ({}rule {}`)
 	f.Add(`rule """""""""0000000
 ({}rule R {int x=1;}`)
+	// the warnInit terminator crasher (#151): the unpaired "(" in the
+	// block literal keeps the separator scan positive, the fallback cut
+	// reached expectSemi's ";" and the head added its own — one ";" per
+	// pass (TestXS_WarnInitUnpairedBrace pins the fix)
+	f.Add(`vector A=(0,0)%{(0}`)
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")
