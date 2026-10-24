@@ -331,7 +331,10 @@ Two gates beyond unit tests:
 - `make corpus` — builds the server and runs it over a deterministic sample
   of 100 published RMS/XS scripts (`scripts/corpus-fetch.sh` downloads the
   pinned pool on first use; CI caches it). A parser regression on
-  real-world scripts fails the gate.
+  real-world scripts fails the gate. The fetch is skipped only while the
+  on-disk sample still matches the pin (the recorded `.sources-hash`);
+  a re-pin of `corpus-sources.txt` re-downloads instead of leaving a
+  stale sample.
 - `make corpus-official` — a local-only corpus: stages the installed game's
   own maps, includes and XS scripts (`scripts/corpus-official.sh`, found via
   the Steam install; `AOE2DE_DIR` overrides) and runs the binary over them.

@@ -15,13 +15,14 @@ lint:
 	golangci-lint run
 
 # Corpus gate: run the LSP binary over a deterministic sample of real
-# maps (see scripts/corpus-fetch.sh). The fetch is skipped when the
-# sample is already on disk — CI caches .corpus by the sources hash.
+# maps (see scripts/corpus-fetch.sh). The fetch runs when the sample is
+# missing or predates the current pin (the recorded .sources-hash); CI
+# caches .corpus by the sources hash.
 corpus: build
-	@if [ "$$(find .corpus -type f 2>/dev/null | wc -l)" -ge "$${CORPUS_COUNT:-100}" ]; then \
-		echo "corpus: sample on disk ($$(find .corpus -type f | wc -l) files), skipping fetch"; \
+	@if scripts/corpus-fetch.sh --check .corpus; then \
+		echo "corpus: sample on disk matches the pin ($$(find .corpus -type f | wc -l) files), skipping fetch"; \
 	else \
-		scripts/corpus-fetch.sh .corpus; \
+		rm -rf .corpus && scripts/corpus-fetch.sh .corpus; \
 	fi
 	go run ./cmd/corpus -bin aoe2-lsp -dir .corpus
 
