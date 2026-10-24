@@ -142,8 +142,8 @@ RMS snippets are a declarative contribution: `snippets/aoe2rms.json`
 referenced from `contributes.snippets` for language `aoe2rms`. No client
 code — VS Code resolves prefixes from the JSON alone.
 
-- Content sources: the new-map skeleton (Zetnus guide,
-  `docs/ref/zetnus-rms-guide.txt`) and frequent blocks from
+- Content sources: the new-map skeleton (Zetnus guide — not vendored; see
+  README.md) and frequent blocks from
   `docs/ref/map-scripting-practices.md` (create_object with fields,
   start_random, base_terrain, sections).
 - Bodies use placeholders (`${1:default}`, choice `${1|a,b|}`); `$0` is
@@ -213,7 +213,28 @@ semantic tokens, not by the grammar.
   platform archives, so it ships as a release asset covered by
   `SHA256SUMS`. The built name must equal `aoe2-lsp-<tag version>.vsix`
   — a mismatch fails the job (the tag was cut without `release.sh`).
-  Marketplace publishing stays out of scope (#47).
+
+## Publishing (release.yml)
+
+On a `v*` tag the Release workflow publishes the extension after the
+GitHub Release and its assets are verified:
+
+- Gate on secrets (v1-final-mile slot 4): when `VSCE_PAT` / `OVSX_PAT`
+  are not both set, the step prints a `::notice::` and exits 0 — the
+  release ships without publishing, CI stays green.
+- Marketplace: `npx @vscode/vsce publish --no-dependencies` from
+  `editors/vscode/` — the package.json version is already the tag
+  (packaging policy above), so the published version equals the
+  release.
+- Open VSX: `npx --yes ovsx create-namespace <publisher> || true`
+  (the namespace exists after the first publish; its "already exists"
+  failure must not break the run — `ovsx publish` is the real gate),
+  then `npx --yes ovsx publish <dist/*.vsix>` — the exact artifact
+  attached to the GitHub Release. `ovsx` is not a devDependency and
+  runs unpinned via npx.
+- Both tools take their PAT from the environment (`VSCE_PAT`,
+  `OVSX_PAT` repo secrets) — tokens are never passed as CLI arguments
+  and never printed.
 
 ### npm install hygiene
 

@@ -1,8 +1,8 @@
 # Include Closure — consuming the include cell
 
-Domain: resolving the #include/#includeXS closure of a document and
-answering cross-file navigation over it. Target audience: implementers of
-the server cell.
+Domain: resolving the #include/#include_drs/#includeXS closure of a
+document and answering cross-file navigation over it. Target audience:
+implementers of the server cell.
 
 ## Wiring
 

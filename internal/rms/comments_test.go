@@ -128,8 +128,11 @@ func TestRmsComments_Extents(t *testing.T) {
 }
 
 // TestRmsComments_DirectivesStayOut pins the directive vocabulary: a
-// #const/#define/#include/#includeXS/#include_drs line is a directive of
-// the grammar, not a comment — none of them lands in Comments.
+// #const/#define/#include/#includeXS/#include_drs/#undefine/#cost line is
+// a directive of the grammar, not a comment — none of them lands in
+// Comments. #undefine is a no-op directive the engine ignores; #cost is a
+// misspelled #const that is diagnosed but still a directive line, so
+// neither is ever folded into Comments as a plain #-comment.
 func TestRmsComments_DirectivesStayOut(t *testing.T) {
 	t.Parallel()
 
@@ -156,6 +159,14 @@ func TestRmsComments_DirectivesStayOut(t *testing.T) {
 		{
 			name: "include_drs",
 			src:  "#include_drs 1 2\n",
+		},
+		{
+			name: "undefine",
+			src:  "#undefine X\n",
+		},
+		{
+			name: "cost typo",
+			src:  "#cost SOIL4 1\n",
 		},
 	}
 

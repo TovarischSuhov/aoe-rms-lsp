@@ -2,6 +2,8 @@ package kb
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,14 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// zetnusGuide is the committed guide export relative to the package dir.
-const zetnusGuide = "../../docs/ref/zetnus-rms-guide.txt"
+// zetnusGuide returns the local Zetnus-guide export relative to the package
+// dir, or skips the calling test. The export is not vendored — the guide has
+// no explicit license — so a checkout without it exercises only the synthetic
+// fixtures; the tests below pin the real document.
+func zetnusGuide(t *testing.T) string {
+	t.Helper()
 
-// TestExtractRmsCommands_RealGuide extracts from the committed Zetnus
-// export and checks structure, metadata and changelog enrichment.
+	path := filepath.Join("..", "..", "docs", "ref", guideFile)
+	if _, err := os.Stat(path); err != nil {
+		t.Skip("zetnus guide export not present, see docs/kb-refresh.md")
+	}
+
+	return path
+}
+
+// TestExtractRmsCommands_RealGuide extracts from the local Zetnus export and
+// checks structure, metadata and changelog enrichment.
 func TestExtractRmsCommands_RealGuide(t *testing.T) {
 	t.Parallel()
-	commands, err := ExtractRmsCommands(zetnusGuide, nil)
+	commands, err := ExtractRmsCommands(zetnusGuide(t), nil)
 	require.NoError(t, err)
 	require.Greater(t, len(commands), 50)
 
@@ -72,7 +86,7 @@ func TestExtractRmsCommands_MissingFile(t *testing.T) {
 // mined range from the real guide.
 func TestExtractRmsCommands_APIShape(t *testing.T) {
 	t.Parallel()
-	commands, err := ExtractRmsCommands(zetnusGuide, nil)
+	commands, err := ExtractRmsCommands(zetnusGuide(t), nil)
 	require.NoError(t, err)
 
 	byName := make(map[string]Command, len(commands))
@@ -92,7 +106,7 @@ func TestExtractRmsCommands_APIShape(t *testing.T) {
 // guide: skeleton kind wins, mined range fills the empty field.
 func TestExtractRmsCommands_MinesRange(t *testing.T) {
 	t.Parallel()
-	commands, err := ExtractRmsCommands(zetnusGuide, nil)
+	commands, err := ExtractRmsCommands(zetnusGuide(t), nil)
 	require.NoError(t, err)
 
 	byName := make(map[string]Command, len(commands))
@@ -120,7 +134,7 @@ func TestExtractRmsCommands_MinesRange(t *testing.T) {
 // regeneration and load-time mining agree.
 func TestStore_MiningIdempotentWithExtraction(t *testing.T) {
 	t.Parallel()
-	commands, err := ExtractRmsCommands(zetnusGuide, nil)
+	commands, err := ExtractRmsCommands(zetnusGuide(t), nil)
 	require.NoError(t, err)
 
 	wire := make([]commandWire, 0, len(commands))

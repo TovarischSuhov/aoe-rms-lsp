@@ -7,7 +7,10 @@ Target audience: maintainers updating the knowledge base.
 
 - docs/ref/ugc-guide/xs/functions/functions.json → xs-functions.json
 - docs/ref/ugc-guide/xs/constants/constants.json → xs-constants.json
-- docs/ref/zetnus-rms-guide.txt → rms-commands.json (via ExtractRmsCommands)
+- docs/ref/zetnus-rms-guide.txt → rms-commands.json (via ExtractRmsCommands).
+  The export is **not vendored** (the guide ships no explicit license), so it
+  may be absent: kbgen then leaves the committed rms-commands.json untouched
+  and only WARNs. Regenerate the commands from a local export, not from CI.
 - docs/ref/aoe2de-xs-rms-changelog.md → since_update enrichment
 - docs/ref/attribute-descs.json → optional desc overlay (project file, not a
   guide mirror): {"attributes": {name: desc}, "command_args": {command:
@@ -34,6 +37,10 @@ cmd/kbgen wraps exactly this call (flags only, no logic of its own).
 Preconditions:
 - Duplicate names within one file are a build error — resolve, do not skip.
 - NewStore() must pass after regeneration (run kb tests).
+- A missing zetnus-rms-guide.txt is not an error: the XS files regenerate and
+  rms-commands.json is kept as committed (WARN). `kbgen -diff` seeds the kept
+  file so the report stays "no command changes" rather than a wholesale
+  removal.
 
 ## Refresh on game patches
 

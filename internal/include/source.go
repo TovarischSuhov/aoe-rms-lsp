@@ -1,6 +1,6 @@
-// Package include resolves the #include/#includeXS closure of a document
-// and answers cross-file navigation over it: loading files from disk on
-// demand while editor state stays authoritative for open documents.
+// Package include resolves the #include/#include_drs/#includeXS closure of a
+// document and answers cross-file navigation over it: loading files from disk
+// on demand while editor state stays authoritative for open documents.
 package include
 
 // Source supplies the editor-state text of open documents. It inverts the

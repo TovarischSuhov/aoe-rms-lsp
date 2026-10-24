@@ -1,6 +1,6 @@
 # AoE2 DE — XS/RMS changelog из release notes
-# Собрано: 2026-09-04, источник: ageofempires.com/news
-# Период: 2019-11 (релиз AoE2 DE) — 2026-09. Просмотрено 77 постов обновлений AoE2 DE
+# Собрано: 2026-10-13, источник: ageofempires.com/news
+# Период: 2019-11 (релиз AoE2 DE) — 2026-09. Просмотрено 78 постов обновлений AoE2 DE
 # (Update/Minor Update/Hotfix/Update Preview). Посты без XS/RMS-изменений в файл не включены.
 #
 # Регламент пополнения (весь процесс обновления kb — docs/kb-refresh.md):
@@ -12,6 +12,137 @@
 #   разделах "### Триггеры/константы", "### Modding…" и любых с "добавлено"
 # - после пополнения: go run ./cmd/kbgen -diff (отчёт «что нового») →
 #   go run ./cmd/kbgen (перегенерация данных)
+
+## Update 185872 — 2026-09-22
+https://www.ageofempires.com/news/age-of-empires-ii-definitive-edition-update-185872/
+
+### XS: добавлено
+- `bool xsSetTechDescription(int techId, int playerId, string description)`
+- `bool xsInitiateResearch(int buildingUnitId, int techId)`
+- `bool xsHasResearchedLocalTechnology(int unitId, int localTechId)`
+- `bool xsResearchLocalTechnology(int buildingUnitId, int localTechId)`
+- `int xsGetAiSignal(int signalId, bool useLegacyAi)`
+- `void xsSetAiSignal(int signalId, int value, bool useLegacyAi)`
+- `int xsGetMapTileAttribute(int x, int y, int attributeId)` — см. Map Tile Attribute Constants в Constants.xs
+- `bool xsTrainObject(int buildingUnitId, int objectId, int count)`
+- `bool xsSetUnitGatherPoint(int buildingUnitId, vector position, int targetUnitId)` — targetUnitId ставит точку сбора на юнит и имеет приоритет над position
+- `vector xsGetUnitGatherPoint(int buildingUnitId)` — при точке сбора на юните Z-координата вектора содержит ID юнита
+- `string xsGetUnitCaption(int unitId)`
+- `bool xsSetUnitCaption(int unitId, string caption)`
+- `bool xsSetUnitName(int unitId, string name)`
+- `string xsGetUnitCivName(int unitId, bool localized)`
+- `bool xsSetUnitCivName(int unitId, string name)`
+- `string xsGetUnitPlayerName(int unitId)`
+- `bool xsSetUnitPlayerName(int unitId, string name)`
+- `bool xsSetObjectDescription(int playerId, int objectId, string description)`
+- `float xsGetUnitProperty(int unitId, int property, int typeOrPlayer)` — см. Unit Property Constants в Constants.xs
+- `bool xsSetUnitProperty(int unitId, int property, float value, int typeOrForce)` — см. Unit Property Constants в Constants.xs
+- `bool xsSetUnitOwner(int unitId, int32 playerId, bool flashUnit = true)`
+- `bool xsFlashUnit(int unitId, int playerId)`
+- `bool xsStopUnit(int unitId)`
+- `bool xsGetAiScriptGoal(int goalId)`
+- `bool xsSetAiScriptGoal(int goalId, bool value)`
+- `string xsGetCivName(int civId, bool localized)`
+- `string xsGetPlayerCivName(int playerId, bool localized)`
+- `bool xsSetPlayerCivName(int playerId, string name)`
+- `bool xsSetPlayerName(int playerId, string name)`
+- `bool xsSetPlayerColor(int playerId, int colorId)`
+- `bool xsSetViewPosition(int playerId, vector position, int duration)`
+- `bool xsSetZoom(int playerId, float zoom, float duration)`
+- `bool xsBuildUnit(int unitIds, int objectId, vector location1, vector location2, bool isShiftQueue, bool isFormationCommand)`
+- `void xsTaskUnits(int unitIds, int actionType, vector location, int locationObjectId, bool isShiftQueue, bool isFormationCommand, bool shouldPlayUnloadSound, int patrolPoints)`
+- `void xsSetChatToPlayer(int playerId, bool enabled)` — вместе с дипломатическими эффектами
+- Локальные функции — параметр player опционален, работает только для локального игрока:
+  - `float xsUnsyncGetZoom(int playerId = -1)`
+  - `vector xsUnsyncGetViewPosition(int playerId = -1)`
+  - `int xsUnsyncGetPlayerSelectedUnitIds(int arrayId = -1, int playerId = -1)` — возвращает array ID выбранных юнитов; при заданном arrayId переиспользует массив вместо создания нового (аналог xsGetPlayerUnitIds)
+  - `bool xsUnsyncIsUnitVisible(int unitId, bool allowInFog, int playerId = -1)`
+- Строковые функции:
+  - `int ord(string character)`
+  - `string chr(int code)`
+  - `int strLen(string str)`
+  - `string strCharAt(string str, int index)`
+  - `string strSubstring(string str, int start, int end)`
+  - `bool strContains(string str, string substring)`
+  - `bool strStartsWith(string str, string prefix)`
+  - `bool strEndsWith(string str, string suffix)`
+  - `string strRemovePrefix(string str, string prefix)`
+  - `string strRemoveSuffix(string str, string suffix)`
+  - `int strIndexOf(string str, string substring, int fromIndex)`
+  - `int strLastIndexOf(string str, string substring, int fromIndex)`
+  - `string strReplace(string str, string target, string replacement, int max)`
+  - `string strInsert(string str, int index, string target)`
+  - `string strRemove(string str, int index, int length)`
+  - `int strSplit(string str, string delimiter, int max)` — возвращает array ID массива строк
+  - `string strJoin(int arrayId, string delimiter)`
+  - `string strTrim(string str)`
+  - `string strTrimStart(string str)`
+  - `string strTrimEnd(string str)`
+  - `string strToUpper(string str)`
+  - `string strToLower(string str)`
+  - `string strReverse(string str)`
+  - `int strToInt(string str, int base, int defaultValue)`
+  - `float strToFloat(string str, float defaultValue)`
+  - `int hex(string str, int defaultValue)`
+  - `int bin(string str, int defaultValue)`
+  - `string fstr(string str)` — Python-подобная интерполяция строк, только имена переменных, без выражений: пример `fstr("{colourTag}{player}: {msg}")` при валидных в области видимости `colourTag`, `player`, `msg`; `{{`/`}}` экранируют сами скобки; шаблон может быть не литералом — многоязычные шаблоны из языковых файлов через `xsGetString`; имена вне области видимости остаются в выводе без изменений
+- Escape-последовательности в XS-строках: `\n`, `\r`, `\t`, `\b`, `\f`, `\v`, `\\`, `\"`
+
+### XS: переименовано
+- `xsGetLocalPlayerId` → `xsUnsyncGetLocalPlayerId`
+- `xsGetTimerTimeRemaining` → `xsUnsyncGetTimerTimeRemaining`
+- Оба ренейма отражают то, что результат функций не синхронизирован между игроками.
+
+### XS: изменено/исправлено
+- Загрузка сохранения или главы больше не сбрасывает глобальное XS-состояние.
+- Исправлена инициализация top-level/global строк.
+- Исправлен `runImmediately` — правило теперь действительно выполняется в начале игры; main-функция вызывается до runImmediately-правил.
+- `xsModifyObject/UnitTasks` корректно работают с включённым параметром `edit`.
+- `xsModifyObject/UnitTasks` корректно переупорядочивают список задач при удалении задач (раньше последующие операции над задачами падали).
+- Правила в Effects.xs больше не выполняются многократно вместо одного раза в начале игры.
+- `xsGetTaskAmount` возвращает корректные ID при запросе некоторых sprites.
+- `xsCreateUnit` возвращает корректный ID созданного юнита, когда юнит инициирует технологию, вызывающую EffectFunction в XS.
+- Многочисленные новые Object Attributes доступны `xsEffectAmount`/`xsGetUnitAttribute`/`xsGetObjectAttribute` (полный список — Constants.xs).
+- `cAttributeFood` с `xsGetUnitAttributeHeld` суммирует ресурсы всех пищевых типов; отдельные типы по-прежнему доступны через константы `cAttributeMeat`/`cAttributeBerries`/`cAttributeFish`.
+- 4-й параметр `xsGetObjectAttribute` (3-й у `xsGetUnitAttribute`) может задавать Train Location Entry Mod при чтении train location атрибутов; без него используется мод самого юнита (прежнее поведение).
+- `xsEffectAmount` получил опциональный 6-й параметр — Train Location Entry Mod при модификации train location атрибутов юнитов/технологий; для применения ко всем игрокам 5-й параметр (player) задаётся явно как -1.
+- Новые атрибуты доступны через `xsGetTechAttribute` (см. Tech Attribute Constants в Constants.xs).
+
+### Триггеры/константы
+- Новый dropdown "Capture Flag" на вкладке Units — управление auto-conversion; "Never (Gaia Aggressive)" позволяет gaia-юнитам действовать агрессивно; юниты с Auto-Convert task (овцы/монументы) могут конвертироваться даже при "Never".
+- Новый чекбокс "Allow in Fog" в условии "Object is Visible (MP)".
+- Новый dropdown "Unit State" на вкладке Units.
+- Исправлено: terrain из инструмента "Map Copy" не появлялся на карте до теста/загрузки сценария.
+- Исправлено: некоторые типы флагов не заменялись эффектом Replace Object.
+- Поле "Master Filter" (в отдельных эффектах Modify Object Attribute) переименовано в "Object Modified State": "All" без изменений; "Shared Master" → "Previously Unmodified" (только юниты, ранее не изменявшиеся Modify Object Attribute); "Own Master" → "Previously Modified" (только ранее изменённые).
+- Stop Object/Freeze Object/Task Object (Stop) теперь корректно очищают очереди производства зданий.
+- Task Object: действие Unload переименовано в "Unload All" и работает как задумано (как обычный Unload); Ungarrison переименован в "Ungarrison Specific", поведение без изменений (приказ покинуть юнит, внутри которого объект гарнизонирован).
+
+### Modding (атрибуты/таски — влияют на константы для XS/Modify Attribute)
+- Звуки в модах: можно добавлять/заменять звуки голыми .wav; при одноимённых .wav и .wem приоритет у .wem (обходится переименованием .wav → .wem — такой файл остаётся валидным WEM).
+- Loot/Power up/Stinger: один Task может нацеливаться на несколько классов юнитов — при "Class" > 1000 целевые классы задаются флагами Charge Attack Filter: 1 Infantry; 2 Cavalry; 4 Archers; 8 Cavalry Archers; 16 Monks; 32 Villagers/Trade Carts/Kings; 64 Ships; 128 Siege; 256 Buildings; отрицательное значение — все классы, кроме указанного.
+- Task 151 (Generating Resources): Unused Flag 4 — work rate юнита как множитель генерации.
+- Task 157 (Stinger): Search Wait Time — атрибуты 63 (Combat Ability), 129 (Invulnerability Level), 115 (Area Damage), 22 (Blast Width); Resource Gathering Sound — короткий tooltip UI-индикатора; Resource Deposit Sound — длинный tooltip; Gather Type — иконка UI-индикатора (per icons.json); Unused Flags: 4 — применять только при charge attack, 8 — полоса длительности над юнитом (как у временных аур), 16 — иконка/описание Stinger в статах юнита.
+- Task 161 (Unit Refund): при Work Range > 0 — проверка Target Diplomacy до выдачи ресурсов; Unused Flag 2 — выдавать ресурс пропорционально прогрессу строительства.
+- Новый Task 164 (Drop off bonus): при сборе ресурса дополнительно собирается вторичный ресурс; не учитывается в carry capacity, отображается в UI (одинаковый ресурс объединяется на UI); Class/Unit ограничивает цель сбора (без них — любой); Work Value 1 — множитель; Productivity Resource — если задан, умножается на Work Value 1; Resource Out — тип генерируемого бонусного ресурса.
+- Новые Object Attributes 167–221: 167 Build And Go Away; 168–170 Type First/Second/Third Storage; 171–173 Store Flag First/Second/Third Storage; 174–176 Amount First/Second/Third Cost; 177–179 Type First/Second/Third Cost; 180–182 Deduct Flag First/Second/Third Cost; 183 Spawning Graphic; 184 Upgrade Graphic; 185 Fly Mode; 186 Can Be Gathered; 187 Hill Mode; 188 Doppelganger; 189 Gather Group; 190 Task Swap Group; 191–192 Placement Terrain 1/2; 193–194 Placement Center Terrain 1/2; 195 Initiated Tech Id; 196 Min Size Multiplier; 197–199 Selection Outline Size X/Y/Z; 200–201 Clearance Size X/Y; 202 Stack Unit; 203 Head Unit; 204 Transform Unit; 205 Pile Unit; 206–209 Annex Units 1–4; 210–217 Annex Units 1–4 Offset X/Y; 218 Move Algorithm; 219 Spacing Modifier; 220 Can Burn; 221 Gather Flag.
+- Resource 96 больше не управляет бонусом Khmer (фермы без dropsite); вместо него Unused Flag (aka Combat Level Flag) = 1 на Hunt/Gather задачах — автосбор всеми villager'ами.
+- Resource 18 (Civilization Voice Override) — теперь позволяет задать язык другой цивилизации (по её ID).
+- Projectile Smart Mode: новый флаг 4 — снаряды игнорируют agility цели; флаг 8 — Charge/Secondary снаряды наносят собственный урон юнита вместо прочего.
+- Исправлено: поле Resource Out в hunt/gather задачах работало некорректно.
+- Исправлено: моды кастомных цивилизаций с числом цивилизаций меньше базовой игры не работали.
+
+### RMS
+- Проверка шанса при выборе объекта из object group больше не инвертирована.
+- Исправлено: map type из параметра `ai_info_map_type` не учитывался AI.
+- Исправлено: GAIA `effect_amount`-команды random map, сгенерированных в редакторе, больше не переносились в следующую игру той же сессии.
+- Константы `random_map.def` обновлены и исправлены: расширены с 41 legacy-декларации до всех 194 актуальных записей; исправлены устаревшие/некорректные ID, удалены legacy-константы без соответствующих карт; `ATTR_ICON_GRAPHICS_ANGLE` больше не определён неверно как ATTR_UPGRADE_GRAPHIC; `ATTR_REMOVE_ATTACK_TYPE` — как ATTR_REMOVE_ARMOR_TYPE; добавлены unit class constants.
+- Новые террейны: Forest, Spruce (131); Forest, Spruce Snow (132); Forest, Oak Green (133).
+- Новые деревья: Spruce (2731), Spruce Snow (2732), Bush Gorse (2733).
+- Новое eye candy-растение: Heather (2743).
+- Новые хищники: Lynx (2736), Elk (2737).
+- Новый huntable: Seal (2735); мелкий непушимый huntable: Pheasant (2739); новая птица: Raven (2578).
+- Новые камни: Mossy Rock (1967), Snow Rock (2734).
 
 ## Update 177723 — 2026-06-02
 https://www.ageofempires.com/news/age-of-empires-ii-definitive-edition-update-177723/

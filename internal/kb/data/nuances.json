@@ -1,0 +1,12 @@
+{
+  "noop_attributes": [],
+  "aliases": [],
+  "deprecated": [
+    {
+      "name": "effect_percent",
+      "code": "deprecated-effect-percent",
+      "message": "effect_percent is deprecated; use effect_amount instead"
+    }
+  ],
+  "legacy": []
+}

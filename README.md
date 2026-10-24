@@ -14,7 +14,8 @@ Definitive Edition languages:
 - **XS** — External Subroutines (C-like scripting used inside RMS and scenarios)
 
 The server is editor-agnostic; a VS Code extension ships in-tree
-([`editors/vscode`](editors/vscode)) and Neovim wiring is documented below.
+([`editors/vscode`](editors/vscode)), and Neovim and Notepad++ wiring is
+documented below.
 Editor-integration details (capabilities, settings, cross-file specifics):
 [`internal/server/.usages/lifecycle.md`](internal/server/.usages/lifecycle.md).
 
@@ -25,7 +26,8 @@ a pre-DE grammar, and fresh editor extensions provide highlighting only.
 
 - **Diagnostics** — syntax (error-recovery parsers) and semantic (unknown
   commands/attributes/symbols, arity, value types); missing
-  `#include`/`#includeXS` targets are reported on the directive's path.
+  `#include`/`#include_drs`/`#includeXS` targets are reported on the
+  directive's path.
   Per-code severity overrides via settings (`none` suppresses a diagnostic).
 - **Quick fixes** — "Change to X" renames suggested from the diagnostic
   message for unknown identifiers, `effect_percent` → `effect_amount`
@@ -44,6 +46,8 @@ a pre-DE grammar, and fresh editor extensions provide highlighting only.
   command/attribute/constant names and XS identifiers.
 - **Folding ranges** — every outline node spanning more than one line (RMS
   sections, XS declarations).
+- **Formatting** — canonical full-document formatting for RMS (indentation,
+  section layout); XS formatting is in development.
 - **Live config** — settings changes re-publish diagnostics without a
   restart; file watchers force-reload changed on-disk includes.
 
@@ -51,19 +55,22 @@ a pre-DE grammar, and fresh editor extensions provide highlighting only.
 
 ```
 cmd/            thin entrypoints: aoe2-lsp (server), kbgen (KB regeneration),
-                corpus (corpus-gate runner)
+                corpus (corpus-gate runner), newscheck (release-notes
+                monitor), tmgen (TextMate grammar generator)
 internal/
   common/       positions, ranges, diagnostics, outline symbols, tokens
                 (shared data types)
   kb/           knowledge base: embedded JSON (XS functions, constants, RMS
                 commands) + data pipeline (GenKB extraction from docs/ref)
+  news/         AoE2DE release-notes feed feeding KB freshness
   rms/          RMS parser (lexer → AST with error recovery)
   xs/           XS parser (C-like grammar, rules/events, externs)
   analysis/     semantic checks (unknown symbols, arity, value types,
                 semantic tokens)
   hints/        signature-help computation (protocol-agnostic)
   complete/     completion candidates (protocol-agnostic)
-  include/      #include/#includeXS closure, cross-file navigation
+  format/       full-document formatter (RMS; XS in development)
+  include/      #include/#include_drs/#includeXS closure, cross-file navigation
   corpus/       running the LSP binary over a sample of real maps
   server/       LSP server over go.lsp.dev/protocol (stdio)
 editors/vscode/ VS Code extension (language configs + LSP client wiring)
@@ -86,14 +93,23 @@ RMS/XS grammars, go.lsp.dev patterns).
 ## Data sources
 
 All sources are vendored locally under `docs/ref/` (no network at build or
-runtime).
+runtime). One exception: the Zetnus guide is not vendored (it ships no
+explicit license) — only its derived `rms-commands.json` is committed (see
+the paragraph after the table).
 
 | Source | What it provides | License | Link |
 |---|---|---|---|
 | **AoE2DE UGC Guide** (Divy1211 et al.) | `xs-functions.json` (204 XS functions), `xs-constants.json` (27 sections), `prelude.xs` dump, XS language docs | **GPL-3.0** | [github.com/Divy1211/AoE2DE_UGC_Guide](https://github.com/Divy1211/AoE2DE_UGC_Guide) · [ugc.aoe2.rocks](https://ugc.aoe2.rocks/general/xs/) |
-| **Zetnus — Definitive Random Map Scripting Guide** | RMS commands/attributes reference (Syntax Skeleton, Constant Reference) | no explicit license; used factually with attribution | [Google Doc](https://docs.google.com/document/d/1jnhZXoeL9mkRUJxcGlKnO98fIwFKStP_OBozpr0CHXo/edit) · [forum thread](https://forums.ageofempires.com/t/definitive-random-map-scripting-guide/104902) |
+| **Zetnus — Definitive Random Map Scripting Guide** | RMS commands/attributes reference (Syntax Skeleton, Constant Reference); only the derived `rms-commands.json` is committed — the full text is not vendored (no explicit license) | derived facts, used with attribution | [Google Doc](https://docs.google.com/document/d/1jnhZXoeL9mkRUJxcGlKnO98fIwFKStP_OBozpr0CHXo/edit) · [forum thread](https://forums.ageofempires.com/t/definitive-random-map-scripting-guide/104902) |
 | **Official AoE2 DE release notes** (World's Edge) | version metadata ("since update N") for KB entries (`docs/ref/aoe2de-xs-rms-changelog.md`) | quoted factually | [ageofempires.com/news](https://www.ageofempires.com/news/) |
 | **aoe2map.net / snippets** (siegeengineers) | real-world RMS/XS corpus: parser fixtures, the corpus gate sample, research notes | community content | [aoe2map.net](https://aoe2map.net/) · [snippets.aoe2map.net](https://snippets.aoe2map.net/) |
+
+Not listed above: the game's own RMS/XS scripts
+(`scripts/corpus-official.sh`) — they are used **locally only**, staged from
+a machine with AoE2DE installed, and never vendored, committed or shipped.
+They are Microsoft-copyrighted (the game is licensed, not sold, and its EULA
+forbids copying beyond the license or publishing), so they stay in a
+gitignored directory.
 
 Derived knowledge-base files (`internal/kb/data/xs-functions.json`,
 `internal/kb/data/xs-constants.json`) are adapted from the UGC Guide and are
@@ -102,12 +118,21 @@ real-map nuances, authoring practices — `docs/ref/real-map-nuances.md`,
 `docs/ref/map-scripting-practices.md`) is the project's own, collected from
 published maps with attribution.
 
+The Zetnus guide export (`docs/ref/zetnus-rms-guide.txt`) is **not** part of
+the repository: it is gitignored and kept as a local, optional copy so a
+maintainer can still regenerate the RMS commands. Without it `kbgen`
+regenerates only the XS files and leaves the committed `rms-commands.json`
+alone (see `docs/kb-refresh.md`).
+
 ## Install & run
 
 Prebuilt binaries (Windows, Linux, macOS Intel/Apple Silicon) are attached to
 [GitHub Releases](https://github.com/TovarischSuhov/aoe-rms-lsp/releases) —
 archives plus `SHA256SUMS`; releases are built and published by CI when a
-`v*` tag is pushed. Check the version with `aoe2-lsp --version`.
+`v*` tag is pushed. Check the version with `aoe2-lsp --version`. The VS
+Code extension ships with each release too: the `.vsix` is attached to the
+release assets and published to
+[Open VSX](https://open-vsx.org/extension/tovarischsuhov/aoe2-lsp).
 
 Cutting a release (from a clean, synced master): `make release BUMP=patch`
 (or `VERSION=vX.Y.Z`) — the script prepends the changelog built from the
@@ -150,14 +175,18 @@ apart from errors.
 
 ## Editor setup
 
-Both editors talk to the same binary over stdio and share the `aoe2lsp`
-settings section:
+All three editors talk to the same binary over stdio; VS Code and Neovim
+share the `aoe2lsp` settings section (the Notepad++ route has a caveat —
+see its section below):
 
 ```jsonc
 {
   "aoe2lsp": {
     "diagnostics": {
-      "severityOverrides": { "undefined-symbol": "hint" }  // code → error|warning|info|hint|none
+      "severityOverrides": {
+        "undefined-symbol": "hint",   // code → error|warning|info|hint|none
+        "unknown-directive": "none"   // e.g. silence the #cost typo warning
+      }
     },
     // extra #include search dirs, e.g. the game's resource folders:
     "includeRoots": [
@@ -175,14 +204,21 @@ lspconfig `settings` table.
 ### VS Code (bundled extension)
 
 The extension in `editors/vscode/` registers the `aoe2rms`/`aoe2xs` languages
-(brackets, comments), launches the binary and forwards the settings. It is
-not on the Marketplace yet — package and install it locally:
+(brackets, comments), launches the binary and forwards the settings. Install
+it from [Open VSX](https://open-vsx.org/extension/tovarischsuhov/aoe2-lsp),
+or grab the `.vsix` attached to each GitHub Release:
+
+```sh
+code --install-extension aoe2-lsp-<version>.vsix
+```
+
+A local build is packaged the usual way:
 
 ```sh
 cd editors/vscode
 npm install
-npm run package            # dist/extension.js + aoe2-lsp-0.1.0.vsix
-code --install-extension aoe2-lsp-0.1.0.vsix
+npm run package            # dist/extension.js + aoe2-lsp-<version>.vsix
+code --install-extension aoe2-lsp-<version>.vsix
 ```
 
 A prebuilt `.vsix` is also attached to every CI run (artifact
@@ -239,6 +275,45 @@ vim.filetype.add({
 })
 ```
 
+### Notepad++ (NppLspClient)
+
+Notepad++ has no built-in LSP support; the third-party
+[NppLspClient](https://github.com/Ekopalypse/NppLspClient) plugin
+provides it. The plugin is explicitly experimental (requires Notepad++
+8.7.7+ and its supported feature set is still evolving), and this
+combination has not been verified end-to-end yet — treat this section
+as a starting point.
+
+Install the plugin per its README (release zip into `Notepad++\plugins`)
+and get the `aoe2-lsp.exe` Windows binary from
+[GitHub Releases](https://github.com/TovarischSuhov/aoe-rms-lsp/releases).
+The server is configured in the plugin's TOML config (Plugins →
+NppLspClient → Open configuration). The section key is the Notepad++
+language name of the buffer; since `.rms`/`.xs` have no built-in
+language, create User Defined Languages with those exact names first
+(the plugin docs show the same pattern for Terraform):
+
+```toml
+[lspservers.aoe2rms]
+mode = "io"
+executable = 'C:\tools\aoe2-lsp\aoe2-lsp.exe'
+
+[lspservers.aoe2xs]
+mode = "io"
+executable = 'C:\tools\aoe2-lsp\aoe2-lsp.exe'
+```
+
+Start the server on an open script via "Start server for current
+language" (or set `auto_start_server = true`). Plugin caveats that
+matter for map scripts: open the maps folder in Folder as Workspace, so
+`rootUri` points at the script tree — without it the plugin falls back
+to the opened file's own directory, which can miss sibling `#include`
+targets; reload externally changed files through the plugin menu, not
+Notepad++'s builtin reload. The `aoe2lsp` settings section
+(`includeRoots`, `severityOverrides`) is delivered over LSP workspace
+settings; whether the plugin forwards them is unverified — until
+checked, assume server defaults apply.
+
 ## Development
 
 Go 1.26+, stdlib first. The standard pre-completion check sequence:
@@ -257,6 +332,10 @@ Two gates beyond unit tests:
   of 100 published RMS/XS scripts (`scripts/corpus-fetch.sh` downloads the
   pinned pool on first use; CI caches it). A parser regression on
   real-world scripts fails the gate.
+- `make corpus-official` — a local-only corpus: stages the installed game's
+  own maps, includes and XS scripts (`scripts/corpus-official.sh`, found via
+  the Steam install; `AOE2DE_DIR` overrides) and runs the binary over them.
+  Microsoft-copyrighted content — gitignored, never committed.
 - CI (`.github/workflows/ci.yml`) — goimports/gofumpt, `go test -race`,
   golangci-lint, govulncheck, VS Code extension type-check + `.vsix`
   packaging, and the corpus gate on master pushes.
@@ -270,7 +349,9 @@ The embedded knowledge base is regenerated from `docs/ref/` with
 
 The project is licensed under GPL-3.0 as a whole because its embedded
 knowledge-base data derives from the GPL-3.0 AoE2DE UGC Guide. Zetnus guide
-material is used factually (command/attribute structure) with attribution.
+material is used factually (command/attribute structure) with attribution;
+the guide text itself is not vendored, only the derived `rms-commands.json`
+is committed.
 
 Age of Empires II: Definitive Edition is a product of World's Edge / Xbox Game
 Studios; this project is not affiliated with or endorsed by them.

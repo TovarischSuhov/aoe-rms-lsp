@@ -42,13 +42,13 @@
         },
         {
           "name": "comment.line.number-sign.aoe2rms",
-          "match": "#(?!(?:includeXS|include_drs|include|const|define)\\b).*$"
+          "match": "#(?!(?:includeXS|include_drs|include|const|define|undefine)\\b).*$"
         }
       ]
     },
     "directives": {
       "name": "keyword.control.directive.aoe2rms",
-      "match": "#(?:includeXS|include_drs|include|const|define)\\b"
+      "match": "#(?:includeXS|include_drs|include|const|define|undefine)\\b"
     },
     "strings": {
       "name": "string.quoted.double.aoe2rms",

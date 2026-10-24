@@ -1,0 +1,9 @@
+{
+  "aoe2": {
+    "command": "aoe2-lsp",
+    "extensionToLanguage": {
+      ".rms": "rms",
+      ".xs": "xs"
+    }
+  }
+}

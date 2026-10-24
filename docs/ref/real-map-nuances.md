@@ -4,8 +4,7 @@
 100 опубликованных карт (прогон 09.09.2026, см.
 [corpus-run-2026-09-09.md](../reviews/corpus-run-2026-09-09.md)), которые
 **не описаны в референсе** — гайде Зетнуса
-([Google Doc](https://docs.google.com/document/d/1jnhZXoeL9mkRUJxcGlKnO98fIwFKStP_OBozpr0CHXo/edit),
-локальная копия: `docs/ref/zetnus-rms-guide.txt`; строки указаны по ней).
+([Google Doc](https://docs.google.com/document/d/1jnhZXoeL9mkRUJxcGlKnO98fIwFKStP_OBozpr0CHXo/edit); текст гайда в репозитории не вендорится — ссылки на строки в этом файле даны по локальной копии `docs/ref/zetnus-rms-guide.txt`).
 
 Рабочая гипотеза (подтверждается структурой находок): движок RMS
 прощающий — неизвестные команды и атрибуты **молча игнорируются**, поэтому

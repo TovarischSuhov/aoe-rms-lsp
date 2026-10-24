@@ -22,9 +22,9 @@ const (
 	maxFiles = 1024
 )
 
-// Resolver computes the #include/#includeXS closure of a document and
-// answers cross-file navigation over it. Editor state (Source) always
-// wins over the disk copy; disk files are cached by size and modtime.
+// Resolver computes the #include/#include_drs/#includeXS closure of a
+// document and answers cross-file navigation over it. Editor state (Source)
+// always wins over the disk copy; disk files are cached by size and modtime.
 type Resolver struct {
 	source Source
 

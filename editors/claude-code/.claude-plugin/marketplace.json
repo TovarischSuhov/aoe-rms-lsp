@@ -1,0 +1,15 @@
+{
+  "name": "aoe2-local",
+  "description": "Local Claude Code plugins for AoE2 tooling",
+  "owner": {
+    "name": "Ilya Sukhov"
+  },
+  "plugins": [
+    {
+      "name": "aoe2-lsp",
+      "source": "./plugins/aoe2-lsp",
+      "description": "AoE2 DE RMS + XS language server (aoe2-lsp) for Claude Code",
+      "category": "development"
+    }
+  ]
+}

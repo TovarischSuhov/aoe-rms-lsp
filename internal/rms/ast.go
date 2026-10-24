@@ -90,8 +90,8 @@ type RmsFile struct {
 	// source-agnostic. ArgAt answers silence from here.
 	Comments []common.Range
 	// excluded are the line spans that never own a statement — section
-	// headers, #include/#includeXS directive lines (path arguments
-	// included) and plain #-comment lines.
+	// headers, #include/#includeXS/#include_drs directive lines (path
+	// arguments included) and plain #-comment lines.
 	excluded []common.Range
 }
 
@@ -175,9 +175,10 @@ func endsBefore(stmt *Statement, pos common.Pos) bool {
 
 // ArgAt discriminates the argument context under the cursor (signature
 // help): the owning command plus the active element. Strings, comments,
-// section-header lines, #include/#includeXS lines and plain #-comment
-// lines answer found=false before any owner lookup; directive-styled
-// statements (#const, #define, #include_drs) are filtered by name.
+// section-header lines, #include/#includeXS/#include_drs lines and plain
+// #-comment lines answer found=false before any owner lookup; all
+// #-prefixed statements (e.g. #const, #define, #undefine, #cost) are
+// filtered by name.
 // Ambiguous positions (braces, gaps, command tail) answer KindNone —
 // never a guessed label.
 func (f RmsFile) ArgAt(pos common.Pos) (ArgSite, bool) {

@@ -1,8 +1,9 @@
 # RMS Grammar — AoE2 Definitive Edition
 
 Domain: the Random Map Script language structure. Target audience: implementers
-of the rms, analysis and kb cells. Sources: docs/ref/zetnus-rms-guide.txt
-(canonical), docs/ref/aoe2de-xs-rms-changelog.md (versioning).
+of the rms, analysis and kb cells. Sources: the Zetnus guide (canonical, not
+vendored — distilled into internal/kb/data/rms-commands.json; see README.md),
+docs/ref/aoe2de-xs-rms-changelog.md (versioning).
 
 ## File structure
 
@@ -36,9 +37,18 @@ command starts. Comments: `/* ... */` (block), `//` and `#` line comments.
 ## Directives
 
     #include <file.rms>      — text include (rms.File.Includes)
+    #include_drs <file> [id] — DE include; the first token is the path, a trailing
+                             legacy numeric id is dropped (rms.File.Includes)
     #includeXS <file.xs>     — inline XS block begins (rms.XsBlock)
     #includeXS               — bare directive switches the rest of file to XS
     #const NAME value        — script constant definition
+    #define NAME value        — script constant definition
+    #undefine NAME           — undefinition line; recorded as a statement
+
+`#cost` is not part of the language: it is a `#const` typo the parser knows
+and reports as an `unknown-directive` warning (kept as a statement). The
+TextMate grammar leaves it unhighlighted on purpose — it stays a hash-comment
+line rather than being colored as a misspelled directive.
 
 ## DE-era additions (must parse; see changelog for versions)
 

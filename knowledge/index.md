@@ -16,4 +16,4 @@ okf_version: "0.2"
 ## Процедуры
 
 * [Проверка изменений](/runbooks/verification.md) — предзадачная последовательность make check, тесты под memory cap, corpus gate, fuzz-цели, состав CI, рабочий процесс задача → ветка → PR
-* [Пайплайн данных базы знаний](/runbooks/kb-data-pipeline.md) — регенерация embedded JSON из docs/ref/ через kbgen, обновление на патчах игры, ночной kb-monitor, лицензионные следствия GPL-3.0
+* [Пайплайн данных базы знаний](/runbooks/kb-data-pipeline.md) — регенерация embedded JSON из docs/ref/ через kbgen (гайд Zetnus — необязательный источник, не вендорится), обновление на патчах игры, ночной kb-monitor, лицензионные следствия GPL-3.0

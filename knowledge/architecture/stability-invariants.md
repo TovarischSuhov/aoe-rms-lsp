@@ -8,6 +8,8 @@ sources:
   - resource: Makefile
   - resource: internal/include/source.go
   - resource: internal/rms/parse.go
+  - resource: internal/analysis/analyzer.go
+  - resource: internal/common/diagnostic.go
   - resource: .goga/history/2026/task-xs-comment-scan/arch.md
   - resource: internal/xs/parse.go
   - resource: internal/server/server.go
@@ -250,8 +252,13 @@ verified:
 ## Диагностика
 
 - **Коды правил стабильны между релизами** (`unknown-command`,
-  `undefined-symbol`, `bad-arity`, …) — на них опираются тесты и
-  пользовательские `severityOverrides` в настройках. Код — это контракт.
+  `undefined-symbol`, `bad-arity`, `unknown-directive`, …) — на них
+  опираются тесты и пользовательские `severityOverrides` в настройках.
+  Код — это контракт. Единого реестра кодов нет: код живёт либо именованной
+  константой ячейки (`analysis` — `CodeUnknownCommand`…`CodeBadArity`,
+  `server` — `codeMissingInclude`), либо строковым литералом в месте эмита
+  (`rms` — `"syntax"`, `"unknown-directive"`). Совпадение эмиттера и
+  настройки держится соглашением, не типом.
 - Значения severity следуют нумерации LSP 1..4; новых значений нет.
 - **Error-диагностики парсера отказывают форматтер** (#96):
   `format.RMS` и `format.XS` на входе с хотя бы одной error-диагностикой

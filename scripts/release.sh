@@ -3,7 +3,9 @@
 # conventional commits since the last tag, prepend it to CHANGELOG.md, bump
 # the extension version in editors/vscode/package.json into the same commit,
 # tag and push. The pushed v* tag triggers .github/workflows/release.yml,
-# which builds the binaries, the .vsix and the GitHub Release.
+# which builds the binaries, the .vsix, creates the GitHub Release and
+# publishes the extension (Marketplace/Open VSX, gated on the
+# VSCE_PAT/OVSX_PAT secrets).
 #
 # Usage: scripts/release.sh <major|minor|patch|vX.Y.Z> [--dry-run]
 #   major|minor|patch — bump the last tag (prerelease suffix is dropped first:

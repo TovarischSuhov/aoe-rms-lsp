@@ -1,0 +1,20 @@
+[
+  {
+    "name": "create_terrain",
+    "section": "terrain_generation",
+    "args": [{"name": "terrain", "kind": "const"}],
+    "attributes": []
+  },
+  {
+    "name": "create_object",
+    "section": "objects_generation",
+    "args": [],
+    "attributes": [{"name": "number_of_objects", "kind": "number"}]
+  },
+  {
+    "name": "old_cmd",
+    "section": "player_setup",
+    "args": [],
+    "attributes": []
+  }
+]

@@ -5,8 +5,18 @@ Usages:
     - xs-functions.json  — adapted from docs/ref/ugc-guide/xs/functions/functions.json
       (categories flattened; fields: name, category, return_type, params[], desc, since_update)
     - xs-constants.json — from constants/constants.json (fields: name, section, value, desc, since_update)
-    - rms-commands.json — extracted from docs/ref/zetnus-rms-guide.txt
+    - rms-commands.json — committed data file, extracted from the Zetnus guide
+      (referenced, not vendored: the local docs/ref/zetnus-rms-guide.txt export
+      is gitignored; regeneration keeps the committed file when it is absent)
       (fields: name, section, args[], attributes[], desc, game_versions, since_update)
+    - nuances.json — hand-curated nuance data, edited in place (GenKB
+      regeneration never touches it): noop_attributes[] {command, attribute}
+      — documented no-op pairs (the game ignores the attribute in this
+      position); aliases[] {wrong, right} — known typos; deprecated[] and
+      legacy[] {name, code, message} — deprecation/legacy markers (legacy
+      for #-directives, name includes #). code is a stable public diagnostic
+      code (e.g. "deprecated-effect-percent"); message is the diagnostic
+      text verbatim.
     since_update sourced from docs/ref/aoe2de-xs-rms-changelog.md; empty string when unknown.
     Names must be unique within each file — validated on load.
 
@@ -64,7 +74,10 @@ Annotations: |
 
     Requirements:
     - конструктор NewStore() читает файлы по `kbdata` и валидирует схему:
-      неизвестные ключи, дубликаты имён, пустые name — ошибка загрузки
+      неизвестные ключи, дубликаты имён, пустые name/code/message — ошибка
+      загрузки; имя одновременно в deprecated и legacy — тоже ошибка
+    - NewStoreFromDir(dir) — тот же конструктор по каталогу файлов той же
+      схемы вместо встраивания (тестовые фикстуры); в рантайме не используется
     - после построения Store потокобезопасен для чтения (immutable данные)
     - при загрузке CommandArg с пустым Range или пустым Kind —
       `MineKindRange`(Desc); идемпотентно с экстракцией (заполнение только
@@ -88,6 +101,25 @@ Annotations: |
       Спецификация атрибута команды; found=false если команда или атрибут неизвестен.
 
       `command`: имя команды; `attr`: имя атрибута
+    "NoopAttribute(command: string, attr: string) -> noop: bool": |
+      Задокументированная no-op пара команда×атрибут из `kbdata`
+      (nuances.json): игра, скорее всего, игнорирует атрибут в этой позиции.
+
+      `command`: имя команды; `attr`: имя атрибута
+    "Alias(name: string) -> right: string, found: bool": |
+      Каноническое написание для известной опечатки; found=false если имя
+      не алиас.
+
+      `name`: проверяемое имя; `right`: правильное написание
+    "Deprecated(name: string) -> code: string, message: string, found: bool": |
+      Deprecated-метка имени: стабильный публичный код диагностики и текст
+      verbatim из `kbdata` (nuances.json); found=false если не помечено.
+
+      `name`: имя команды; `code`: код диагностики; `message`: текст
+      предупреждения
+    "Legacy(name: string) -> code: string, message: string, found: bool": |
+      Legacy-метка #-директивы (`name` с #): code — стабильный публичный
+      код, message — текст verbatim, те же поля, что у deprecated-меток.
 
 "Function()":
   location: model.go
@@ -226,7 +258,8 @@ Annotations: |
     Разовое извлечение RMS-команд из текстового экспорта гайда Zetnus
     в rms-commands.json (формат по `kbdata`).
 
-    `path`: путь к docs/ref/zetnus-rms-guide.txt
+    `path`: путь к экспорту гайда; в репозитории его нет (гайд не
+    вендорится), у мейнтейнера — локальная копия docs/ref/zetnus-rms-guide.txt
     `log`: инжектированный логгер сборки (в Go — *slog.Logger; nil → slog.Default())
     `commands`: извлечённые команды; `err`: ошибки чтения/разбора
 
