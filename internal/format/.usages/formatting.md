@@ -133,6 +133,15 @@ XS additionally:
   keeps its own terminator discipline — `vector A=0.!%{(}` was never
   bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
   seed `void A(){0.!%{(}}`.
+- The include tail-comment drift (#164) is closed: unclosedEOF's
+  byte check reads a closing `*/` only in the suffix — a `*/` short
+  of an EOF-clipped extent's end is other bytes' (the opener `/*/`
+  carries its own pair), so the include line's cut stops before the
+  unterminated tail instead of gluing it to the directive line, and
+  the comment anchors on its own line from the first pass. A closed
+  block at EOF still rides the line as written. Pins:
+  TestXS_IncludeTrailingCommentOnce (five rows) and the FuzzXS seed
+  `include"";include"";/*/0`.
 - Convergence has known open escape classes — the list is not
   closed, fresh fuzzing keeps surfacing more (the grouped
   zero-call chain below surfaced in this run's fuzz re-check).
@@ -161,11 +170,7 @@ XS additionally:
   `vector A = (A)();`, one `()` pair short of the input; pass 2
   unwraps the grouping — `vector A = A();`; fixed point from
   pass 3, and neither the input nor any pass output carries a
-  diagnostic — a silent byte change, the reparse never breaks),
-  the comment drift
-  behind a doubled include (`include"";include"";/*/0` — pass 1
-  glues `/*/0` to the second include line, pass 2 moves it to its
-  own line; fixed point from pass 2, the reparse stays whole) and
+  diagnostic — a silent byte change, the reparse never breaks) and
   the paren-dropping zero-call chain (`vector A=0(0())()` —
   pass 1 prints `vector A = 0(0();`, one `)` short, and the output
   does not reparse, `expected , or ) in argument list`; the two

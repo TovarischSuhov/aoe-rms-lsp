@@ -138,10 +138,13 @@ func (p *xsPrinter) commentText(r common.Range) string {
 // file's end: an unterminated /* — or a // on the file's last line —
 // whose extent runs to EOF, so every closer printed after its start is
 // swallowed by it on the next parse. The extent's bytes are checked too —
-// a "*/" inside means the scanner closed this comment and the EOF end
-// came from the file simply ending there.
+// a comment the scanner closed ends on its "*/", so only a suffix closes:
+// a "*/" short of the end is other bytes' — the opener itself can carry
+// one ("/*/" closes the pair before the comment said anything), and
+// reading it as a closer once glued an unterminated tail comment into an
+// include line's cut and shifted its anchoring to the next pass.
 func (p *xsPrinter) unclosedEOF(r common.Range) bool {
-	return r.End.Offset >= len(p.src) && !strings.Contains(p.cut(r), "*/")
+	return r.End.Offset >= len(p.src) && !strings.HasSuffix(p.cut(r), "*/")
 }
 
 // flushBefore anchors every comment starting before the byte offset, in
