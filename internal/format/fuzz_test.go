@@ -41,6 +41,9 @@ func FuzzXS(f *testing.F) {
 	f.Add("rule\"0000\n{/**/}")
 	f.Add(`vector A=(0,0)(0)`)
 	f.Add(`void A(){in%A00%A0000.0;0}`)
+	// #163: the block literal's own "}" must not be spent on its
+	// tolerated unclosed "(", or the cut eats the enclosing body's
+	f.Add(`void A(){0.!%{(}}`)
 	f.Add(`vector A=(0(0))`)
 	f.Add(`vector A=(0(0));`)
 	f.Add(`void f(){while{x}{y}}`)

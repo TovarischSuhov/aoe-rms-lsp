@@ -123,6 +123,16 @@ XS additionally:
   parser reads `void void` as two type words on any reparse — and only
   comma re-attachment could print it, which the comment anchoring
   forbids.
+- The warn-literal statement body (#163) is closed on the statement
+  path: warnCutEnd's closer hunt pairs by opener kind — a closer pops
+  the opener of its own kind, and a closer nothing opened of its kind
+  (the parser tolerates an unclosed `(` inside a block literal) closes
+  the opener the depth counted, so `void A(){0.!%{(}}`'s cut stops on
+  the literal's own `}` instead of spending it on the `(` and eating
+  the enclosing body's brace. The declaration-level cut (warnInit)
+  keeps its own terminator discipline — `vector A=0.!%{(}` was never
+  bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
+  seed `void A(){0.!%{(}}`.
 - Convergence has known open escape classes — the list is not
   closed, fresh fuzzing keeps surfacing more (the grouped
   zero-call chain below surfaced in this run's fuzz re-check).
@@ -152,19 +162,16 @@ XS additionally:
   unwraps the grouping — `vector A = A();`; fixed point from
   pass 3, and neither the input nor any pass output carries a
   diagnostic — a silent byte change, the reparse never breaks),
-  the warn-literal statement body (`void A(){0.!%{(}}` — the
-  verbatim cut keeps both source `}` and the head prints its own,
-  so a stray `}` reaches the top level and the output does not
-  reparse, `unexpected "}" at top level`), the comment drift
+  the comment drift
   behind a doubled include (`include"";include"";/*/0` — pass 1
   glues `/*/0` to the second include line, pass 2 moves it to its
   own line; fixed point from pass 2, the reparse stays whole) and
   the paren-dropping zero-call chain (`vector A=0(0())()` —
   pass 1 prints `vector A = 0(0();`, one `)` short, and the output
-  does not reparse, `expected , or ) in argument list`; the three
+  does not reparse, `expected , or ) in argument list`; the two
   remaining members appended 2026-10-25 from the format-xs run's
   backlog, each rechecked byte-for-byte on master. The split
-  type-word-name residual above joins them as the batch's fourth
+  type-word-name residual above joins them as the batch's third
   member — narrowed out of the closed #162 class on
   task/xs-decl-head).
   An XS divergence outside this list is a finding to report

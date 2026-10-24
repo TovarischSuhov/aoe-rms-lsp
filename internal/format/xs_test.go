@@ -601,6 +601,102 @@ func TestXS_WarnGroupedVectorStmt(t *testing.T) {
 	}
 }
 
+// TestXS_WarnLiteralBodyOnce pins the typed closer pairing in warnCutEnd
+// (#163): a block literal tolerates an unclosed "(" in its recovery bytes,
+// and the cut hunt used to spend the literal's own "}" on it — the cut ran
+// on to the enclosing body's brace, and the printed body grew a stray "}"
+// at top level. The closer is now spent on an opener of its own kind; one
+// nothing opened of its kind closes the opener the depth counted.
+func TestXS_WarnLiteralBodyOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// the class: the "(" is unowned junk inside the
+			// literal, the statement's cut stops on the literal's
+			// own brace
+			name: "unclosed paren in literal",
+			src:  "void A(){0.!%{(}}",
+			want: "void A() {\n    0.!%{(}\n}\n",
+		},
+		{
+			name: "operand before the paren",
+			src:  "void A(){0.!%{(0}}",
+			want: "void A() {\n    0.!%{(0}\n}\n",
+		},
+		{
+			// a matched pair past the extent steps whole — the
+			// guard the typed pairing must not disturb
+			name: "balanced pair in literal",
+			src:  "void A(){0.!%{()}}",
+			want: "void A() {\n    0.!%{()}\n}\n",
+		},
+		{
+			// the closed form was correct before the fix
+			name: "closed literal",
+			src:  "void A(){0.!%{}}",
+			want: "void A() {\n    0.!%{}\n}\n",
+		},
+		{
+			// a compound statement's cut legitimately carries its
+			// own body brace after the literal's
+			name: "nested body",
+			src:  "void A(){if(1){0.!%{(}}}",
+			want: "void A() {\n    if(1){0.!%{(}}\n}\n",
+		},
+		{
+			// the declaration-level cut (warnInit) has its own
+			// terminator discipline and was never bitten
+			name: "declaration-level literal",
+			src:  "vector A=0.!%{(}",
+			want: "vector A=0.!%{(}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			wantTree, _ := xs.XsParse(tt.src, "")
+			gotTree, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(wantTree), xsTreeShape(gotTree)); diff != "" {
+				t.Errorf("XS(%q) tree drift:\n%s\noutput:\n%s", tt.src, diff, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_WarnInitUnpairedBrace pins the warnInit terminator rule (#151): a
 // block literal with an unpaired "(" keeps the bracket scan positive, the
 // separator search finds no end, and the fallback cut reaches the extent's
