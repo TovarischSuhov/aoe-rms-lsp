@@ -69,22 +69,74 @@ RMS additionally:
 XS additionally:
 - The formatted output reparses without error diagnostics, and its
   tree is structurally equal to the input's.
-- Convergence has one documented open escape class — a doubled
-  synthesized `;` in warnInit (an unpaired bracket inside an
-  initializer block literal keeps the balance positive, the
-  separator search sees no `;` at zero depth and the cut swallows
-  the synthesized semicolon; repro `vector A=(0,0)%{(0}`). The
-  output grows pass over pass — no later pass converges, unlike
-  the RMS escapes. An XS divergence outside the open class is a
-  finding to report: not a bug in your calling code, not something
-  to mask with a third pass. Inputs hitting the open class never
-  enter the FuzzXS seed corpus — the seed corpus must stay green
-  (a diverging corpus .xs is removed from the sample, not pinned
-  as a seed). The include-CR escape (#150) is closed in the same
-  #120 change-set that introduced this printer: p.include trims
-  the lone trailing \r an unterminated include-path literal
-  carries out of its line — blockText's page-ending rule — pinned
-  by the TestXS_IncludeTrailingCR rows.
+- The include-CR escape (#150) is closed in the same #120 change-set
+  that introduced this printer: p.include trims the lone trailing \r
+  an unterminated include-path literal carries out of its line —
+  blockText's page-ending rule — pinned by the
+  TestXS_IncludeTrailingCR rows.
+- The grouped wrong-arity vector (#152) is closed on the branch
+  task/format-xs (the format-xs-fixes run, 2026-10-23/24): a warn
+  statement's verbatim cut opened on the warning's own start and
+  lost the dropped groupings' `(` while keeping their `)` —
+  warnVerbatim now walks back to the groupings' own `(` after
+  cutArgsEnd (calleeStart) and takes it only while the widened cut
+  keeps its brackets net non-positive. Pins:
+  TestXS_WarnGroupedVectorStmt (four rows), the FuzzXS seeds
+  `void A(){((0,0));}` / `void A(){(((0,0)));}` and the pinned
+  seed crasher 1777e76aae25ce1c (testdata/fuzz).
+- The zero-extent sibling (#153) is closed on both print paths on
+  the same branch and run: statements — emptyBodyEnd spends a `{}`
+  pair only on the statement's own zero-width block (a StmtBlock
+  of its body chain starting exactly at the extent's end), never
+  on the sibling block a bare `while;` ends its extent beside;
+  declarations — a rule header's verbatim cut clamps to declLimit,
+  the boundary decls sets at the next declaration's start, and its
+  closer hunt gates on the same boundary (closer+1 past it breaks
+  the loop). Pins: TestXS_ZeroExtentSiblingOnce (crasher
+  6481cc9454be3769, the warn-chain and do rows; the accepted
+  `void A(){do;{}}` shape refuses with ErrParseErrors),
+  TestXS_DeclAdjacentOnce (crasher df7bb1183f5bb08, adj5, partial),
+  the FuzzXS seeds `int A(){{while;{}}}` / `while;{}` and the two
+  decl crashers.
+- Convergence has known open escape classes — the list is not
+  closed, fresh fuzzing keeps surfacing more (the grouped
+  zero-call chain below surfaced in this run's fuzz re-check).
+  Every class below is pre-existing — each reproduces, byte for
+  byte, on the task/format-xs tree before this run's delta and on
+  the final tree (rechecked 2026-10-24) — and none of them enters
+  the FuzzXS seed corpus: the seed corpus must stay green (a
+  diverging corpus .xs is removed from the sample, not pinned as
+  a seed). warnInit's doubled
+  synthesized `;` (#151, a separate task): an unpaired bracket
+  inside an initializer block literal keeps the balance positive,
+  the separator search sees no `;` at zero depth and the cut
+  swallows the synthesized semicolon — repro
+  `vector A=(0,0)%{(0}`, pass 1 prints `(0};`, pass 2 doubles it,
+  growth ends there (fixed point from pass 3, the output reparses
+  with the arity warning only). The fuzzer's pre-existing classes:
+  the degenerate declarator tail
+  `vector A000000;extern A00 A000000=(0);int A0000000000000000000;int A00000000=(0),A="`
+  (the first pass's output does not reparse — `unexpected
+  identifier "A" at top level`), the unterminated include-path
+  literal with a trailing backslash (`include"\` — the first two
+  passes grow the document by a byte, fixed point from pass 3),
+  the warn-collapsed initializer with a second declarator
+  (`vector A=(0.!),A` — output does not reparse, `expected ;`), the
+  degenerate chain in a rule body (`rule { (""."") }` — output
+  does not reparse, `expected ")"`), the warn-header switch with
+  an empty body (`void A(){switch((0,0)){}}` — the body's `{}` pair
+  is lost and the output does not reparse, `expected { after
+  switch`), the grouped wrong-arity vector with a degenerate
+  name (`void A(){((0.(,0));}` — the outer `(` is lost and
+  `(0.(,0));` does not reparse, `expected ;`) and the grouped
+  zero-call chain (`vector A=(A)()()` — pass 1 prints
+  `vector A = (A)();`, one `()` pair short of the input; pass 2
+  unwraps the grouping — `vector A = A();`; fixed point from
+  pass 3, and neither the input nor any pass output carries a
+  diagnostic — a silent byte change, the reparse never breaks).
+  An XS divergence outside this list is a finding to report
+  just the same: not a bug in your calling code, not something
+  to mask with a third pass.
 
 The contracts are pinned by FuzzXS (any accepted input must reparse
 and be idempotent; seeds: golden fixtures, the .corpus sample, pinned
