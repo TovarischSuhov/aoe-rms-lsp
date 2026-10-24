@@ -1264,14 +1264,15 @@ func (p *xsPrinter) openString(from, to int) bool {
 // string literal as its own bytes: the initializer's literal runs to its
 // line's end, and the canonical print's synthesized ';' — or the warn
 // cut's ';' search, which cannot see through the literal — would glue
-// into it on the reparse. The declaration hooks answer whether they took
-// the line.
-func (p *xsPrinter) openStringVerbatim(from, to int) bool {
+// into it on the reparse. head carries declHead's synthesized type words
+// for a cut starting at a split declarator's bare name. The declaration
+// hooks answer whether they took the line.
+func (p *xsPrinter) openStringVerbatim(head string, from, to int) bool {
 	if !p.openString(from, to) {
 		return false
 	}
 
-	p.declVerbatim(from, to)
+	p.declVerbatim(head, from, to)
 
 	return true
 }
@@ -1293,8 +1294,11 @@ func (p *xsPrinter) openStringVerbatim(from, to int) bool {
 // taking them prints the sibling's head twice — once inside the cut, once
 // from its own node (the df7bb1183f5bb08 growth). A grouping whose closer
 // sits past the boundary is a recovery shape, and the line prints short of
-// it — the cut cannot own what the parse gave another declaration.
-func (p *xsPrinter) declVerbatim(from, to int) {
+// it — the cut cannot own what the parse gave another declaration. head
+// carries declHead's synthesized type words when the extent starts at a
+// split declarator's bare name: without them the line is a statement, and
+// it does not reparse.
+func (p *xsPrinter) declVerbatim(head string, from, to int) {
 	to = p.cutArgsEnd(from, to)
 	if to > p.declLimit {
 		to = p.declLimit
@@ -1313,7 +1317,7 @@ func (p *xsPrinter) declVerbatim(from, to int) {
 		balance--
 	}
 
-	p.line(0, strings.TrimRight(p.blockText(from, to), " \t\r\n"))
+	p.line(0, head+strings.TrimRight(p.blockText(from, to), " \t\r\n"))
 	p.dropBefore(to)
 }
 
@@ -1359,8 +1363,8 @@ func (p *xsPrinter) decls(list []xs.Decl) {
 }
 
 // varGroup extends a top-level declaration group: consecutive variable
-// declarators whose source gap is exactly the separating comma belong to
-// one declaration list. The group's canonical print is its own fixed
+// declarators whose source gap is the separating comma belong to one
+// declaration list. The group's canonical print is its own fixed
 // point — `int a = 1, b;` re-parses to the same comma-adjacent
 // declarators — which is what keeps the pass idempotent where per-node
 // printing would drift the split declarators apart.
@@ -1370,11 +1374,57 @@ func (p *xsPrinter) varGroup(list []xs.Decl, i int) int {
 	for end < len(list) &&
 		list[end-1].Kind == xs.DeclVariable && list[end].Kind == xs.DeclVariable &&
 		list[end-1].Type == list[end].Type &&
-		strings.TrimSpace(p.cutBytes(list[end-1].Range.End.Offset, list[end].Range.Start.Offset)) == "," {
+		commaGap(p.cutBytes(list[end-1].Range.End.Offset, list[end].Range.Start.Offset)) {
 		end++
 	}
 
 	return end
+}
+
+// xsOpBytes mirrors the scanner's visible non-word bytes (parse.go
+// singleOps, plus the string quote and the ident underscore); every other
+// byte is next()'s silent unknown-byte skip — tokenless, so it lands in
+// no AST extent.
+const xsOpBytes = "+-*/%=<>!&|^~?:;,(){}[].\"_"
+
+// stripInvisible drops the bytes the scanner never tokenizes: whitespace
+// and the unknown-byte skips.
+func stripInvisible(s string) string {
+	var b strings.Builder
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= '0' && c <= '9' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' ||
+			strings.IndexByte(xsOpBytes, c) >= 0 {
+			b.WriteByte(c)
+		}
+	}
+
+	return b.String()
+}
+
+// commaGap reports whether a declarator gap is source comma-adjacency:
+// its visible bytes reduce to a single comma. Scanner-invisible junk
+// between the comma and the next name splits the extents without breaking
+// the adjacency — the pair still re-parses to the same declarator list.
+func commaGap(gap string) bool {
+	return stripInvisible(gap) == ","
+}
+
+// declHead answers the synthesized type words a declarator cut needs
+// ahead of its bytes: a first declarator's extent opens with the type
+// words (the parser starts it at the type), a split one's at the bare
+// name — cut as-is, the bytes print a statement, not a declaration. The
+// test runs over stripped bytes: the source may carry invisible junk
+// between the type words and the name, and a name may extend a type word.
+func (p *xsPrinter) declHead(d xs.Decl) string {
+	text := stripInvisible(p.blockText(d.Range.Start.Offset, d.Range.End.Offset))
+	if rest, ok := strings.CutPrefix(text, strings.ReplaceAll(d.Type, " ", "")); ok &&
+		strings.HasPrefix(rest, d.Name) {
+		return ""
+	}
+
+	return d.Type + " "
 }
 
 // declGroup prints one top-level declaration group: a lone declaration of
@@ -1393,7 +1443,7 @@ func (p *xsPrinter) declGroup(group []xs.Decl) {
 	// an unterminated string in any initializer takes the whole line as
 	// its own bytes: the merged print's synthesized ';' would glue into
 	// the literal on the reparse
-	if p.openStringVerbatim(group[0].Range.Start.Offset, group[len(group)-1].Range.End.Offset) {
+	if p.openStringVerbatim(p.declHead(group[0]), group[0].Range.Start.Offset, group[len(group)-1].Range.End.Offset) {
 		return
 	}
 
@@ -1402,7 +1452,7 @@ func (p *xsPrinter) declGroup(group []xs.Decl) {
 	// chains the AST no longer records)
 	for _, d := range group {
 		if len(d.Body) > 0 && degenerateExprs(d.Body[0].Exprs) || p.degenerateRange(d.Range) {
-			p.declVerbatim(group[0].Range.Start.Offset, group[len(group)-1].Range.End.Offset)
+			p.declVerbatim(p.declHead(group[0]), group[0].Range.Start.Offset, group[len(group)-1].Range.End.Offset)
 
 			return
 		}
@@ -1475,7 +1525,7 @@ func (p *xsPrinter) function(d xs.Decl) {
 	// literal, and the ";" or " {" synthesized after it would glue into
 	// it on the reparse
 	if p.openString(shape, rparen+1) {
-		p.declVerbatim(d.Range.Start.Offset, p.declOwnEnd(rparen+1))
+		p.declVerbatim("", d.Range.Start.Offset, p.declOwnEnd(rparen+1))
 
 		return
 	}
@@ -1510,12 +1560,12 @@ func (p *xsPrinter) extern(d xs.Decl) {
 	}
 
 	if p.src[shape] == '=' {
-		if p.openStringVerbatim(d.Range.Start.Offset, d.Range.End.Offset) {
+		if p.openStringVerbatim("", d.Range.Start.Offset, d.Range.End.Offset) {
 			return
 		}
 
 		if len(d.Body) > 0 && degenerateExprs(d.Body[0].Exprs) || p.degenerateRange(d.Range) {
-			p.declVerbatim(d.Range.Start.Offset, d.Range.End.Offset)
+			p.declVerbatim("", d.Range.Start.Offset, d.Range.End.Offset)
 
 			return
 		}
@@ -1549,12 +1599,12 @@ func (p *xsPrinter) extern(d xs.Decl) {
 // line — the grouping back into a single line is the hybrid-slice pass's
 // to refine.
 func (p *xsPrinter) variable(d xs.Decl) {
-	if p.openStringVerbatim(d.Range.Start.Offset, d.Range.End.Offset) {
+	if p.openStringVerbatim(p.declHead(d), d.Range.Start.Offset, d.Range.End.Offset) {
 		return
 	}
 
 	if len(d.Body) > 0 && degenerateExprs(d.Body[0].Exprs) || p.degenerateRange(d.Range) {
-		p.declVerbatim(d.Range.Start.Offset, d.Range.End.Offset)
+		p.declVerbatim(p.declHead(d), d.Range.Start.Offset, d.Range.End.Offset)
 
 		return
 	}
@@ -1612,7 +1662,7 @@ func (p *xsPrinter) rule(d xs.Decl) {
 	// " {" synthesized after it would glue into it on the reparse
 	if p.openString(startOff, open) {
 		if closer, ok := p.matchBracket(open, '{', '}'); ok {
-			p.declVerbatim(startOff, closer+1)
+			p.declVerbatim("", startOff, closer+1)
 
 			return
 		}
@@ -1650,7 +1700,7 @@ func (p *xsPrinter) event(d xs.Decl) {
 	// an unterminated literal in the argument bytes is function's header
 	// shape: the whole declaration prints as its own bytes
 	if p.openString(shape, rparen+1) {
-		p.declVerbatim(d.Range.Start.Offset, p.declOwnEnd(rparen+1))
+		p.declVerbatim("", d.Range.Start.Offset, p.declOwnEnd(rparen+1))
 
 		return
 	}
