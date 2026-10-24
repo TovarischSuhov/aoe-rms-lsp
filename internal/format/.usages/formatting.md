@@ -70,9 +70,11 @@ RMS additionally:
   scope disagrees with the section tags around it, the output shows
   the scope's flow, and the tree survives (the #94 interleaving
   model; the former knownDivergent corpus entry is closed by it).
-- Convergence has one known escape class (a flat #-line with an
-  unterminated /* at EOF) — it converges from the second pass and
-  is pinned.
+- Convergence is unconditional: the former escape class (a flat
+  #-line with an unterminated /* EOF clips at the line's end) is
+  closed in the parser (#135) — mergeComments cuts the #-extent at
+  the comment's start for the EOF-clipped tail too, so pass one
+  already prints the split form.
 
 XS additionally:
 - The formatted output reparses without error diagnostics, and its
