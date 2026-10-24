@@ -387,15 +387,6 @@ func TestRMS_Deterministic(t *testing.T) {
 	}
 }
 
-// knownDivergent lists corpus files whose parse the current stream model
-// does not round-trip: if chains crossing section headers reorder
-// standalone commands into a preceding create_*'s attribute context
-// (escalated for an architectural decision; formatting converges from the
-// second pass).
-var knownDivergent = map[string]bool{
-	"078__KHR_WSVG_Meatballs_v2.rms": true,
-}
-
 // TestRMS_StructureInvariant checks the round-trip contract the golden
 // files alone cannot: parsing the formatted output yields the same tree
 // as parsing the input — same shape without positions, same comment
@@ -413,10 +404,6 @@ func TestRMS_StructureInvariant(t *testing.T) {
 	for _, in := range inputs {
 		t.Run(filepath.Base(in), func(t *testing.T) {
 			t.Parallel()
-
-			if knownDivergent[filepath.Base(in)] {
-				t.Skip("known stream-model divergence, escalated")
-			}
 
 			raw, err := os.ReadFile(in)
 			if err != nil {
@@ -584,9 +571,7 @@ func commentTexts(f rms.RmsFile, src string) []string {
 // corpus live in memory only — written to disk under testdata they would
 // enter the golden glob and pin the very bytes the bug corrupts;
 // case32.rms is the deliberate exception, a hand-written fixture keeping
-// the run covered where CI has no corpus. 078 keeps its stream-model
-// divergence (#94) under the mapped wrap too, so it is pinned by
-// convergence rather than skipped out of sight.
+// the run covered where CI has no corpus.
 func TestRMS_IdempotentMappedCorpus(t *testing.T) {
 	t.Parallel()
 
@@ -614,19 +599,6 @@ func TestRMS_IdempotentMappedCorpus(t *testing.T) {
 			twice, err := RMS(once, Options{TabSize: 4})
 			if err != nil {
 				t.Fatalf("RMS(formatted): %v", err)
-			}
-
-			if knownDivergent[filepath.Base(in)] {
-				thrice, err := RMS(twice, Options{TabSize: 4})
-				if err != nil {
-					t.Fatalf("RMS(RMS(RMS(%s))): %v", in, err)
-				}
-
-				if thrice != twice {
-					t.Errorf("RMS(%s) stopped converging:\n--- twice ---\n%q\n--- thrice ---\n%q", in, twice, thrice)
-				}
-
-				return
 			}
 
 			if twice != once {

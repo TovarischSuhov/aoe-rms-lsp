@@ -47,7 +47,9 @@ func RMS(source string, opts Options) (string, error) {
 	p.rawClosed = make(map[uint64]bool)
 	p.xsMask = xsLineMask(p.doc.blanked, file.XsBlocks)
 	p.chainLast = chainLast(p.doc.blanked, p.xsMask)
+	p.inline = make(map[uint64][]element)
 	p.list(p.elements(file), 0, p.doc.eof(), true)
+	p.flushSpanClosers()
 
 	// Whatever is still pending here is unclosed-to-EOF: every flush left
 	// it for this anchor, so it prints past every closer synthesized
@@ -258,15 +260,56 @@ type element struct {
 	start common.Pos // where the unit begins — the stream's sort key
 	end   common.Pos // where its AST extent ends
 	rawTo common.Pos // past this the unit's source bytes are printed as-is
+
+	// spanned marks a section header printed inline inside a chain
+	// statement's child stream: only the opening tag prints there — the
+	// closing tag defers until the next header (see printer.spanClosers).
+	spanned bool
+	// openEnd marks a section whose content rides chain extents past its
+	// own span: its closing tag defers like a spanned header's — printed
+	// earlier it would reset cur while later statements still reparse
+	// onto the section.
+	openEnd bool
+}
+
+// spanCloser is one deferred section-closing tag: the tag and the indent
+// level its opening header printed at — the flush points sit in deeper
+// lists than the header, so the level travels with the entry.
+type spanCloser struct {
+	name  string
+	level int
 }
 
 // elements flattens the file's printable surface: named sections keep
 // their statements plus the directives written inside their span, the
 // synthetic "global" section dissolves into the stream, and the
 // remaining directives and XS blocks join by position — file order is
-// the order of range starts.
+// the order of range starts. A section whose header sits inside a chain
+// statement's extent prints inline in that statement's child stream —
+// the opening tag at the header's own position, its statements and
+// directives as stream elements after it, the closing tag deferred
+// (printer.spanClosers).
 func (p *printer) elements(file rms.RmsFile) []element {
 	directives := p.directives(file)
+	extents := blockExtents(file)
+
+	// A directive inside a chain's extent rides the chain's own stream:
+	// once the chain prints tighter than the section whose span absorbed
+	// the directive, the section's range no longer reaches it on a
+	// reparse — the bucket keeps it at its source position instead.
+	kept := directives[:0]
+	for _, dir := range directives {
+		if owner, ok := spanOwner(extents, dir.start); ok {
+			key := lineCol(owner)
+			p.inline[key] = append(p.inline[key], dir)
+
+			continue
+		}
+
+		kept = append(kept, dir)
+	}
+
+	directives = kept
 
 	var out []element
 
@@ -283,6 +326,37 @@ func (p *printer) elements(file rms.RmsFile) []element {
 			end:     sec.Range.End,
 		}
 		el.inner, directives = absorb(sec, directives)
+
+		if owner, ok := spanOwner(extents, sec.Range.Start); ok {
+			el.spanned = true
+			key := lineCol(owner)
+
+			// every statement of a spanned section sits beyond the owner's
+			// extent — one inside would have attached to the owner's open
+			// scope, never to the section — so they print as bare elements
+			// at their own positions while only the header (and the
+			// directives written into the section's span) rides the bucket
+			stmts := make([]element, 0, len(el.inner))
+			kept := el.inner[:0]
+			for _, unit := range el.inner {
+				if unit.kind == elemStatement {
+					stmts = append(stmts, unit)
+
+					continue
+				}
+
+				kept = append(kept, unit)
+			}
+
+			el.inner = kept
+			p.inline[key] = append(p.inline[key], el)
+			p.inline[key] = append(p.inline[key], el.inner...)
+			out = append(out, stmts...)
+
+			continue
+		}
+
+		el.openEnd = innerOverflows(el.inner, sec.Range.End)
 		out = append(out, el)
 	}
 
@@ -290,6 +364,71 @@ func (p *printer) elements(file rms.RmsFile) []element {
 	slices.SortStableFunc(out, byStart)
 
 	return out
+}
+
+// blockExtents collects the ranges of every conditional/random statement
+// in the file, nested ones included: only scope-keeping blocks span
+// section headers — their scopes stay open across headers and collect the
+// statements of the sections they cover, so only their extents reach past
+// a header line.
+func blockExtents(file rms.RmsFile) []common.Range {
+	var out []common.Range
+
+	var walk func(stmts []rms.Statement)
+	walk = func(stmts []rms.Statement) {
+		for _, stmt := range stmts {
+			if stmt.Kind == rms.KindConditional || stmt.Kind == rms.KindRandom {
+				out = append(out, stmt.Range)
+			}
+
+			walk(stmt.Children)
+		}
+	}
+
+	for _, sec := range file.Sections {
+		walk(sec.Statements)
+	}
+
+	return out
+}
+
+// spanOwner reports the start of the innermost conditional/random
+// statement whose extent strictly contains pos — the statement that
+// prints pos inline in its child stream. Among containing extents the
+// innermost starts last: a descendant begins after its ancestor.
+func spanOwner(extents []common.Range, pos common.Pos) (common.Pos, bool) {
+	var owner common.Pos
+
+	found := false
+
+	for _, r := range extents {
+		if !r.Start.Before(pos) || !pos.Before(r.End) {
+			continue
+		}
+
+		if !found || owner.Before(r.Start) {
+			owner = r.Start
+			found = true
+		}
+	}
+
+	return owner, found
+}
+
+// innerOverflows reports whether a section's merged content reaches past
+// the section's own span: chain extents crossing the next header stretch
+// the content beyond it. Printing the closing tag right after such
+// content would reset cur while later statements — the next chain
+// branch, most often — still reparse onto the section, so the tag defers
+// to the next header instead (printer.spanClosers).
+func innerOverflows(inner []element, end common.Pos) bool {
+	for _, el := range inner {
+		if end.Before(el.end) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // directives builds the include and XS-block units that carry their own
@@ -435,6 +574,17 @@ type printer struct {
 	rawClosed map[uint64]bool
 	chainLast map[uint64]bool // conditionals ending their chain, by lineCol key
 	xsMask    []bool          // lines the rms parser never reads: embedded XS
+	// inline holds the section headers spanned by a conditional/random
+	// statement's extent, keyed by the owning statement's lineCol: their
+	// lines sit inside the chain's flow (the parser keeps those scopes open
+	// across headers), so they print in the child stream, not after it.
+	inline map[uint64][]element
+	// spanClosers holds the section-closing tags deferred past their
+	// sections: spanned headers' tags, and sections whose content rides
+	// chain extents past their span. The tag waits for the next section
+	// header (or the end of the print) — closing early would reset cur
+	// while later statements still reparse onto the section.
+	spanClosers []spanCloser
 }
 
 // result joins the printed lines with the input's dominant EOL and ends
@@ -632,6 +782,20 @@ func (p *printer) cut(elems []element, i int, limit common.Pos) common.Pos {
 func (p *printer) element(el element, level int, limit common.Pos) (common.Pos, bool) {
 	switch el.kind {
 	case elemSection:
+		// any header materializes the pending sections — the flush sits
+		// exactly where the source's own next-header discipline closes them
+		p.flushSpanClosers()
+
+		if el.spanned {
+			// an inline header inside a chain's flow: the opening tag only —
+			// the section's statements print as elements of their own past
+			// it, and the closing tag waits for the next header
+			p.line(level, "<"+el.section.Name+">")
+			p.spanClosers = append(p.spanClosers, spanCloser{name: el.section.Name, level: level})
+
+			return common.Pos{}, false
+		}
+
 		p.section(el, level, limit)
 	case elemStatement:
 		if p.verbatim(el.stmt) {
@@ -681,7 +845,9 @@ func ranges(start, end common.Pos) common.Range {
 
 // section prints a named section: header, its merged inner stream one
 // level in, closing tag. Its own range runs to the next header, so it
-// bounds the content — a caller's tighter limit wins.
+// bounds the content — a caller's tighter limit wins. Content stretched
+// past the span by chain extents defers the tag to the next header
+// (openEnd).
 func (p *printer) section(el element, level int, limit common.Pos) {
 	sec := el.section
 	p.line(level, "<"+sec.Name+">")
@@ -692,6 +858,13 @@ func (p *printer) section(el element, level int, limit common.Pos) {
 	}
 
 	p.list(el.inner, level+1, inner, false)
+
+	if el.openEnd {
+		p.spanClosers = append(p.spanClosers, spanCloser{name: sec.Name, level: level})
+
+		return
+	}
+
 	p.line(level, "</"+sec.Name+">")
 }
 
@@ -727,11 +900,43 @@ func (p *printer) statement(stmt rms.Statement, level int, limit common.Pos) {
 	}
 
 	if len(stmt.Children) > 0 {
-		p.list(statementElements(stmt.Children), level+1, stmt.Range.End, false)
+		p.list(p.withInline(stmt, statementElements(stmt.Children)), level+1, stmt.Range.End, false)
 	}
 
 	// childless blocks keep their header-line comment
 	p.flushBefore(stmt.Range.End, level+1)
+}
+
+// withInline merges the section headers (and their statements and
+// directives) spanned by stmt's extent into its child stream at their
+// source positions: the parser keeps conditional/random scopes open
+// across section headers, so a header inside the extent belongs to the
+// chain's flow — printing it only after the chain would move every
+// statement past it on a reparse.
+func (p *printer) withInline(stmt rms.Statement, kids []element) []element {
+	units := p.inline[lineCol(stmt.Range.Start)]
+	if len(units) == 0 {
+		return kids
+	}
+
+	merged := append(slices.Clone(kids), units...)
+	slices.SortStableFunc(merged, byStart)
+
+	return merged
+}
+
+// flushSpanClosers prints the deferred section-closing tags, each at the
+// level its opening header printed at. The flush points are the next
+// section header — any header materializes the pending sections exactly
+// where the source's own next-header discipline would — and the end of
+// the print. Flushing anywhere earlier could reset cur while later
+// statements still reparse onto the pending sections.
+func (p *printer) flushSpanClosers() {
+	for _, c := range p.spanClosers {
+		p.line(c.level, "</"+c.name+">")
+	}
+
+	p.spanClosers = p.spanClosers[:0]
 }
 
 // closer rebuilds the block closer the AST does not carry: the parser

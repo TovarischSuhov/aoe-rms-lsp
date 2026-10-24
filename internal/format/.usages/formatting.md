@@ -62,9 +62,17 @@ RMS additionally:
   document with the output never introduces new syntax errors on
   input the parser accepted.
 - inline XS blocks pass through verbatim.
-- Convergence has two known escape classes (the knownDivergent list,
-  and the flat #-line with an unterminated /* at EOF) — both converge
-  from the second pass; the list is closed and pinned.
+- A conditional/random block whose extent crosses section headers
+  prints those headers inline in its own child flow, and such
+  sections' closing tags defer to the next header or the end of the
+  document (each at its opening header's level). The layout follows
+  the parse tree, not the author's visual nesting — where an open
+  scope disagrees with the section tags around it, the output shows
+  the scope's flow, and the tree survives (the #94 interleaving
+  model; the former knownDivergent corpus entry is closed by it).
+- Convergence has one known escape class (a flat #-line with an
+  unterminated /* at EOF) — it converges from the second pass and
+  is pinned.
 
 XS additionally:
 - The formatted output reparses without error diagnostics, and its

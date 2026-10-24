@@ -1,0 +1,23 @@
+// case54: a root if chain crossing two section headers — the published-map
+// shape behind #94. Statements written after a header still attach to the
+// open if scope, never to the crossed section, so the headers print inline
+// in the chain's child stream and the include rides it too; the sections'
+// closing tags wait for the next header (or the end of the print), each at
+// the level its opening header printed at.
+<player_setup>
+    if CONDITIONS
+        // pick the map flavor
+        #include_drs random_map.def 54000
+        <land_generation>
+        base_terrain GRASS
+        start_random
+        </land_generation>
+            <terrain_generation>
+            create_terrain FOREST
+        end_random
+
+elseif DESERT
+    base_terrain SAND
+endif
+            </terrain_generation>
+</player_setup>

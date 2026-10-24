@@ -131,9 +131,8 @@ func TestXS_InvariantStructure(t *testing.T) {
 
 // TestXS_InvariantIdempotent pins the fixed point on the goldens and the
 // corpus: formatting an already formatted document changes nothing, byte
-// for byte. The RMS suite's knownDivergent convergence escape is carried
-// over deliberately NOT — an XS divergence is a finding to report, not to
-// mask with a third pass.
+// for byte. An XS divergence is a finding to report, never a third-pass
+// escape to mask it with.
 func TestXS_InvariantIdempotent(t *testing.T) {
 	t.Parallel()
 

@@ -1,0 +1,22 @@
+// case55: nested chain with headers inside branch extents. The headers
+// print inline in their own branch's child stream; the elseif that ends
+// the outer chain attaches to the section of the last header it follows
+// — inside the else branch's extent — and prints as an element of the
+// section's stream after the whole nested chain.
+<PLAYERS>
+if ROOT
+create_player_lands {
+    terrain_type GRASS
+}
+if TINY
+<LAND_GENERATION>
+base_terrain GRASS
+else
+<TERRAIN_GENERATION>
+base_terrain SAND
+endif
+elseif HUGE
+create_player_lands {
+    terrain_type SAND
+}
+endif
