@@ -55,6 +55,12 @@ func FuzzXS(f *testing.F) {
 	// #177: a // comment inside the chain cut lifts out of it — collapsed
 	// into the cut, the chain's tail re-read as part of the comment
 	f.Add(`void A(){00//\n()()}`)
+	// #170: the warned operand folds to a node inside a grouping — the
+	// statement's cut carries the grouping's ")" with its "(" left of
+	// the extent, the cut's own brackets net zero and the closing hunt
+	// saw no depth; the cut now opens at the closer's own opener
+	f.Add(`void A(){(0);(0)%(0,0)}`)
+	f.Add(`void A(){(0) (0%(0,0))}`)
 	f.Add(`vector A=(0(0))`)
 	f.Add(`vector A=(0(0));`)
 	f.Add(`void f(){while{x}{y}}`)
