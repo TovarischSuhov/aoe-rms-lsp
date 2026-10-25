@@ -836,6 +836,29 @@ func TestXS_ZeroCallChainOnce(t *testing.T) {
 			src:  "vector A=A()(0)",
 			want: "vector A = A()(0);\n",
 		},
+		{
+			// a // comment between the callee and the suffix lifted
+			// out of the cut: collapsed inside it, the chain's tail
+			// re-read as part of the comment and the shape drifted
+			// on the next pass (#177)
+			name: "comment before suffix",
+			src:  "void A(){00//\n()()}",
+			want: "void A() {\n    //\n    00 ()();\n}\n",
+		},
+		{
+			// a block comment between the pairs rides the cut — it
+			// closes itself, the chain bytes around it stay one line
+			name: "block comment rides",
+			src:  "vector A=(0)/*c*/()",
+			want: "vector A = (0)/*c*/();\n",
+		},
+		{
+			// a // comment between the pairs lifts above the
+			// declaration; the pairs stay on the decl line
+			name: "line comment between pairs",
+			src:  "vector A=(0)//c\n()",
+			want: "//c\nvector A = (0)();\n",
+		},
 	}
 
 	for _, tt := range tests {

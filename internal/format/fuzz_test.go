@@ -48,6 +48,9 @@ func FuzzXS(f *testing.F) {
 	// cut must carry every suffix pair, and stop before the next ";"
 	f.Add(`vector A=0(0())()`)
 	f.Add(`void A(){get(1)();(1, 2, 3)();}`)
+	// #177: a // comment inside the chain cut lifts out of it — collapsed
+	// into the cut, the chain's tail re-read as part of the comment
+	f.Add(`void A(){00//\n()()}`)
 	f.Add(`vector A=(0(0))`)
 	f.Add(`vector A=(0(0));`)
 	f.Add(`void f(){while{x}{y}}`)

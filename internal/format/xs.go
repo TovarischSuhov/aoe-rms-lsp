@@ -2530,7 +2530,12 @@ func (p *xsPrinter) unary(e xs.Expr, minPrec int) string {
 func (p *xsPrinter) call(e xs.Expr) string {
 	if len(e.Children) == 0 {
 		if from, to, ok := p.zeroCallChain(e); ok {
-			return collapseWS(p.cutBytes(from, to))
+			// the same comment discipline as the callee cut below:
+			// collapseWS on the raw span printed a // inside the cut
+			// with its newline collapsed — the chain's tail bytes then
+			// re-read as part of the comment and the shape drifted on
+			// the next pass (#177)
+			return p.liftLine(from, to, p.level)
 		}
 	}
 
