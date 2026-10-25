@@ -2072,9 +2072,24 @@ func (p *xsPrinter) stmt(s xs.Stmt, level int) {
 	// synthesized ";" back as the name (degenerateExprs) — and a chain a
 	// trailing call swallowed into its callee left the AST clean, so the
 	// extent's bytes answer too (degenerateRange). A for loop's typed
-	// init prints inside the header, so its expressions count too
-	if degenerateExprs(s.Exprs) || p.degenerateRange(s.Range) ||
-		(s.Kind == xs.StmtFor && len(s.Body) > 0 && degenerateExprs(s.Body[0].Exprs)) {
+	// init prints inside the header, so its expressions count too. The
+	// byte scope of a header+body statement is its header: the body
+	// prints through branch with its own degenerate checks, and a
+	// body-grown extent would pull the whole header+body cut through
+	// blockText, whose per-line collapse strands the interior
+	// indentation between passes (do keeps its full extent — its
+	// condition rides past the body)
+	scope := s.Range
+	switch s.Kind {
+	case xs.StmtFor, xs.StmtWhile, xs.StmtIf, xs.StmtSwitch:
+		if len(s.Body) > 0 {
+			scope.End = s.Body[len(s.Body)-1].Range.Start
+		}
+	}
+
+	if degenerateExprs(s.Exprs) || p.degenerateRange(scope) ||
+		(s.Kind == xs.StmtFor && len(s.Body) == 2 && s.Body[0].Kind == xs.StmtDecl &&
+			degenerateExprs(s.Body[0].Exprs)) {
 		p.stmtVerbatim(s, level)
 
 		return

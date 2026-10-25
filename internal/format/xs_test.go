@@ -732,11 +732,13 @@ func TestXS_WarnLiteralBodyOnce(t *testing.T) {
 			want: "void A() {\n    0.!%{}\n}\n",
 		},
 		{
-			// a compound statement's cut legitimately carries its
-			// own body brace after the literal's
+			// the parent prints canonically since #171: a body-grown
+			// extent no longer forces the whole-if verbatim, the
+			// warn statement's cut rides inside the block (the same
+			// discipline as the top-level row)
 			name: "nested body",
 			src:  "void A(){if(1){0.!%{(}}}",
-			want: "void A() {\n    if(1){0.!%{(}}\n}\n",
+			want: "void A() {\n    if (1) {\n        0.!%{(}\n    }\n}\n",
 		},
 		{
 			// the declaration-level cut (warnInit) has its own
@@ -1133,6 +1135,97 @@ func TestXS_DegenerateChains(t *testing.T) {
 
 			if twice != once {
 				t.Errorf("XS(%q) not idempotent: first pass %q, second pass %q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
+// TestXS_HeaderDegenerateScopeOnce pins the header scope of the
+// degenerate-name gate (#171): a degenerate member name in the BYTES OF A
+// BODY used to pull the whole header+body statement verbatim, and the
+// multi-line cut's per-line collapse stranded the interior indentation —
+// the for body printed at two levels on the first pass and at one space
+// on the second. The gate now scopes to the header, the body prints
+// through branch with its own degenerate checks, and every row is a fixed
+// point from the first pass. A degenerate in the header itself keeps the
+// whole-statement verbatim (single-line cut, own bytes).
+func TestXS_HeaderDegenerateScopeOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "for body degenerate",
+			src:  "void A(){switch(0%0%0){0%0}for(0%0;0)!{.00}}",
+			want: "void A() {\n    switch (0 % 0 % 0) {\n        0 % 0;\n    }\n    for (0 % 0; 0;)\n        !{.00};\n}\n",
+		},
+		{
+			name: "while body degenerate",
+			src:  "void A(){while(0)!{.00}}",
+			want: "void A() {\n    while (0)\n        !{.00};\n}\n",
+		},
+		{
+			name: "if body degenerate",
+			src:  "void A(){if(0)!{.00}}",
+			want: "void A() {\n    if (0)\n        !{.00};\n}\n",
+		},
+		{
+			name: "switch case degenerate",
+			src:  "void A(){switch(0){0%!{.00}}}",
+			want: "void A() {\n    switch (0) {\n        0 % !{.00};\n    }\n}\n",
+		},
+		{
+			name: "typed init body degenerate",
+			src:  "void A(){for(int i=0;i<3;)!{.00}}",
+			want: "void A() {\n    for (int i = 0; i < 3;)\n        !{.00};\n}\n",
+		},
+		{
+			name: "header degenerate stays whole-statement verbatim",
+			src:  "void A(){for(0.!;0)0;}",
+			want: "void A() {\n    for(0.!;0)0;\n}\n",
+		},
+		{
+			name: "canonical for",
+			src:  "void A(){for(0%0;0)0;}",
+			want: "void A() {\n    for (0 % 0; 0;)\n        0;\n}\n",
+		},
+		{
+			name: "canonical typed init",
+			src:  "void A(){for(int i=0;i<3;)0;}",
+			want: "void A() {\n    for (int i = 0; i < 3;)\n        0;\n}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			_, gotDiags := xs.XsParse(once, "")
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
 			}
 		})
 	}

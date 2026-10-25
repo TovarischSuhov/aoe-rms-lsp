@@ -100,6 +100,12 @@ func FuzzXS(f *testing.F) {
 	// the tail declarator standalone — a bare statement at top level
 	// (TestXS_DeclSplitHeadOnce pins the group's own-bytes fixed point)
 	f.Add(`void A,#A=0.`)
+	// #171: a degenerate member name in a BODY's bytes used to pull the
+	// whole header+body statement verbatim — the multi-line cut's
+	// per-line collapse stranded the interior indentation between passes
+	// (TestXS_HeaderDegenerateScopeOnce pins the header scope)
+	f.Add(`void A(){switch(0%0%0){0%0}for(0%0;0)!{.00}}`)
+	f.Add(`void A(){while(0)!{.00}}`)
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")
