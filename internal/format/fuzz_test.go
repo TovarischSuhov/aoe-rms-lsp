@@ -94,6 +94,12 @@ func FuzzXS(f *testing.F) {
 	// the tail declarator standalone — a bare statement at top level
 	// (TestXS_DeclSplitHeadOnce pins the group's own-bytes fixed point)
 	f.Add(`void A,#A=0.`)
+	// #172: the grammar continues a zero suffix across whitespace — the
+	// callee-stopped call's "(" sits past a space, and a token scan that
+	// answered on the space dropped the extension, the cut printed one
+	// closer short (TestXS_ZeroSuffixSpacedOnce pins the spaced forms)
+	f.Add(`vector A=(0.! ())`)
+	f.Add(`void A(){0.! ()}`)
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")
