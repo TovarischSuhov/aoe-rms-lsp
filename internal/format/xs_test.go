@@ -697,6 +697,100 @@ func TestXS_WarnLiteralBodyOnce(t *testing.T) {
 	}
 }
 
+// TestXS_WarnDegenerateTailOnce pins the degenerate-tail literal cut
+// (#173): an unclosed "(" inside a CLOSED block literal has no closer
+// anywhere, and a typeless residual spent the first closer past the
+// extent on it — the enclosing body's own brace, once a degenerate
+// member (`.0`) carried the extent past the literal's closer. The cut
+// then printed the body's `}` and the body printer printed it again, and
+// the output did not reparse (`unexpected "}" at top level`). The
+// residual skips closed literals whole (the scanner's own discipline);
+// the #163 open-literal shapes are untouched.
+func TestXS_WarnDegenerateTailOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// the issue repro: the cut stops before the body's
+			// own brace
+			name: "degenerate tail",
+			src:  "void A(){in%A0%{00000000000(0000}.0}",
+			want: "void A() {\n    in%A0%{00000000000(0000}.0\n}\n",
+		},
+		{
+			// the closed literal without the tail prints
+			// canonically and always did
+			name: "closed literal canonical",
+			src:  "void A(){in%A0%{00000000}}",
+			want: "void A() {\n    in % A0 % {00000000};\n}\n",
+		},
+		{
+			// the open literal at the extent edge keeps the #163
+			// cut: the hunt still spends the literal's own closer
+			name: "open literal edge",
+			src:  "void A(){0.!%{(}}",
+			want: "void A() {\n    0.!%{(}\n}\n",
+		},
+		{
+			// the compound statement's cut still carries its own
+			// body brace after the literal's
+			name: "nested body",
+			src:  "void A(){if(1){0.!%{(}}}",
+			want: "void A() {\n    if(1){0.!%{(}}\n}\n",
+		},
+		{
+			// the warnInit decl path has its own terminator
+			// discipline and was never bitten
+			name: "decl literal control",
+			src:  "vector A=0.!%{(}",
+			want: "vector A=0.!%{(}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			wantTree, _ := xs.XsParse(tt.src, "")
+			gotTree, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(wantTree), xsTreeShape(gotTree)); diff != "" {
+				t.Errorf("XS(%q) tree drift:\n%s\noutput:\n%s", tt.src, diff, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_WarnInitUnpairedBrace pins the warnInit terminator rule (#151): a
 // block literal with an unpaired "(" keeps the bracket scan positive, the
 // separator search finds no end, and the fallback cut reaches the extent's

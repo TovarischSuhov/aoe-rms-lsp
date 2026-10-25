@@ -166,6 +166,22 @@ XS additionally:
   TestXS_ZeroCallChainOnce (ten rows) and the FuzzXS seeds
   `vector A=0(0())()` / `void A(){get(1)();(1, 2, 3)();}` /
   `void A(){00//\n()()}`.
+- The degenerate tail after a closed literal (#173) is closed on the
+  statement cut: an unclosed "(" inside a CLOSED block literal has no
+  closer anywhere, and the typeless residual counted it open — once a
+  degenerate member (`.0`) carried the extent past the literal's own
+  closer, the closer hunt spent the enclosing body's brace on it: the
+  cut printed the body's `}` and the body printer printed it again
+  (`void A(){in%A0%{00000000000(0000}.0}` printed the cut
+  `in%A0%{00000000000(0000}.0}` plus the `}` line; the output did not
+  reparse — `unexpected "}" at top level`). The residual now skips
+  closed literals whole — the scanner's own bare-block discipline — so
+  tolerated junk inside a closed literal leaves the hunt nothing, while
+  an open literal at the extent edge keeps the #163 cut (its opener
+  counts, the hunt matches its closer outside). Pins:
+  TestXS_WarnDegenerateTailOnce (five rows) and the FuzzXS seeds
+  `vector A=(00000);void A(){in%A0%{00000000};in%A0%{00000000000(0000}.0}`
+  / `void A(){in%A0%{00000000000(0000}.0}`.
 - Convergence has known open escape classes — the list is not
   closed, fresh fuzzing keeps surfacing more.
   Every class below is pre-existing — each reproduces, byte for
