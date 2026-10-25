@@ -602,6 +602,79 @@ func (p *xsPrinter) xsBracketDepth(from, to int, names []common.Range) int {
 	return depth
 }
 
+// xsResidualDepth counts the bracket depth an extent leaves open for the
+// closer hunt, closed block literals skipped whole: the scanner carries a
+// bare block past its tolerated junk, and an unclosed "(" inside a closed
+// literal has no closer anywhere — a typeless residual spends the first
+// closer past the extent on it, which is the enclosing body's own brace
+// when a degenerate member carried the extent past the literal's closer
+// (`in%A0%{...(0000}.0`). A literal whose closer sits at or past to is the
+// open shape the hunt exists for: its opener counts and the hunt matches
+// its closer outside. Comments, strings and degenerate member names step
+// over whole, the xsBracketDepth discipline.
+func (p *xsPrinter) xsResidualDepth(from, to int, names []common.Range) int {
+	src := p.src
+	depth := 0
+	ni := 0
+
+	ci := 0 // first comment not fully passed; the extents are sorted and disjoint
+
+	for i := from; i < to && i < len(src); {
+		for ci < len(p.comments) && p.comments[ci].End.Offset <= i {
+			ci++
+		}
+
+		if ci < len(p.comments) && p.comments[ci].Start.Offset <= i {
+			i = p.comments[ci].End.Offset
+
+			continue // a comment is no token: the walk crosses it
+		}
+
+		if inNames(&ni, i, names) {
+			i = names[ni].End.Offset
+
+			continue
+		}
+
+		switch src[i] {
+		case '"':
+			for i++; i < to && i < len(src); i++ {
+				if src[i] == '\\' && i+1 < len(src) {
+					i++
+
+					continue
+				}
+
+				if src[i] == '"' || src[i] == '\n' {
+					i++
+
+					break
+				}
+			}
+
+			continue
+		case '{':
+			// closed inside the extent: the literal rides whole, its
+			// interior brackets are the scanner's business, not the count's
+			if closer, ok := p.matchBracket(i, '{', '}'); ok && closer < to {
+				i = closer + 1
+
+				continue
+			}
+
+			depth++
+		case '(', '[':
+			depth++
+		case ')', ']', '}':
+			depth--
+		}
+
+		i++
+	}
+
+	return depth
+}
+
 // matchBracketNames is matchBracket over code bytes with the degenerate
 // member names stepped over whole: a name's "(" opens nothing, so its ")"
 // closes nothing either.
@@ -1155,8 +1228,9 @@ func (p *xsPrinter) openBefore(hang int, names []common.Range) (int, bool) {
 // switch) end their extent at the last nested statement, so every brace
 // the parser closed after it is outside the extent while the statement's
 // bytes run through it. The unmatched opens are counted over the cut's own
-// code bytes — degenerate member names stepped over whole, a name's
-// brackets being its own text (xsBracketDepth) — and closed one closer at
+// code bytes — closed block literals skipped whole, degenerate member
+// names stepped over whole, a name's brackets being its own text
+// (xsResidualDepth) — and closed one closer at
 // a time; a source that runs out first keeps the extent's end. A bracket
 // opening at or past the extent's own end is not the statement's — the
 // empty `{}` a body's last statement can be ends the extent right on its
@@ -1174,7 +1248,7 @@ func (p *xsPrinter) openBefore(hang int, names []common.Range) (int, bool) {
 // brace it owns.
 func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 	end := s.Range.End.Offset
-	depth := p.xsBracketDepth(from, end, p.xsMemberNames(from, end))
+	depth := p.xsResidualDepth(from, end, p.xsMemberNames(from, end))
 
 	extended := false
 

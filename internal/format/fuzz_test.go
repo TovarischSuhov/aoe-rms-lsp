@@ -106,6 +106,12 @@ func FuzzXS(f *testing.F) {
 	// (TestXS_HeaderDegenerateScopeOnce pins the header scope)
 	f.Add(`void A(){switch(0%0%0){0%0}for(0%0;0)!{.00}}`)
 	f.Add(`void A(){while(0)!{.00}}`)
+	// #173: an unclosed "(" inside a CLOSED block literal has no closer
+	// anywhere — the residual skips the literal whole, the closer hunt
+	// keeps the enclosing body's brace out of the cut
+	// (TestXS_WarnDegenerateTailOnce pins the degenerate tail)
+	f.Add("vector A=(00000);void A(){in%A0%{00000000};in%A0%{00000000000(0000}.0}")
+	f.Add(`void A(){in%A0%{00000000000(0000}.0}`)
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")
