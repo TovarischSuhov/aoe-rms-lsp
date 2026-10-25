@@ -1066,14 +1066,24 @@ func (p *xsPrinter) warnSlice(s xs.Stmt) (int, bool) {
 // opener of its own kind, and a closer nothing opened of its kind closes
 // the opener the depth counted: the parser tolerates an unclosed `(` inside
 // a block literal (`0.!%{(}`), and a typeless count would spend the
-// literal's own `}` on it, pushing the cut onto the enclosing body's brace. The second answer reports whether the loop
+// literal's own `}` on it, pushing the cut onto the enclosing body's brace.
+// The depth itself is the residual the cut leaves (xsResidualKinds): a
+// closed block literal rides whole, and a tolerated junk closer leaves the
+// stack alone — the orphan ")" closing an opener BEFORE the extent (the
+// unclosed-string statement `("\n)(""` starts inside the dropped
+// grouping) must not cancel the unit of the call's own "(", or the cut
+// stops before the call's closer and the reparse dies inside the argument
+// list. The spend is kind-bound — a closer nothing out there opened spends
+// the residual's opener only of its kind. The second answer reports
+// whether the loop
 // moved the end — it always lands strictly past the extent (the scan
 // starts on the end itself), so the callers can tell a cut that already
 // consumed its own body's closing brace from one stopped short of every
 // brace it owns.
 func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 	end := s.Range.End.Offset
-	depth := p.xsBracketDepth(from, end, p.xsMemberNames(from, end))
+	residual := p.xsResidualKinds(from, end, p.xsMemberNames(from, end))
+	depth := len(residual)
 
 	extended := false
 
@@ -1090,6 +1100,10 @@ func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 					return false
 				}
 
+				if len(opens) == 0 && len(residual) > 0 && residual[len(residual)-1] != xsOpener(c) {
+					return false
+				}
+
 				return true
 			}
 
@@ -1102,9 +1116,91 @@ func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 		end = closer + 1
 		depth--
 		extended = true
+
+		if n := len(residual); n > 0 {
+			residual = residual[:n-1]
+		}
 	}
 
 	return end, extended
+}
+
+// xsResidualKinds collects the openers a cut leaves unmatched, innermost
+// last — the kinds the closer hunt spends on, one unit each. Closed block
+// literals ride whole: the scanner carries a bare block past its tolerated
+// junk, and interior brackets are the scanner's business, not the count's
+// — a degenerate member name inside a closed literal holds its own `}` in
+// its text, and a count that stepped names without skipping the literal
+// read the closed `{` as open. A literal whose closer sits at or past the
+// extent's end is the open shape the hunt exists for: its opener counts.
+// A closer nothing opened leaves the stack alone — the net count would let
+// it cancel a real opener's unit (the orphan ")" of a dropped grouping,
+// whether ahead of a block literal or ahead of a call). The walk mirrors
+// the bracket disciplines (comments and strings transparent, degenerate
+// member names stepped over whole, a name's brackets being its own text).
+func (p *xsPrinter) xsResidualKinds(from, to int, names []common.Range) []byte {
+	src := p.src
+	stack := make([]byte, 0, 4)
+	ni := 0
+
+	ci := 0 // first comment not fully passed; the extents are sorted and disjoint
+
+	for i := from; i < to && i < len(src); {
+		for ci < len(p.comments) && p.comments[ci].End.Offset <= i {
+			ci++
+		}
+
+		if ci < len(p.comments) && p.comments[ci].Start.Offset <= i {
+			i = p.comments[ci].End.Offset
+
+			continue // a comment is no token: the walk crosses it
+		}
+
+		if inNames(&ni, i, names) {
+			i = names[ni].End.Offset
+
+			continue
+		}
+
+		switch src[i] {
+		case '"':
+			for i++; i < to && i < len(src); i++ {
+				if src[i] == '\\' && i+1 < len(src) {
+					i++
+
+					continue
+				}
+
+				if src[i] == '"' || src[i] == '\n' {
+					i++
+
+					break
+				}
+			}
+
+			continue
+		case '{':
+			// closed inside the extent: the literal rides whole, its
+			// interior brackets are the scanner's business, not the count's
+			if closer, ok := p.matchBracket(i, '{', '}'); ok && closer < to {
+				i = closer + 1
+
+				continue
+			}
+
+			stack = append(stack, '{')
+		case '(', '[':
+			stack = append(stack, src[i])
+		case ')', ']', '}':
+			if n := len(stack); n > 0 && stack[n-1] == xsOpener(src[i]) {
+				stack = stack[:n-1]
+			}
+		}
+
+		i++
+	}
+
+	return stack
 }
 
 // xsOpener answers the opener byte c closes.

@@ -697,6 +697,79 @@ func TestXS_WarnLiteralBodyOnce(t *testing.T) {
 	}
 }
 
+// TestXS_UnterminatedStringChainOnce pins the residual walk through an
+// unterminated string statement (#176): the parser clips the unclosed
+// literal at the line end, the statement's extent starts inside the
+// dropped grouping, and the orphan ")" closing the grouping's own "("
+// used to cancel the unit of the call's "(" in the net count — the cut
+// stopped before the call's closer and the reparse died inside the
+// argument list. The residual leaves junk closers out of the stack, the
+// hunt spends the call's own ")", and the walk back restores the
+// grouping's opener.
+func TestXS_UnterminatedStringChainOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// the class: the cut carries the whole chain with its
+			// closers, the unterminated string keeps its line break
+			name: "rule body chain",
+			src:  "rule{(\"\n)(\"\")}",
+			want: "rule {\n    (\"\n)(\"\")\n}\n",
+		},
+		{
+			// the same shape in a function body — the class is not
+			// rule-specific
+			name: "function body chain",
+			src:  "void A(){(\"\n)(\"\")}",
+			want: "void A() {\n    (\"\n)(\"\")\n}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			wantTree, _ := xs.XsParse(tt.src, "")
+			gotTree, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(wantTree), xsTreeShape(gotTree)); diff != "" {
+				t.Errorf("XS(%q) tree drift:\n%s\noutput:\n%s", tt.src, diff, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_WarnInitUnpairedBrace pins the warnInit terminator rule (#151): a
 // block literal with an unpaired "(" keeps the bracket scan positive, the
 // separator search finds no end, and the fallback cut reaches the extent's

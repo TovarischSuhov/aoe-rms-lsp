@@ -94,6 +94,13 @@ func FuzzXS(f *testing.F) {
 	// the tail declarator standalone — a bare statement at top level
 	// (TestXS_DeclSplitHeadOnce pins the group's own-bytes fixed point)
 	f.Add(`void A,#A=0.`)
+	// #176: an unterminated string clips the extent at the line end, the
+	// statement starts inside the dropped grouping, and the orphan ")"
+	// closing the grouping's own "(" canceled the call's unit in the net
+	// count — the cut lost the call's closer and the reparse died inside
+	// the argument list (TestXS_UnterminatedStringChainOnce pins the
+	// residual walk)
+	f.Add("rule{(\"\n)(\"\")}")
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")
