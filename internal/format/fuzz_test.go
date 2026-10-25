@@ -100,6 +100,13 @@ func FuzzXS(f *testing.F) {
 	// the tail declarator standalone — a bare statement at top level
 	// (TestXS_DeclSplitHeadOnce pins the group's own-bytes fixed point)
 	f.Add(`void A,#A=0.`)
+	// #174: a block literal in a brace-less if body tolerates a junk ")"
+	// before the literal's own "}" — the closer hunt spent it on the
+	// counted "{" and the cut lost the real closer, whose absence the
+	// reparse spent the body's brace on (TestXS_WarnBareBodyLiteralOnce
+	// pins the kind-bound spend)
+	f.Add(`void A(){if((0,0))0%{)}}`)
+	f.Add(`void A(){0.!%{)}}`)
 	// #171: a degenerate member name in a BODY's bytes used to pull the
 	// whole header+body statement verbatim — the multi-line cut's
 	// per-line collapse stranded the interior indentation between passes

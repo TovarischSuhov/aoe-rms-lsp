@@ -789,6 +789,98 @@ func TestXS_WarnLiteralBodyOnce(t *testing.T) {
 	}
 }
 
+// TestXS_WarnBareBodyLiteralOnce pins the kind-bound closer spend in
+// warnCutEnd (#174): a block literal in a brace-less if body tolerates a
+// junk ")" before the literal's own "}", and the hunt used to spend it on
+// the counted "{" — the cut ended before the real closer, and the reparse
+// spent the enclosing body's brace on the unclosed literal (expected "}"
+// at top level). The spend is now bound to the residual's own opener kind
+// (xsResidualKinds): a closer nothing opened closes the residual's opener
+// only of its kind, junk rides inside the cut.
+func TestXS_WarnBareBodyLiteralOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// the class: the ")" is tolerated junk inside the
+			// literal, the cut skips it and stops on the literal's
+			// own brace
+			name: "if bare body",
+			src:  "void A(){if((0,0))0%{)}}",
+			want: "void A() {\n    if((0,0))0%{)}\n}\n",
+		},
+		{
+			// the degenerate-member form rides stmtVerbatim's
+			// warnCutEnd the same way
+			name: "degenerate bare body",
+			src:  "void A(){0.!%{)}}",
+			want: "void A() {\n    0.!%{)}\n}\n",
+		},
+		{
+			name: "while bare body",
+			src:  "void A(){while((0,0))0%{)}}",
+			want: "void A() {\n    while((0,0))0%{)}\n}\n",
+		},
+		{
+			// the closed form was correct before the fix: the
+			// literal's closer is the first byte the hunt meets
+			name: "closed literal control",
+			src:  "void A(){if((0,0))0%{}}",
+			want: "void A() {\n    if((0,0))0%{}\n}\n",
+		},
+		{
+			// a block body carries its own brace after the
+			// literal's — two spends, both of their kinds
+			name: "block body",
+			src:  "void A(){if((0,0)){0%{)}}}",
+			want: "void A() {\n    if((0,0)){0%{)}}\n}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			wantTree, _ := xs.XsParse(tt.src, "")
+			gotTree, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(wantTree), xsTreeShape(gotTree)); diff != "" {
+				t.Errorf("XS(%q) tree drift:\n%s\noutput:\n%s", tt.src, diff, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_WarnDegenerateTailOnce pins the degenerate-tail literal cut
 // (#173): an unclosed "(" inside a CLOSED block literal has no closer
 // anywhere, and a typeless residual spent the first closer past the
