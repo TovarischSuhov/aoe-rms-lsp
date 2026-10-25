@@ -133,6 +133,21 @@ XS additionally:
   keeps its own terminator discipline — `vector A=0.!%{(}` was never
   bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
   seed `void A(){0.!%{(}}`.
+- The bare-body literal tail (#174) is closed on the same hunt: a block
+  literal in a brace-less if body tolerates a junk `)` before the
+  literal's own `}`, and the typeless spend used to burn it on the
+  counted `{` — the cut ended before the real closer, and the reparse
+  spent the enclosing body's `}` on the unclosed literal
+  (`void A(){if((0,0))0%{)}}` printed `if((0,0))0%{)` and stopped
+  parsing). The spend is bound to the residual's own opener kind
+  (xsResidualKinds): a closer nothing out there opened closes the
+  residual's opener only of its kind, and junk of another kind rides
+  inside the cut. The degenerate-member form (`void A(){0.!%{)}}`)
+  rides the same fix through stmtVerbatim; the declaration-level cut
+  keeps its own discipline — the `vector A=(0,0)%{)}` member of the
+  negative-depth family stays in the open list. Pins:
+  TestXS_WarnBareBodyLiteralOnce (five rows) and the FuzzXS seeds
+  `void A(){if((0,0))0%{)}}` / `void A(){0.!%{)}}`.
 - The warned operand cut inside a grouping (#170) is closed on the
   statement path: a wrong-arity vector folds to a node inside its
   grouping, so the statement's cut carries the grouping's ")" while
@@ -207,6 +222,24 @@ XS additionally:
   and the sibling boundary stays put (the cut still ends at its own
   ";"). Pins: TestXS_ZeroSuffixSpacedOnce (five rows) and the FuzzXS
   seeds `vector A=(0.! ())` / `void A(){0.! ()}`.
+- The degenerate tail after a closed literal (#173) is closed on the
+  statement cut: an unclosed "(" inside a CLOSED block literal has no
+  closer anywhere, and the typeless residual counted it open — once a
+  degenerate member (`.0`) carried the extent past the literal's own
+  closer, the closer hunt spent the enclosing body's brace on it: the
+  cut printed the body's `}` and the body printer printed it again
+  (`void A(){in%A0%{00000000000(0000}.0}` printed the cut
+  `in%A0%{00000000000(0000}.0}` plus the `}` line; the output did not
+  reparse — `unexpected "}" at top level`). The hunt's spend is kind-bound
+  to the residual (xsResidualKinds): the closed literal's tolerated junk
+  leaves an unclosed "(" on the stack, and the body's brace — a closer of
+  another kind than the residual's own — is rejected, so tolerated junk
+  inside a closed literal leaves the hunt nothing, while
+  an open literal at the extent edge keeps the #163 cut (its opener
+  counts, the hunt matches its closer outside). Pins:
+  TestXS_WarnDegenerateTailOnce (five rows) and the FuzzXS seeds
+  `vector A=(00000);void A(){in%A0%{00000000};in%A0%{00000000000(0000}.0}`
+  / `void A(){in%A0%{00000000000(0000}.0}`.
 - Convergence has known open escape classes — the list is not
   closed, fresh fuzzing keeps surfacing more.
   Every class below is pre-existing — each reproduces, byte for
