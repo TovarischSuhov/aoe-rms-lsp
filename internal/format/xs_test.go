@@ -770,6 +770,137 @@ func TestXS_WarnInitUnpairedBrace(t *testing.T) {
 	}
 }
 
+// TestXS_ZeroCallChainOnce pins the zero-call chain recovery (#165): the
+// parser folds every zero-argument call suffix into its callee — one Call
+// node whose extent stops at the callee — and the canonical print spends
+// at most one "(" pair past it. A chain of two or more zero suffixes lost
+// the extra pairs silently (byte drift, no diagnostic anywhere), and a
+// truncation that landed inside an argument list printed an unbalanced
+// callee slice that does not reparse. The chain's own bytes print as one
+// cut; the single-suffix and argument-capped shapes stay canonical.
+func TestXS_ZeroCallChainOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// the grouped repro: one suffix consumed canonically,
+			// the second lost — the cut carries both
+			name: "grouped chain",
+			src:  "vector A=(A)()()",
+			want: "vector A = (A)()();\n",
+		},
+		{
+			// the truncation repro: the tail suffix collapsed the
+			// node mid-arglist, the cut printed `0(0()` and the
+			// output stopped parsing
+			name: "truncated arglist",
+			src:  "vector A=0(0())()",
+			want: "vector A = 0(0())();\n",
+		},
+		{
+			// a plain-ident callee folds the same way: one `()`
+			// pair short, no diagnostic
+			name: "plain callee chain",
+			src:  "vector A=A()()",
+			want: "vector A = A()();\n",
+		},
+		{
+			// the truncation can land in an inner call's own
+			// arglist
+			name: "inner arglist truncation",
+			src:  "vector A=f(A())()",
+			want: "vector A = f(A())();\n",
+		},
+		{
+			// suffix pairs in a statement body — the statement
+			// boundary ends the cut; riding into the next
+			// statement's leading "(" duplicated it on every pass
+			name: "chain in body",
+			src:  "void A(){(A)()()();}",
+			want: "void A() {\n    (A)()()();\n}\n",
+		},
+		{
+			// one suffix: the canonical print was never wrong
+			name: "single suffix",
+			src:  "vector A=f(A)()",
+			want: "vector A = f(A)();\n",
+		},
+		{
+			// an argument suffix after the zero one is represented
+			// — the canonical print already carried it
+			name: "argument suffix",
+			src:  "vector A=A()(0)",
+			want: "vector A = A()(0);\n",
+		},
+		{
+			// a // comment between the callee and the suffix lifted
+			// out of the cut: collapsed inside it, the chain's tail
+			// re-read as part of the comment and the shape drifted
+			// on the next pass (#177)
+			name: "comment before suffix",
+			src:  "void A(){00//\n()()}",
+			want: "void A() {\n    //\n    00 ()();\n}\n",
+		},
+		{
+			// a block comment between the pairs rides the cut — it
+			// closes itself, the chain bytes around it stay one line
+			name: "block comment rides",
+			src:  "vector A=(0)/*c*/()",
+			want: "vector A = (0)/*c*/();\n",
+		},
+		{
+			// a // comment between the pairs lifts above the
+			// declaration; the pairs stay on the decl line
+			name: "line comment between pairs",
+			src:  "vector A=(0)//c\n()",
+			want: "//c\nvector A = (0)();\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			wantTree, _ := xs.XsParse(tt.src, "")
+			gotTree, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(wantTree), xsTreeShape(gotTree)); diff != "" {
+				t.Errorf("XS(%q) tree drift:\n%s\noutput:\n%s", tt.src, diff, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_DegenerateChains checks the degenerate member-name contract: a
 // chain whose name after "." came off a non-identifier token has no
 // canonical spelling, so the construct prints as a byte-exact slice of its

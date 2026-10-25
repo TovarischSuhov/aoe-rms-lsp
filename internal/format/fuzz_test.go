@@ -44,6 +44,13 @@ func FuzzXS(f *testing.F) {
 	// #163: the block literal's own "}" must not be spent on its
 	// tolerated unclosed "(", or the cut eats the enclosing body's
 	f.Add(`void A(){0.!%{(}}`)
+	// #165: a zero-call chain folds to one callee-stopped node — the
+	// cut must carry every suffix pair, and stop before the next ";"
+	f.Add(`vector A=0(0())()`)
+	f.Add(`void A(){get(1)();(1, 2, 3)();}`)
+	// #177: a // comment inside the chain cut lifts out of it — collapsed
+	// into the cut, the chain's tail re-read as part of the comment
+	f.Add(`void A(){00//\n()()}`)
 	f.Add(`vector A=(0(0))`)
 	f.Add(`vector A=(0(0));`)
 	f.Add(`void f(){while{x}{y}}`)

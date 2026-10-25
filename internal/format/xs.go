@@ -723,6 +723,85 @@ func (p *xsPrinter) zeroCallParen(e xs.Expr) (int, bool) {
 	return open, true
 }
 
+// zeroCallChain recovers a postfix call chain a zero-argument suffix
+// capped: the parser folds every zero suffix into its callee — one Call
+// node whose extent stops at the callee — and the canonical print spends
+// at most one "(" pair past it, so a second suffix is lost silently and
+// a truncation that landed inside an argument list prints an unbalanced
+// callee slice. The chain's own bytes are the shape's only record: the
+// cut walks the grouping prefixes back, closes the extent's unclosed
+// opens one closer at a time (typed pairing), then consumes every
+// postfix pair that follows — the grammar continues the chain on an
+// immediately following "(" token, any other code token ends it. ok
+// reports whether the chain runs past the one pair the canonical print
+// consumes; a single well-formed suffix stays with it.
+func (p *xsPrinter) zeroCallChain(e xs.Expr) (int, int, bool) {
+	open, ok := p.scanFirst(e.Range.End.Offset, '(')
+	if !ok {
+		return 0, 0, false
+	}
+
+	closer, ok := p.matchBracket(open, '(', ')')
+	if !ok {
+		return 0, 0, false
+	}
+
+	from := p.calleeStart(e.Range.Start.Offset, open)
+
+	var opens []byte
+
+	end := e.Range.End.Offset
+	depth := p.xsBracketDepth(from, end, p.xsMemberNames(from, end))
+
+	// the walk reads one code token at a time and stops at any that
+	// cannot continue the chain: a zero-capped chain ends before the
+	// next ";" — the statement boundary — and a pair hunt that skipped
+	// over one swallowed the following statement's leading "(" whole
+	// (the vector-literal callee's own "(" rides unbalanced past the
+	// extent, so the hunt runs even on plain single-suffix chains)
+	for depth > 0 {
+		i, ok := p.xsFind(end, len(p.src), func(_ int, c byte) bool {
+			return xsTokenStart(c)
+		})
+		if !ok {
+			return 0, 0, false
+		}
+
+		switch c := p.src[i]; c {
+		case '(', '[', '{':
+			opens = append(opens, c)
+		case ')', ']', '}':
+			if n := len(opens); n > 0 && opens[n-1] == xsOpener(c) {
+				opens = opens[:n-1]
+			} else {
+				depth--
+			}
+		default:
+			return 0, 0, false
+		}
+
+		end = i + 1
+	}
+
+	for {
+		i, ok := p.xsFind(end, len(p.src), func(_ int, c byte) bool {
+			return xsTokenStart(c)
+		})
+		if !ok || p.src[i] != '(' {
+			break
+		}
+
+		c, ok := p.matchBracket(i, '(', ')')
+		if !ok {
+			break
+		}
+
+		end = c + 1
+	}
+
+	return from, end, end > closer+1
+}
+
 // bodyBlock prints a top-level head line sharing its brace with the block
 // at open: contents one level in, the comments ahead of the closer
 // anchored inside, then the closer.
@@ -2449,6 +2528,17 @@ func (p *xsPrinter) unary(e xs.Expr, minPrec int) string {
 // its own "(" (calleeStart), or the group's ")" would ride the
 // cut while its opener went missing.
 func (p *xsPrinter) call(e xs.Expr) string {
+	if len(e.Children) == 0 {
+		if from, to, ok := p.zeroCallChain(e); ok {
+			// the same comment discipline as the callee cut below:
+			// collapseWS on the raw span printed a // inside the cut
+			// with its newline collapsed — the chain's tail bytes then
+			// re-read as part of the comment and the shape drifted on
+			// the next pass (#177)
+			return p.liftLine(from, to, p.level)
+		}
+	}
+
 	callee := e.Callee
 	if callee == "" {
 		open, ok := 0, false
