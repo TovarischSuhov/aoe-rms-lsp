@@ -94,6 +94,14 @@ func FuzzXS(f *testing.F) {
 	// the tail declarator standalone — a bare statement at top level
 	// (TestXS_DeclSplitHeadOnce pins the group's own-bytes fixed point)
 	f.Add(`void A,#A=0.`)
+	// #175: a closed block literal must ride the residual walk whole — a
+	// degenerate member inside held the literal's "}" out of the count and
+	// the body's brace was spent on the closed "{" (document growth) — and
+	// a dropped grouping's orphan ")" must not cancel the literal's unit
+	// (the cut kept the grouping's closer without its opener)
+	// (TestXS_WarnLiteralResidualOnce pins both)
+	f.Add(`void A(){0%{.}}`)
+	f.Add(`void A(){((0,0))%{}}`)
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")

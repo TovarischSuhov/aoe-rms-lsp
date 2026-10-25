@@ -697,6 +697,89 @@ func TestXS_WarnLiteralBodyOnce(t *testing.T) {
 	}
 }
 
+// TestXS_WarnLiteralResidualOnce pins the residual walk in warnCutEnd
+// (#175): a closed block literal rides whole — a degenerate member name
+// inside holds the literal's own "}" in its text, and a count that stepped
+// names without skipping the literal read the closed "{" as open, spent
+// the enclosing body's brace on it and grew the document every pass — and
+// a tolerated junk closer leaves the stack alone, so the orphan ")" of a
+// dropped grouping cannot cancel the literal's unit (the hunt stood still
+// and the cut kept the grouping's closer without its opener). The spend
+// stays kind-bound to the residual's own opener.
+func TestXS_WarnLiteralResidualOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// the closed literal holds its degenerate member in
+			// its own braces; the canonical first pass is stable
+			// from the second (the verbatim cut re-reads the same
+			// bytes)
+			name: "closed literal degenerate member",
+			src:  "void A(){0%{.}}",
+			want: "void A() {\n    0 % {.};\n}\n",
+		},
+		{
+			// the dropped grouping's orphan ")" rides the cut,
+			// the literal's unit survives, and the walk-back
+			// restores the grouping's own "("
+			name: "orphan grouping closer",
+			src:  "void A(){((0,0))%{}}",
+			want: "void A() {\n    ((0,0))%{}\n}\n",
+		},
+		{
+			// the bare-body junk ")" (#174's class) is the same
+			// kind-bound skip on this walk
+			name: "junk closer in bare body",
+			src:  "void A(){if((0,0))0%{)}}",
+			want: "void A() {\n    if((0,0))0%{)}\n}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			wantTree, _ := xs.XsParse(tt.src, "")
+			gotTree, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(wantTree), xsTreeShape(gotTree)); diff != "" {
+				t.Errorf("XS(%q) tree drift:\n%s\noutput:\n%s", tt.src, diff, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_WarnInitUnpairedBrace pins the warnInit terminator rule (#151): a
 // block literal with an unpaired "(" keeps the bracket scan positive, the
 // separator search finds no end, and the fallback cut reaches the extent's

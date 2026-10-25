@@ -133,6 +133,21 @@ XS additionally:
   keeps its own terminator discipline — `vector A=0.!%{(}` was never
   bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
   seed `void A(){0.!%{(}}`.
+- The residual shapes (#175) are closed on the same hunt: warnCutEnd's
+  depth is now the residual the cut leaves — closed block literals ride
+  whole, and tolerated junk closers leave the stack alone. Two failures
+  fell out of the net count: a degenerate member inside a CLOSED literal
+  (`void A(){0%{.}}` — pass 1 canonical `0 % {.};`, pass 2 grew the
+  body's `}` every pass, because the name held the literal's own `}` in
+  its text and the closed `{` read as open), and a dropped grouping's
+  orphan `)` ahead of a literal (`void A(){((0,0))%{}}` printed
+  `(0,0))%{` — the junk closer canceled the literal's unit, the hunt
+  stood still, and the cut kept the grouping's closer without its
+  opener). The spend stays kind-bound: a closer nothing out there opened
+  spends the residual's opener only of its kind (the bare-body junk `)`
+  of #174 is the same skip on this walk). Pins:
+  TestXS_WarnLiteralResidualOnce (three rows) and the FuzzXS seeds
+  `void A(){0%{.}}` / `void A(){((0,0))%{}}`.
 - The include tail-comment drift (#164) is closed: unclosedEOF's
   byte check reads a closing `*/` only where a closer can be — the
   suffix, with its `*` past the opener's own (the opener holds the
