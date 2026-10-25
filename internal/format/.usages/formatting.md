@@ -143,9 +143,31 @@ XS additionally:
   still rides the line as written. Pins:
   TestXS_IncludeTrailingCommentOnce (six rows) and the FuzzXS seeds
   `include"";include"";/*/0` / `include""/*/`.
+- The zero-call chain (#165) is closed on the expression path: the
+  parser folds every zero-argument call suffix into its callee — one
+  Call node whose extent stops at the callee — and the canonical print
+  spent at most one "(" pair past it, so a second suffix was lost
+  silently (`vector A=(A)()()` printed `(A)()`, `vector A=A()()` printed
+  `A()()`, byte drift with no diagnostic) and a truncation that landed
+  inside an argument list printed an unbalanced callee slice
+  (`vector A=0(0())()` printed `0(0();`, the output stopped parsing).
+  zeroCallChain now recovers the chain's own bytes as one cut: the
+  grouping prefixes walk back, the extent's unclosed opens close one
+  closer at a time (typed pairing), and every postfix "(" pair that
+  immediately follows is consumed — the walk reads one code token at a
+  time and ends at any token that cannot continue the chain, so a ";"
+  boundary is never crossed (crossing it duplicated the next statement
+  on every pass — the case41 fixture caught it). The cut prints through
+  the same comment discipline as the callee cut: a // inside it lifts
+  to its own line — collapsed into the cut, the chain's tail re-read as
+  part of the comment and the shape drifted on the next pass (#177),
+  while a block comment rides. The single-suffix and
+  argument-capped shapes stay canonical. Pins:
+  TestXS_ZeroCallChainOnce (ten rows) and the FuzzXS seeds
+  `vector A=0(0())()` / `void A(){get(1)();(1, 2, 3)();}` /
+  `void A(){00//\n()()}`.
 - Convergence has known open escape classes — the list is not
-  closed, fresh fuzzing keeps surfacing more (the grouped
-  zero-call chain below surfaced in this run's fuzz re-check).
+  closed, fresh fuzzing keeps surfacing more.
   Every class below is pre-existing — each reproduces, byte for
   byte, on the task/format-xs tree before this run's delta and on
   the final tree (rechecked 2026-10-24) — and none of them enters
@@ -178,6 +200,13 @@ XS additionally:
   remaining members appended 2026-10-25 from the format-xs run's
   backlog, each rechecked byte-for-byte on master. The split
   type-word-name residual above joins them as the batch's third
+  `(0.(,0));` does not reparse, `expected ;`), the comment drift
+  behind a doubled include (`include"";include"";/*/0` — pass 1
+  glues `/*/0` to the second include line, pass 2 moves it to its
+  own line; fixed point from pass 2, the reparse stays whole; the
+  remaining member appended 2026-10-25 from the format-xs run's
+  backlog, rechecked byte-for-byte on master. The split
+  type-word-name residual above joins it as the batch's second
   member — narrowed out of the closed #162 class on
   task/xs-decl-head).
   An XS divergence outside this list is a finding to report
