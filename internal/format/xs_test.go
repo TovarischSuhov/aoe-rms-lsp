@@ -601,6 +601,96 @@ func TestXS_WarnGroupedVectorStmt(t *testing.T) {
 	}
 }
 
+// TestXS_WarnTruncatedOperandOnce pins the hanging-closer walk-back in
+// warnCutStart (#170): the warned operand folds to a node inside a
+// grouping, so the statement's cut carries the grouping's ")" while its
+// "(" sits left of the extent — and the cut's own brackets then net zero,
+// the closing hunt saw no depth to close, and pass one printed a hanging
+// ")" with the tail operand lost (`0)%(0` from `(0)%(0,0)`), unparseable.
+// The cut now opens at the closer's own opener, and warnCutEnd closes the
+// depth the widened cut counts.
+func TestXS_WarnTruncatedOperandOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// the class: the "%" LHS keeps its grouping's ")",
+			// the warned vector RHS loses the tail past the
+			// collapsed first operand
+			name: "binary with truncated rhs",
+			src:  "void A(){(0);(0)%(0,0)}",
+			want: "void A() {\n    0;\n    (0)%(0,0)\n}\n",
+		},
+		{
+			// the issue's second member: the warned vector sits
+			// inside a grouping of its own
+			name: "statement in grouping",
+			src:  "void A(){(0) (0%(0,0))}",
+			want: "void A() {\n    (0) (0%(0,0))\n}\n",
+		},
+		{
+			// the walk-back is per grouping: two layers, two
+			// hanging closers
+			name: "nested grouping lhs",
+			src:  "void A(){((0))%(0,0)}",
+			want: "void A() {\n    ((0))%(0,0)\n}\n",
+		},
+		{
+			// the warned operand's own grouping closes past the
+			// collapsed extent
+			name: "grouped rhs",
+			src:  "void A(){(0)%((0,0))}",
+			want: "void A() {\n    (0)%((0,0))\n}\n",
+		},
+		{
+			// a float operand prints its dot byte-exact
+			name: "float lhs",
+			src:  "void A(){(0.0)%(0,0)}",
+			want: "void A() {\n    (0.0)%(0,0)\n}\n",
+		},
+		{
+			// the mirror: the warned vector carries the "%"
+			name: "truncated lhs",
+			src:  "void A(){(0);(0,0)%(0)}",
+			want: "void A() {\n    0;\n    (0,0)%(0)\n}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			_, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if once != tt.want || twice != once {
+				t.Errorf("XS(%q) =\n%q\n(reprint %q)\nwant\n%q", tt.src, once, twice, tt.want)
+			}
+		})
+	}
+}
+
 // TestXS_WarnLiteralBodyOnce pins the typed closer pairing in warnCutEnd
 // (#163): a block literal tolerates an unclosed "(" in its recovery bytes,
 // and the cut hunt used to spend the literal's own "}" on it — the cut ran

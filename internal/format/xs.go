@@ -1049,6 +1049,107 @@ func (p *xsPrinter) warnSlice(s xs.Stmt) (int, bool) {
 	return 0, false
 }
 
+// warnCutStart moves a warning cut's start back over the groupings the
+// collapsed extent opens inside: the cut's own bytes can carry a grouping's
+// ")" while the extent lost its "(" (the parser folds the warned operand
+// to a node inside the grouping, #170), and a cut from the extent prints
+// the hanging closer — and its own brackets then net zero, so warnCutEnd
+// sees no depth to close. The walk takes the opener of the closer that
+// drives the cut's prefix depth below zero, one grouping per step; a
+// grouping closing past the end is the callee cut's shape and stays with
+// calleeStart's own gate. The degenerate member names step over whole,
+// their brackets being their own text.
+func (p *xsPrinter) warnCutStart(from, end int) int {
+	names := p.xsMemberNames(from, end)
+
+	for {
+		depth, hang := 0, -1
+		ni := 0
+
+		_, _ = p.xsFind(from, end, func(i int, c byte) bool {
+			if inNames(&ni, i, names) {
+				return false
+			}
+
+			switch c {
+			case '(', '[', '{':
+				depth++
+			case ')', ']', '}':
+				depth--
+				if depth < 0 && hang < 0 {
+					hang = i
+				}
+			}
+
+			return false
+		})
+		if hang < 0 {
+			return from
+		}
+
+		b, ok := p.openBefore(hang, names)
+		if !ok {
+			return from
+		}
+
+		from = b
+	}
+}
+
+// openBefore finds the grouping opener a closer at hang pairs with: a
+// backward walk over code bytes (comments transparent), the names stepped
+// over whole, only the pair's own kind counted, a ";" or brace aborting —
+// the statement boundary no argument pairing crosses.
+func (p *xsPrinter) openBefore(hang int, names []common.Range) (int, bool) {
+	var openB, closeB byte
+
+	switch p.src[hang] {
+	case ')':
+		openB, closeB = '(', ')'
+	case ']':
+		openB, closeB = '[', ']'
+	default:
+		return 0, false
+	}
+
+	depth := 0
+
+	for i := hang; ; {
+		b, ok := p.codeBefore(i)
+		if !ok {
+			return 0, false
+		}
+
+		i = b
+
+		held := false
+
+		for _, r := range names {
+			if r.Start.Offset <= b && b < r.End.Offset {
+				held = true
+
+				break
+			}
+		}
+
+		if held {
+			continue
+		}
+
+		switch p.src[b] {
+		case closeB:
+			depth++
+		case openB:
+			depth--
+			if depth < 0 {
+				return b, true
+			}
+		case ';', '{', '}':
+			return 0, false
+		}
+	}
+}
+
 // warnCutEnd extends a warning-carrying statement's extent to where its
 // verbatim cut must stop: compound statements (if/else chains, while, for,
 // switch) end their extent at the last nested statement, so every brace
@@ -1180,6 +1281,8 @@ func (p *xsPrinter) warnVerbatim(s xs.Stmt) (string, bool) {
 	if !ok {
 		return "", false
 	}
+
+	from = p.warnCutStart(from, s.Range.End.Offset)
 
 	end, extended := p.warnCutEnd(from, s)
 	if !extended {

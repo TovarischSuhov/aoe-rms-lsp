@@ -133,6 +133,19 @@ XS additionally:
   keeps its own terminator discipline — `vector A=0.!%{(}` was never
   bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
   seed `void A(){0.!%{(}}`.
+- The warned operand cut inside a grouping (#170) is closed on the
+  statement path: a wrong-arity vector folds to a node inside its
+  grouping, so the statement's cut carries the grouping's ")" while
+  its "(" sits left of the extent — the cut's own brackets net zero,
+  the closing hunt saw no depth, and a binary statement printed a
+  hanging ")" with the tail operand lost (`void A(){(0);(0)%(0,0)}`
+  printed `0)%(0`, the output did not reparse). warnCutStart now
+  opens the cut at the closer's own opener (a typed backward walk,
+  names stepped over, a ";" or brace the hard bound), and warnCutEnd
+  closes the depth the widened cut counts; the cut prints byte-exact
+  from pass one. Pins: TestXS_WarnTruncatedOperandOnce (six rows) and
+  the FuzzXS seeds `void A(){(0);(0)%(0,0)}` /
+  `void A(){(0) (0%(0,0))}`.
 - The include tail-comment drift (#164) is closed: unclosedEOF's
   byte check reads a closing `*/` only where a closer can be — the
   suffix, with its `*` past the opener's own (the opener holds the
@@ -222,11 +235,18 @@ XS additionally:
   backlog, rechecked byte-for-byte on master. The split
   type-word-name residual above joins it as the batch's second
   member — narrowed out of the closed #162 class on
-  task/xs-decl-head), and the headerless unary-over-literal
-  degenerate (`void A(){!{.}}` — pass 2 prints the function's
-  closing brace a second time, `void A() {\n    !{.};\n}\n}\n`;
-  appended 2026-10-25 from the #171-branch battery, rechecked
-  byte-for-byte on master).
+  task/xs-decl-head), the member-call degenerate
+  (`void A(){(0.();}` — the grouping "(" is lost and the output
+  does not reparse, `expected ;`; appended 2026-10-25 from the
+  #170-branch battery, rechecked byte-for-byte on master), the
+  warn-collapsed initializer's degenerate call group
+  (`vector A=(0.! ())` — the closing ")" is lost and the output
+  does not reparse, `expected ")"`; appended 2026-10-25 from the
+  same battery, rechecked byte-for-byte on master), and the
+  headerless unary-over-literal degenerate (`void A(){!{.}}` —
+  pass 2 prints the function's closing brace a second time,
+  `void A() {\n    !{.};\n}\n}\n`; appended 2026-10-25 from the
+  #171-branch battery, rechecked byte-for-byte on master).
   An XS divergence outside this list is a finding to report
   just the same: not a bug in your calling code, not something
   to mask with a third pass.
