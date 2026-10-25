@@ -601,6 +601,96 @@ func TestXS_WarnGroupedVectorStmt(t *testing.T) {
 	}
 }
 
+// TestXS_WarnTruncatedOperandOnce pins the hanging-closer walk-back in
+// warnCutStart (#170): the warned operand folds to a node inside a
+// grouping, so the statement's cut carries the grouping's ")" while its
+// "(" sits left of the extent — and the cut's own brackets then net zero,
+// the closing hunt saw no depth to close, and pass one printed a hanging
+// ")" with the tail operand lost (`0)%(0` from `(0)%(0,0)`), unparseable.
+// The cut now opens at the closer's own opener, and warnCutEnd closes the
+// depth the widened cut counts.
+func TestXS_WarnTruncatedOperandOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// the class: the "%" LHS keeps its grouping's ")",
+			// the warned vector RHS loses the tail past the
+			// collapsed first operand
+			name: "binary with truncated rhs",
+			src:  "void A(){(0);(0)%(0,0)}",
+			want: "void A() {\n    0;\n    (0)%(0,0)\n}\n",
+		},
+		{
+			// the issue's second member: the warned vector sits
+			// inside a grouping of its own
+			name: "statement in grouping",
+			src:  "void A(){(0) (0%(0,0))}",
+			want: "void A() {\n    (0) (0%(0,0))\n}\n",
+		},
+		{
+			// the walk-back is per grouping: two layers, two
+			// hanging closers
+			name: "nested grouping lhs",
+			src:  "void A(){((0))%(0,0)}",
+			want: "void A() {\n    ((0))%(0,0)\n}\n",
+		},
+		{
+			// the warned operand's own grouping closes past the
+			// collapsed extent
+			name: "grouped rhs",
+			src:  "void A(){(0)%((0,0))}",
+			want: "void A() {\n    (0)%((0,0))\n}\n",
+		},
+		{
+			// a float operand prints its dot byte-exact
+			name: "float lhs",
+			src:  "void A(){(0.0)%(0,0)}",
+			want: "void A() {\n    (0.0)%(0,0)\n}\n",
+		},
+		{
+			// the mirror: the warned vector carries the "%"
+			name: "truncated lhs",
+			src:  "void A(){(0);(0,0)%(0)}",
+			want: "void A() {\n    0;\n    (0,0)%(0)\n}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			_, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if once != tt.want || twice != once {
+				t.Errorf("XS(%q) =\n%q\n(reprint %q)\nwant\n%q", tt.src, once, twice, tt.want)
+			}
+		})
+	}
+}
+
 // TestXS_WarnLiteralBodyOnce pins the typed closer pairing in warnCutEnd
 // (#163): a block literal tolerates an unclosed "(" in its recovery bytes,
 // and the cut hunt used to spend the literal's own "}" on it — the cut ran
@@ -642,11 +732,13 @@ func TestXS_WarnLiteralBodyOnce(t *testing.T) {
 			want: "void A() {\n    0.!%{}\n}\n",
 		},
 		{
-			// a compound statement's cut legitimately carries its
-			// own body brace after the literal's
+			// the parent prints canonically since #171: a body-grown
+			// extent no longer forces the whole-if verbatim, the
+			// warn statement's cut rides inside the block (the same
+			// discipline as the top-level row)
 			name: "nested body",
 			src:  "void A(){if(1){0.!%{(}}}",
-			want: "void A() {\n    if(1){0.!%{(}}\n}\n",
+			want: "void A() {\n    if (1) {\n        0.!%{(}\n    }\n}\n",
 		},
 		{
 			// the declaration-level cut (warnInit) has its own
@@ -1138,6 +1230,97 @@ func TestXS_DegenerateChains(t *testing.T) {
 
 			if twice != once {
 				t.Errorf("XS(%q) not idempotent: first pass %q, second pass %q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
+// TestXS_HeaderDegenerateScopeOnce pins the header scope of the
+// degenerate-name gate (#171): a degenerate member name in the BYTES OF A
+// BODY used to pull the whole header+body statement verbatim, and the
+// multi-line cut's per-line collapse stranded the interior indentation —
+// the for body printed at two levels on the first pass and at one space
+// on the second. The gate now scopes to the header, the body prints
+// through branch with its own degenerate checks, and every row is a fixed
+// point from the first pass. A degenerate in the header itself keeps the
+// whole-statement verbatim (single-line cut, own bytes).
+func TestXS_HeaderDegenerateScopeOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "for body degenerate",
+			src:  "void A(){switch(0%0%0){0%0}for(0%0;0)!{.00}}",
+			want: "void A() {\n    switch (0 % 0 % 0) {\n        0 % 0;\n    }\n    for (0 % 0; 0;)\n        !{.00};\n}\n",
+		},
+		{
+			name: "while body degenerate",
+			src:  "void A(){while(0)!{.00}}",
+			want: "void A() {\n    while (0)\n        !{.00};\n}\n",
+		},
+		{
+			name: "if body degenerate",
+			src:  "void A(){if(0)!{.00}}",
+			want: "void A() {\n    if (0)\n        !{.00};\n}\n",
+		},
+		{
+			name: "switch case degenerate",
+			src:  "void A(){switch(0){0%!{.00}}}",
+			want: "void A() {\n    switch (0) {\n        0 % !{.00};\n    }\n}\n",
+		},
+		{
+			name: "typed init body degenerate",
+			src:  "void A(){for(int i=0;i<3;)!{.00}}",
+			want: "void A() {\n    for (int i = 0; i < 3;)\n        !{.00};\n}\n",
+		},
+		{
+			name: "header degenerate stays whole-statement verbatim",
+			src:  "void A(){for(0.!;0)0;}",
+			want: "void A() {\n    for(0.!;0)0;\n}\n",
+		},
+		{
+			name: "canonical for",
+			src:  "void A(){for(0%0;0)0;}",
+			want: "void A() {\n    for (0 % 0; 0;)\n        0;\n}\n",
+		},
+		{
+			name: "canonical typed init",
+			src:  "void A(){for(int i=0;i<3;)0;}",
+			want: "void A() {\n    for (int i = 0; i < 3;)\n        0;\n}\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			_, gotDiags := xs.XsParse(once, "")
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
 			}
 		})
 	}

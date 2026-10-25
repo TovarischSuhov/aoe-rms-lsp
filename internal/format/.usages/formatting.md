@@ -133,6 +133,19 @@ XS additionally:
   keeps its own terminator discipline — `vector A=0.!%{(}` was never
   bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
   seed `void A(){0.!%{(}}`.
+- The warned operand cut inside a grouping (#170) is closed on the
+  statement path: a wrong-arity vector folds to a node inside its
+  grouping, so the statement's cut carries the grouping's ")" while
+  its "(" sits left of the extent — the cut's own brackets net zero,
+  the closing hunt saw no depth, and a binary statement printed a
+  hanging ")" with the tail operand lost (`void A(){(0);(0)%(0,0)}`
+  printed `0)%(0`, the output did not reparse). warnCutStart now
+  opens the cut at the closer's own opener (a typed backward walk,
+  names stepped over, a ";" or brace the hard bound), and warnCutEnd
+  closes the depth the widened cut counts; the cut prints byte-exact
+  from pass one. Pins: TestXS_WarnTruncatedOperandOnce (six rows) and
+  the FuzzXS seeds `void A(){(0);(0)%(0,0)}` /
+  `void A(){(0) (0%(0,0))}`.
 - The include tail-comment drift (#164) is closed: unclosedEOF's
   byte check reads a closing `*/` only where a closer can be — the
   suffix, with its `*` past the opener's own (the opener holds the
@@ -166,6 +179,20 @@ XS additionally:
   TestXS_ZeroCallChainOnce (ten rows) and the FuzzXS seeds
   `vector A=0(0())()` / `void A(){get(1)();(1, 2, 3)();}` /
   `void A(){00//\n()()}`.
+- The body-grown extent (#171) is closed on the statement gate: a
+  degenerate member name in a BODY's bytes (`!{.00}` — unary "!" over
+  a tolerated block literal) used to pull the whole header+body
+  statement verbatim, and the multi-line cut's per-line collapse
+  stranded the interior indentation — the for body printed at two
+  levels on pass one and at one space on pass two (same for while/if/
+  switch; the reparse stayed whole, a pure drift). The degenerate-name
+  gate now scopes to the header — the body prints through branch with
+  its own checks, do keeps its full extent (its condition rides past
+  the body) — and the #163 nested-body row's whole-if verbatim became
+  the canonical if with the warn cut inside (its pin updated
+  deliberately). Pins: TestXS_HeaderDegenerateScopeOnce (eight rows)
+  and the FuzzXS seeds `void A(){switch(0%0%0){0%0}for(0%0;0)!{.00}}`
+  / `void A(){while(0)!{.00}}`.
 - The spaced zero suffix (#172) is closed on the verbatim-cut path:
   the grammar continues a postfix call across whitespace — `0.! ()`
   parses as `0.!()` and folds into the same callee-stopped Call node —
@@ -222,7 +249,18 @@ XS additionally:
   backlog, rechecked byte-for-byte on master. The split
   type-word-name residual above joins it as the batch's second
   member — narrowed out of the closed #162 class on
-  task/xs-decl-head).
+  task/xs-decl-head), the member-call degenerate
+  (`void A(){(0.();}` — the grouping "(" is lost and the output
+  does not reparse, `expected ;`; appended 2026-10-25 from the
+  #170-branch battery, rechecked byte-for-byte on master), the
+  warn-collapsed initializer's degenerate call group
+  (`vector A=(0.! ())` — the closing ")" is lost and the output
+  does not reparse, `expected ")"`; appended 2026-10-25 from the
+  same battery, rechecked byte-for-byte on master), and the
+  headerless unary-over-literal degenerate (`void A(){!{.}}` —
+  pass 2 prints the function's closing brace a second time,
+  `void A() {\n    !{.};\n}\n}\n`; appended 2026-10-25 from the
+  #171-branch battery, rechecked byte-for-byte on master).
   An XS divergence outside this list is a finding to report
   just the same: not a bug in your calling code, not something
   to mask with a third pass.

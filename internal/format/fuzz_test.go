@@ -55,6 +55,12 @@ func FuzzXS(f *testing.F) {
 	// #177: a // comment inside the chain cut lifts out of it — collapsed
 	// into the cut, the chain's tail re-read as part of the comment
 	f.Add(`void A(){00//\n()()}`)
+	// #170: the warned operand folds to a node inside a grouping — the
+	// statement's cut carries the grouping's ")" with its "(" left of
+	// the extent, the cut's own brackets net zero and the closing hunt
+	// saw no depth; the cut now opens at the closer's own opener
+	f.Add(`void A(){(0);(0)%(0,0)}`)
+	f.Add(`void A(){(0) (0%(0,0))}`)
 	f.Add(`vector A=(0(0))`)
 	f.Add(`vector A=(0(0));`)
 	f.Add(`void f(){while{x}{y}}`)
@@ -94,6 +100,12 @@ func FuzzXS(f *testing.F) {
 	// the tail declarator standalone — a bare statement at top level
 	// (TestXS_DeclSplitHeadOnce pins the group's own-bytes fixed point)
 	f.Add(`void A,#A=0.`)
+	// #171: a degenerate member name in a BODY's bytes used to pull the
+	// whole header+body statement verbatim — the multi-line cut's
+	// per-line collapse stranded the interior indentation between passes
+	// (TestXS_HeaderDegenerateScopeOnce pins the header scope)
+	f.Add(`void A(){switch(0%0%0){0%0}for(0%0;0)!{.00}}`)
+	f.Add(`void A(){while(0)!{.00}}`)
 	// #172: the grammar continues a zero suffix across whitespace — the
 	// callee-stopped call's "(" sits past a space, and a token scan that
 	// answered on the space dropped the extension, the cut printed one
