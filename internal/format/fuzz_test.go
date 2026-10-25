@@ -113,6 +113,12 @@ func FuzzXS(f *testing.F) {
 	// (TestXS_HeaderDegenerateScopeOnce pins the header scope)
 	f.Add(`void A(){switch(0%0%0){0%0}for(0%0;0)!{.00}}`)
 	f.Add(`void A(){while(0)!{.00}}`)
+	// #172: the grammar continues a zero suffix across whitespace — the
+	// callee-stopped call's "(" sits past a space, and a token scan that
+	// answered on the space dropped the extension, the cut printed one
+	// closer short (TestXS_ZeroSuffixSpacedOnce pins the spaced forms)
+	f.Add(`vector A=(0.! ())`)
+	f.Add(`void A(){0.! ()}`)
 	// #173: an unclosed "(" inside a CLOSED block literal has no closer
 	// anywhere — the residual skips the literal whole, the closer hunt
 	// keeps the enclosing body's brace out of the cut

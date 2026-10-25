@@ -1181,6 +1181,101 @@ func TestXS_ZeroCallChainOnce(t *testing.T) {
 	}
 }
 
+// TestXS_ZeroSuffixSpacedOnce pins the spaced zero-suffix cut (#172): the
+// grammar continues a postfix call across whitespace (`0.! ()` parses as
+// `0.!()`), so the callee-stopped call's own "(" can sit past a space —
+// and a token scan that answered on the space itself dropped the
+// extension: the cut kept the unclosed grouping and the balance walk spent
+// the suffix's own ")" on it, the output printed one closer short and
+// stopped reparsing (`expected ")"`). The scan reads the next code token;
+// the glued form's byte-shape stays what it was.
+func TestXS_ZeroSuffixSpacedOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// the issue repro: the grouping's "(" rode the cut,
+			// the suffix's ")" closed it, the grouping's own ")"
+			// was lost
+			name: "decl grouped spaced suffix",
+			src:  "vector A=(0.! ())",
+			want: "vector A=(0.! ())\n",
+		},
+		{
+			// the glued form never drifted — its "(" is the first
+			// byte past the extent
+			name: "decl glued suffix",
+			src:  "vector A=(0.!())",
+			want: "vector A=(0.!())\n",
+		},
+		{
+			// the statement form takes the same cut through
+			// stmtVerbatim
+			name: "statement spaced suffix",
+			src:  "void A(){0.! ()}",
+			want: "void A() {\n    0.! ()\n}\n",
+		},
+		{
+			// without the grouping the suffix sits after the
+			// extent the same way
+			name: "bare spaced suffix",
+			src:  "vector A=0.! ()",
+			want: "vector A=0.! ()\n",
+		},
+		{
+			// the boundary holds: the sibling after the spaced
+			// suffix prints canonically, the cut stops at its own
+			// ";"
+			name: "sibling boundary",
+			src:  "vector A=0.! ();vector B=1",
+			want: "vector A=0.! ();\n\nvector B = 1;\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			wantTree, _ := xs.XsParse(tt.src, "")
+			gotTree, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(wantTree), xsTreeShape(gotTree)); diff != "" {
+				t.Errorf("XS(%q) tree drift:\n%s\noutput:\n%s", tt.src, diff, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_DegenerateChains checks the degenerate member-name contract: a
 // chain whose name after "." came off a non-identifier token has no
 // canonical spelling, so the construct prints as a byte-exact slice of its

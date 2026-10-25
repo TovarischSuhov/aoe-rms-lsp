@@ -859,7 +859,10 @@ func (p *xsPrinter) matchBracket(from int, openB, closeB byte) (int, bool) {
 // next statement's, never this line's. The pair is matched with the
 // degenerate names stepped over — a nested chain's "(" is a name, not an
 // opener (matchBracketNames) — and chains: a call on a call's result owes
-// its own pair too.
+// its own pair too. The token scan reads the next CODE token: the grammar
+// continues a zero suffix across whitespace (`0.! ()` parses as `0.!()`),
+// so the call's "(" may sit past a space, and the space itself must not
+// answer the scan.
 func (p *xsPrinter) cutArgsEnd(from, to int) int {
 	names := p.xsMemberNames(from, len(p.src))
 
@@ -869,8 +872,8 @@ func (p *xsPrinter) cutArgsEnd(from, to int) int {
 			break
 		}
 
-		open, ok := p.xsFind(to, len(p.src), func(_ int, _ byte) bool {
-			return true
+		open, ok := p.xsFind(to, len(p.src), func(_ int, c byte) bool {
+			return xsTokenStart(c)
 		})
 		if !ok {
 			break

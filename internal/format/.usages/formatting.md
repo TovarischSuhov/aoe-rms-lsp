@@ -208,6 +208,20 @@ XS additionally:
   deliberately). Pins: TestXS_HeaderDegenerateScopeOnce (eight rows)
   and the FuzzXS seeds `void A(){switch(0%0%0){0%0}for(0%0;0)!{.00}}`
   / `void A(){while(0)!{.00}}`.
+- The spaced zero suffix (#172) is closed on the verbatim-cut path:
+  the grammar continues a postfix call across whitespace — `0.! ()`
+  parses as `0.!()` and folds into the same callee-stopped Call node —
+  but the callee-stopped pair extension answered on the literal first
+  byte past the cut, and a space made it give up: the cut kept the
+  unclosed grouping and the balance walk spent the suffix's own ")"
+  on it (`vector A=(0.! ())` printed `vector A=(0.! ()`, one `)`
+  short, the output did not reparse — `expected ")"`; the glued form
+  `vector A=(0.!())` never drifted). The extension now reads the next
+  code token, so the pair is carried whatever whitespace separates it
+  from the callee — statement, bare and grouped decl forms alike —
+  and the sibling boundary stays put (the cut still ends at its own
+  ";"). Pins: TestXS_ZeroSuffixSpacedOnce (five rows) and the FuzzXS
+  seeds `vector A=(0.! ())` / `void A(){0.! ()}`.
 - The degenerate tail after a closed literal (#173) is closed on the
   statement cut: an unclosed "(" inside a CLOSED block literal has no
   closer anywhere, and the typeless residual counted it open — once a
