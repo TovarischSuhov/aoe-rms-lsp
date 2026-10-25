@@ -1049,14 +1049,115 @@ func (p *xsPrinter) warnSlice(s xs.Stmt) (int, bool) {
 	return 0, false
 }
 
+// warnCutStart moves a warning cut's start back over the groupings the
+// collapsed extent opens inside: the cut's own bytes can carry a grouping's
+// ")" while the extent lost its "(" (the parser folds the warned operand
+// to a node inside the grouping, #170), and a cut from the extent prints
+// the hanging closer — and its own brackets then net zero, so warnCutEnd
+// sees no depth to close. The walk takes the opener of the closer that
+// drives the cut's prefix depth below zero, one grouping per step; a
+// grouping closing past the end is the callee cut's shape and stays with
+// calleeStart's own gate. The degenerate member names step over whole,
+// their brackets being their own text.
+func (p *xsPrinter) warnCutStart(from, end int) int {
+	names := p.xsMemberNames(from, end)
+
+	for {
+		depth, hang := 0, -1
+		ni := 0
+
+		_, _ = p.xsFind(from, end, func(i int, c byte) bool {
+			if inNames(&ni, i, names) {
+				return false
+			}
+
+			switch c {
+			case '(', '[', '{':
+				depth++
+			case ')', ']', '}':
+				depth--
+				if depth < 0 && hang < 0 {
+					hang = i
+				}
+			}
+
+			return false
+		})
+		if hang < 0 {
+			return from
+		}
+
+		b, ok := p.openBefore(hang, names)
+		if !ok {
+			return from
+		}
+
+		from = b
+	}
+}
+
+// openBefore finds the grouping opener a closer at hang pairs with: a
+// backward walk over code bytes (comments transparent), the names stepped
+// over whole, only the pair's own kind counted, a ";" or brace aborting —
+// the statement boundary no argument pairing crosses.
+func (p *xsPrinter) openBefore(hang int, names []common.Range) (int, bool) {
+	var openB, closeB byte
+
+	switch p.src[hang] {
+	case ')':
+		openB, closeB = '(', ')'
+	case ']':
+		openB, closeB = '[', ']'
+	default:
+		return 0, false
+	}
+
+	depth := 0
+
+	for i := hang; ; {
+		b, ok := p.codeBefore(i)
+		if !ok {
+			return 0, false
+		}
+
+		i = b
+
+		held := false
+
+		for _, r := range names {
+			if r.Start.Offset <= b && b < r.End.Offset {
+				held = true
+
+				break
+			}
+		}
+
+		if held {
+			continue
+		}
+
+		switch p.src[b] {
+		case closeB:
+			depth++
+		case openB:
+			depth--
+			if depth < 0 {
+				return b, true
+			}
+		case ';', '{', '}':
+			return 0, false
+		}
+	}
+}
+
 // warnCutEnd extends a warning-carrying statement's extent to where its
 // verbatim cut must stop: compound statements (if/else chains, while, for,
 // switch) end their extent at the last nested statement, so every brace
 // the parser closed after it is outside the extent while the statement's
 // bytes run through it. The unmatched opens are counted over the cut's own
 // code bytes — degenerate member names stepped over whole, a name's
-// brackets being its own text (xsBracketDepth) — and closed one closer at
-// a time; a source that runs out first keeps the extent's end. A bracket
+// brackets being its own text (xsResidualKinds) — and closed one closer
+// at a time; a source that runs out first keeps the extent's end. A bracket
 // opening at or past the extent's own end is not the statement's — the
 // empty `{}` a body's last statement can be ends the extent right on its
 // opener — so the walk steps over such pairs whole and spends only a
@@ -1226,6 +1327,8 @@ func (p *xsPrinter) warnVerbatim(s xs.Stmt) (string, bool) {
 	if !ok {
 		return "", false
 	}
+
+	from = p.warnCutStart(from, s.Range.End.Offset)
 
 	end, extended := p.warnCutEnd(from, s)
 	if !extended {
@@ -2015,9 +2118,24 @@ func (p *xsPrinter) stmt(s xs.Stmt, level int) {
 	// synthesized ";" back as the name (degenerateExprs) — and a chain a
 	// trailing call swallowed into its callee left the AST clean, so the
 	// extent's bytes answer too (degenerateRange). A for loop's typed
-	// init prints inside the header, so its expressions count too
-	if degenerateExprs(s.Exprs) || p.degenerateRange(s.Range) ||
-		(s.Kind == xs.StmtFor && len(s.Body) > 0 && degenerateExprs(s.Body[0].Exprs)) {
+	// init prints inside the header, so its expressions count too. The
+	// byte scope of a header+body statement is its header: the body
+	// prints through branch with its own degenerate checks, and a
+	// body-grown extent would pull the whole header+body cut through
+	// blockText, whose per-line collapse strands the interior
+	// indentation between passes (do keeps its full extent — its
+	// condition rides past the body)
+	scope := s.Range
+	switch s.Kind {
+	case xs.StmtFor, xs.StmtWhile, xs.StmtIf, xs.StmtSwitch:
+		if len(s.Body) > 0 {
+			scope.End = s.Body[len(s.Body)-1].Range.Start
+		}
+	}
+
+	if degenerateExprs(s.Exprs) || p.degenerateRange(scope) ||
+		(s.Kind == xs.StmtFor && len(s.Body) == 2 && s.Body[0].Kind == xs.StmtDecl &&
+			degenerateExprs(s.Body[0].Exprs)) {
 		p.stmtVerbatim(s, level)
 
 		return
