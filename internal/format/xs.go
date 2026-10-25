@@ -747,18 +747,75 @@ func (p *xsPrinter) zeroCallChain(e xs.Expr) (int, int, bool) {
 	}
 
 	from := p.calleeStart(e.Range.Start.Offset, open)
+	end := e.Range.End.Offset
+
+	// the recovery can come out bracket-negative: the extent may sit
+	// inside groupings calleeStart stops before on purpose (their "("
+	// would reprint unmatched in a callee cut), so their closers ride
+	// the cut without the openers. Each negative balance moves the cut
+	// one wrap out — the grouping right behind the cut start, never past
+	// a callee (#169) — and the recovery reruns from its opener.
+	for {
+		var ok bool
+
+		from, end, ok = p.chainRecover(from, end)
+		if !ok {
+			return 0, 0, false
+		}
+
+		if p.xsBracketDepth(from, end, nil) >= 0 {
+			break
+		}
+
+		b, ok := p.codeBefore(from)
+		if !ok {
+			return 0, 0, false
+		}
+
+		c := p.src[b]
+		if c != '(' && c != '[' {
+			return 0, 0, false
+		}
+
+		cl := byte(')')
+		if c == '[' {
+			cl = ']'
+		}
+
+		if _, ok := p.matchBracket(b, c, cl); !ok {
+			return 0, 0, false
+		}
+
+		if pb, ok := p.codeBefore(b); ok && calleeByte(p.src[pb]) {
+			return 0, 0, false
+		}
+
+		from = b
+	}
+
+	return from, end, end > closer+1
+}
+
+// chainRecover extends the cut from a start the extent collapsed inside:
+// the extent's unclosed opens close one typed closer at a time — other
+// content between the closers rides, a wrapping grouping carries the
+// chain's own operators — then every postfix "(" pair that follows is
+// consumed. The walk reads one code token at a time and stops at any
+// that cannot continue the chain: a zero-capped chain ends before the
+// next ";" — the statement boundary a pair hunt that skipped over one
+// crossed, swallowing the following statement's leading "(" whole (the
+// vector-literal callee's own "(" rides unbalanced past the extent, so
+// the hunt runs even on plain single-suffix chains). A closer whose own
+// opener sits just behind the cut is the wrapping grouping's tail —
+// crossed when nothing callee-ish precedes that opener, the chain keeps
+// hunting pairs past it.
+func (p *xsPrinter) chainRecover(from, extentEnd int) (int, int, bool) {
+	depth := p.xsBracketDepth(from, extentEnd, p.xsMemberNames(from, extentEnd))
 
 	var opens []byte
 
-	end := e.Range.End.Offset
-	depth := p.xsBracketDepth(from, end, p.xsMemberNames(from, end))
+	end := extentEnd
 
-	// the walk reads one code token at a time and stops at any that
-	// cannot continue the chain: a zero-capped chain ends before the
-	// next ";" — the statement boundary — and a pair hunt that skipped
-	// over one swallowed the following statement's leading "(" whole
-	// (the vector-literal callee's own "(" rides unbalanced past the
-	// extent, so the hunt runs even on plain single-suffix chains)
 	for depth > 0 {
 		i, ok := p.xsFind(end, len(p.src), func(_ int, c byte) bool {
 			return xsTokenStart(c)
@@ -776,7 +833,7 @@ func (p *xsPrinter) zeroCallChain(e xs.Expr) (int, int, bool) {
 			} else {
 				depth--
 			}
-		default:
+		case ';':
 			return 0, 0, false
 		}
 
@@ -787,7 +844,24 @@ func (p *xsPrinter) zeroCallChain(e xs.Expr) (int, int, bool) {
 		i, ok := p.xsFind(end, len(p.src), func(_ int, c byte) bool {
 			return xsTokenStart(c)
 		})
-		if !ok || p.src[i] != '(' {
+		if !ok {
+			break
+		}
+
+		if p.src[i] != '(' {
+			if c := p.src[i]; c == ')' || c == ']' {
+				if b, ok := p.codeBefore(from); ok && p.src[b] == xsOpener(c) {
+					if w, ok := p.matchBracket(b, p.src[b], c); ok && w == i {
+						if pb, ok := p.codeBefore(b); !ok || !calleeByte(p.src[pb]) {
+							from = b
+							end = i + 1
+
+							continue
+						}
+					}
+				}
+			}
+
 			break
 		}
 
@@ -799,7 +873,20 @@ func (p *xsPrinter) zeroCallChain(e xs.Expr) (int, int, bool) {
 		end = c + 1
 	}
 
-	return from, end, end > closer+1
+	return from, end, true
+}
+
+// calleeByte reports whether c reads as the tail of a callee: an
+// identifier byte, a member dot or a closer of a call or index chain — a
+// grouping opener preceded by one belongs to that call, not to a chain
+// the printer is recovering.
+func calleeByte(c byte) bool {
+	switch {
+	case c >= '0' && c <= '9', c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z':
+		return true
+	}
+
+	return c == '_' || c == '.' || c == ')' || c == ']'
 }
 
 // bodyBlock prints a top-level head line sharing its brace with the block

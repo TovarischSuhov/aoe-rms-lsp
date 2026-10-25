@@ -859,6 +859,31 @@ func TestXS_ZeroCallChainOnce(t *testing.T) {
 			src:  "vector A=(0)//c\n()",
 			want: "//c\nvector A = (0)();\n",
 		},
+		{
+			// the fold can shrink the extent to a byte inside
+			// nested groupings: the cut crosses the wraps out — a
+			// bracket-negative balance moves it one wrap out and
+			// the recovery reruns (#169)
+			name: "wrapped degenerate body",
+			src:  "vector A=((0%0()))()",
+			want: "vector A = ((0%0()))();\n",
+		},
+		{
+			// the postfix pairs can run out exactly at the wrap's
+			// closer: the recovery crosses it and keeps hunting
+			// (#169)
+			name: "wrapped chain",
+			src:  "vector A=((A)())()",
+			want: "vector A = ((A)())();\n",
+		},
+		{
+			// a wrapped call as a binary operand: the chain cut
+			// crosses the wrap's closer at the operand's edge and
+			// prints the span byte-exact
+			name: "grouped operand",
+			src:  "vector A=2*((0)())",
+			want: "vector A = 2 * ((0)());\n",
+		},
 	}
 
 	for _, tt := range tests {

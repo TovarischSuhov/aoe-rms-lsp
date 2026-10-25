@@ -147,15 +147,23 @@ XS additionally:
   immediately follows is consumed — the walk reads one code token at a
   time and ends at any token that cannot continue the chain, so a ";"
   boundary is never crossed (crossing it duplicated the next statement
-  on every pass — the case41 fixture caught it). The cut prints through
+  on every pass — the case41 fixture caught it). The cut also crosses
+  the chain's own wrapping groupings: a fold that shrank the extent to
+  a byte inside nested groupings leaves the cut bracket-negative (the
+  wraps' closers ride without their openers — the callee cut stops
+  before those wraps on purpose), so each negative balance moves the
+  cut one wrap out — the grouping right behind it, never past a
+  callee — and the recovery reruns, with the postfix pair hunt
+  continuing past the wrap's closer (#169). The cut prints through
   the same comment discipline as the callee cut: a // inside it lifts
   to its own line — collapsed into the cut, the chain's tail re-read as
   part of the comment and the shape drifted on the next pass (#177),
   while a block comment rides. The single-suffix and
   argument-capped shapes stay canonical. Pins:
-  TestXS_ZeroCallChainOnce (ten rows) and the FuzzXS seeds
+  TestXS_ZeroCallChainOnce (thirteen rows) and the FuzzXS seeds
   `vector A=0(0())()` / `void A(){get(1)();(1, 2, 3)();}` /
-  `void A(){00//\n()()}`.
+  `void A(){00//\n()()}` / `vector A=((0%0()))()` /
+  `vector A=((A)())()`.
 - Convergence has known open escape classes — the list is not
   closed, fresh fuzzing keeps surfacing more.
   Every class below is pre-existing — each reproduces, byte for

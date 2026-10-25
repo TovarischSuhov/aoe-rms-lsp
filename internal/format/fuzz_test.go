@@ -51,6 +51,11 @@ func FuzzXS(f *testing.F) {
 	// #177: a // comment inside the chain cut lifts out of it — collapsed
 	// into the cut, the chain's tail re-read as part of the comment
 	f.Add(`void A(){00//\n()()}`)
+	// #169: the fold shrinks the extent to a byte inside nested groupings
+	// — the chain cut crosses the wraps out, bracket-negative balances
+	// move it one wrap out and the recovery reruns
+	f.Add(`vector A=((0%0()))()`)
+	f.Add(`vector A=((A)())()`)
 	f.Add(`vector A=(0(0))`)
 	f.Add(`vector A=(0(0));`)
 	f.Add(`void f(){while{x}{y}}`)
