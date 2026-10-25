@@ -1150,6 +1150,101 @@ func TestXS_IncludeTrailingCR(t *testing.T) {
 	}
 }
 
+// TestXS_IncludeTrailingCommentOnce checks the include line's trailing
+// comment contract (FR4): a comment spilling past the directive line
+// anchors on its own line from the first pass — an unterminated-to-EOF
+// block whose "*/" sits in its own opener ("/*/") is still unterminated,
+// and the line's cut must stop before it instead of gluing it; a closed
+// block is the line's own bytes and rides.
+func TestXS_IncludeTrailingCommentOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			// #164: the opener's "*/" fooled the closed check and
+			// the cut swallowed the comment — pass 1 glued it to the
+			// last include, pass 2 anchored it
+			name: "unterminated block, two includes",
+			src:  `include"";include"";/*/0`,
+			want: "include\"\";\n\ninclude\"\";\n/*/0\n",
+		},
+		{
+			name: "unterminated block, one include",
+			src:  `include"";/*/0`,
+			want: "include\"\";\n/*/0\n",
+		},
+		{
+			// the variable path never cuts past its extent — the
+			// stability guard for the same tail
+			name: "unterminated block after a variable",
+			src:  `int A;/*/0`,
+			want: "int A;\n/*/0\n",
+		},
+		{
+			// the opener plus one byte ends on "*/" all the same —
+			// the closer's "*" must sit past the opener's
+			name: "unterminated opener-plus-one",
+			src:  `include""/*/`,
+			want: "include\"\"\n/*/\n",
+		},
+		{
+			name: "unterminated block with terminator bytes",
+			src:  `include"";/*/0;`,
+			want: "include\"\";\n/*/0;\n",
+		},
+		{
+			// a closed block at EOF ends on its "*/": the line's
+			// trailing comment, a fixed point as written
+			name: "closed block rides the line",
+			src:  `include"";/*c*/`,
+			want: "include\"\";/*c*/\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			once, err := XS(tt.src, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS: %v", err)
+			}
+
+			want, _ := xs.XsParse(tt.src, "")
+			got, gotDiags := xs.XsParse(once, "")
+
+			// the published guarantee: replacing a document with its
+			// formatted form never introduces syntax errors
+			for _, d := range gotDiags {
+				if d.Severity == common.SeverityError {
+					t.Fatalf("XS(%q) output no longer parses: %s (line %d), output:\n%s", tt.src, d.Message, d.Range.Start.Line+1, once)
+				}
+			}
+
+			twice, err := XS(once, Options{TabSize: 4})
+			if err != nil {
+				t.Fatalf("XS(output) does not reparse (%v); output:\n%s", err, once)
+			}
+
+			if diff := linesDiff(xsTreeShape(want), xsTreeShape(got)); diff != "" {
+				t.Errorf("XS(%q) tree drift:\n%s\noutput:\n%s", tt.src, diff, once)
+			}
+
+			if once != tt.want {
+				t.Errorf("XS(%q) =\n%q\nwant\n%q", tt.src, once, tt.want)
+			}
+
+			if twice != once {
+				t.Errorf("XS(%q) not a fixed point:\n--- once ---\n%q\n--- twice ---\n%q", tt.src, once, twice)
+			}
+		})
+	}
+}
+
 // TestXS_EOLDominance checks the line-ending contract: the dominant EOL of
 // the input survives to the output, and exactly one final newline closes
 // the document.

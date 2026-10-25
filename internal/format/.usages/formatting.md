@@ -133,6 +133,16 @@ XS additionally:
   keeps its own terminator discipline — `vector A=0.!%{(}` was never
   bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
   seed `void A(){0.!%{(}}`.
+- The include tail-comment drift (#164) is closed: unclosedEOF's
+  byte check reads a closing `*/` only where a closer can be — the
+  suffix, with its `*` past the opener's own (the opener holds the
+  first two bytes, so `/*/` and `/*/0` both end short of a real
+  closer) — and the include line's cut stops before the unterminated
+  tail instead of gluing it to the directive line, so the comment
+  anchors on its own line from the first pass. A closed block at EOF
+  still rides the line as written. Pins:
+  TestXS_IncludeTrailingCommentOnce (six rows) and the FuzzXS seeds
+  `include"";include"";/*/0` / `include""/*/`.
 - The zero-call chain (#165) is closed on the expression path: the
   parser folds every zero-argument call suffix into its callee — one
   Call node whose extent stops at the callee — and the canonical print
@@ -178,6 +188,18 @@ XS additionally:
   is lost and the output does not reparse, `expected { after
   switch`), the grouped wrong-arity vector with a degenerate
   name (`void A(){((0.(,0));}` — the outer `(` is lost and
+  `(0.(,0));` does not reparse, `expected ;`), the grouped
+  zero-call chain (`vector A=(A)()()` — pass 1 prints
+  `vector A = (A)();`, one `()` pair short of the input; pass 2
+  unwraps the grouping — `vector A = A();`; fixed point from
+  pass 3, and neither the input nor any pass output carries a
+  diagnostic — a silent byte change, the reparse never breaks) and
+  the paren-dropping zero-call chain (`vector A=0(0())()` —
+  pass 1 prints `vector A = 0(0();`, one `)` short, and the output
+  does not reparse, `expected , or ) in argument list`; the two
+  remaining members appended 2026-10-25 from the format-xs run's
+  backlog, each rechecked byte-for-byte on master. The split
+  type-word-name residual above joins them as the batch's third
   `(0.(,0));` does not reparse, `expected ;`), the comment drift
   behind a doubled include (`include"";include"";/*/0` — pass 1
   glues `/*/0` to the second include line, pass 2 moves it to its
