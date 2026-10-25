@@ -55,6 +55,12 @@ func FuzzXS(f *testing.F) {
 	// #177: a // comment inside the chain cut lifts out of it — collapsed
 	// into the cut, the chain's tail re-read as part of the comment
 	f.Add(`void A(){00//\n()()}`)
+	// #170: the warned operand folds to a node inside a grouping — the
+	// statement's cut carries the grouping's ")" with its "(" left of
+	// the extent, the cut's own brackets net zero and the closing hunt
+	// saw no depth; the cut now opens at the closer's own opener
+	f.Add(`void A(){(0);(0)%(0,0)}`)
+	f.Add(`void A(){(0) (0%(0,0))}`)
 	f.Add(`vector A=(0(0))`)
 	f.Add(`vector A=(0(0));`)
 	f.Add(`void f(){while{x}{y}}`)
@@ -101,6 +107,39 @@ func FuzzXS(f *testing.F) {
 	// the argument list (TestXS_UnterminatedStringChainOnce pins the
 	// residual walk)
 	f.Add("rule{(\"\n)(\"\")}")
+	// #175: a closed block literal must ride the residual walk whole — a
+	// degenerate member inside held the literal's "}" out of the count and
+	// the body's brace was spent on the closed "{" (document growth) — and
+	// a dropped grouping's orphan ")" must not cancel the literal's unit
+	// (the cut kept the grouping's closer without its opener)
+	// (TestXS_WarnLiteralResidualOnce pins both)
+	f.Add(`void A(){0%{.}}`)
+	f.Add(`void A(){((0,0))%{}}`)
+	// #174: a block literal in a brace-less if body tolerates a junk ")"
+	// before the literal's own "}" — the closer hunt spent it on the
+	// counted "{" and the cut lost the real closer, whose absence the
+	// reparse spent the body's brace on (TestXS_WarnBareBodyLiteralOnce
+	// pins the kind-bound spend)
+	f.Add(`void A(){if((0,0))0%{)}}`)
+	f.Add(`void A(){0.!%{)}}`)
+	// #171: a degenerate member name in a BODY's bytes used to pull the
+	// whole header+body statement verbatim — the multi-line cut's
+	// per-line collapse stranded the interior indentation between passes
+	// (TestXS_HeaderDegenerateScopeOnce pins the header scope)
+	f.Add(`void A(){switch(0%0%0){0%0}for(0%0;0)!{.00}}`)
+	f.Add(`void A(){while(0)!{.00}}`)
+	// #172: the grammar continues a zero suffix across whitespace — the
+	// callee-stopped call's "(" sits past a space, and a token scan that
+	// answered on the space dropped the extension, the cut printed one
+	// closer short (TestXS_ZeroSuffixSpacedOnce pins the spaced forms)
+	f.Add(`vector A=(0.! ())`)
+	f.Add(`void A(){0.! ()}`)
+	// #173: an unclosed "(" inside a CLOSED block literal has no closer
+	// anywhere — the residual skips the literal whole, the closer hunt
+	// keeps the enclosing body's brace out of the cut
+	// (TestXS_WarnDegenerateTailOnce pins the degenerate tail)
+	f.Add("vector A=(00000);void A(){in%A0%{00000000};in%A0%{00000000000(0000}.0}")
+	f.Add(`void A(){in%A0%{00000000000(0000}.0}`)
 
 	seedFuzzXSFixtures(f, "testdata", ".xs")
 	seedFuzzXSFixtures(f, filepath.Join("..", "..", ".corpus"), ".xs")
