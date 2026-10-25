@@ -133,6 +133,17 @@ XS additionally:
   keeps its own terminator discipline — `vector A=0.!%{(}` was never
   bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
   seed `void A(){0.!%{(}}`.
+- The unterminated-string chain (#176) is closed on the same hunt: the
+  parser clips the unclosed literal at the line end, so the statement's
+  extent starts inside the dropped grouping — and the orphan `)` closing
+  the grouping's own `(` canceled the unit of the call's `(` in the net
+  count (`rule{("\n)("")}` printed `("\n)(""`, the reparse died inside
+  the argument list). The depth is the residual the cut leaves
+  (xsResidualKinds): junk closers leave the stack alone, the hunt spends
+  the call's own `)`, and the walk back restores the grouping's opener —
+  the cut carries the whole chain with its line break. Pins:
+  TestXS_UnterminatedStringChainOnce (two rows) and the FuzzXS seed
+  `rule{("\n)("")}`.
 - The residual shapes (#175) are closed on the same hunt: warnCutEnd's
   depth is now the residual the cut leaves — closed block literals ride
   whole, and tolerated junk closers leave the stack alone. Two failures
@@ -272,7 +283,12 @@ XS additionally:
   the warn-collapsed initializer with a second declarator
   (`vector A=(0.!),A` — output does not reparse, `expected ;`), the
   degenerate chain in a rule body (`rule { (""."") }` — output
-  does not reparse, `expected ")"`), the warn-header switch with
+  does not reparse, `expected ")"`), the same chain in a function
+  body behind a bare block (`int A(A A){\n{\nwhile(0)\n\n0=0+0.}
+  }A000}` — the bare block's `}` rides the degenerate statement's
+  cut and the output does not reparse, `expected ;` — appended
+  2026-10-25 from this run's battery, rechecked byte-for-byte on
+  master), the warn-header switch with
   an empty body (`void A(){switch((0,0)){}}` — the body's `{}` pair
   is lost and the output does not reparse, `expected { after
   switch`), the grouped wrong-arity vector with a degenerate

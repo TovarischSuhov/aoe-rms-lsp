@@ -1176,12 +1176,13 @@ func (p *xsPrinter) openBefore(hang int, names []common.Range) (int, bool) {
 // tolerated junk — a degenerate member name inside can hold the literal's
 // own `}` out of the count and make a closed `{` look open, spending the
 // enclosing body's brace on it and growing the document every pass,
-// `0 % {.};`), a tolerated junk closer leaves the stack alone (the
-// orphan ")" of a dropped grouping must not cancel the literal's unit,
-// or the hunt stands still and the cut keeps the grouping's closer
-// without its opener), and the spend is kind-bound — a closer nothing out
-// there opened spends the residual's opener only of its kind. The second
-// answer reports whether the loop
+// `0 % {.};`), and a tolerated junk closer leaves the stack alone — the
+// orphan ")" closing an opener BEFORE the extent (the unclosed-string
+// statement `("\n)(""` starts inside the dropped grouping) must not
+// cancel the unit of the call's own "(", or the cut stops before the
+// call's closer and the reparse dies inside the argument list. The spend
+// is kind-bound — a closer nothing out there opened spends the residual's
+// opener only of its kind. The second answer reports whether the loop
 // moved the end — it always lands strictly past the extent (the scan
 // starts on the end itself), so the callers can tell a cut that already
 // consumed its own body's closing brace from one stopped short of every
@@ -1240,10 +1241,10 @@ func (p *xsPrinter) warnCutEnd(from int, s xs.Stmt) (int, bool) {
 // read the closed `{` as open. A literal whose closer sits at or past the
 // extent's end is the open shape the hunt exists for: its opener counts.
 // A closer nothing opened leaves the stack alone — the net count would let
-// it cancel a real opener's unit (the orphan ")" of a dropped grouping
-// ahead of a block literal). The walk mirrors the bracket disciplines
-// (comments and strings transparent, degenerate member names stepped over
-// whole, a name's brackets being its own text).
+// it cancel a real opener's unit (the orphan ")" of a dropped grouping,
+// whether ahead of a block literal or ahead of a call). The walk mirrors
+// the bracket disciplines (comments and strings transparent, degenerate
+// member names stepped over whole, a name's brackets being its own text).
 func (p *xsPrinter) xsResidualKinds(from, to int, names []common.Range) []byte {
 	src := p.src
 	stack := make([]byte, 0, 4)
