@@ -133,6 +133,21 @@ XS additionally:
   keeps its own terminator discipline — `vector A=0.!%{(}` was never
   bitten. Pins: TestXS_WarnLiteralBodyOnce (six rows) and the FuzzXS
   seed `void A(){0.!%{(}}`.
+- The bare-body literal tail (#174) is closed on the same hunt: a block
+  literal in a brace-less if body tolerates a junk `)` before the
+  literal's own `}`, and the typeless spend used to burn it on the
+  counted `{` — the cut ended before the real closer, and the reparse
+  spent the enclosing body's `}` on the unclosed literal
+  (`void A(){if((0,0))0%{)}}` printed `if((0,0))0%{)` and stopped
+  parsing). The spend is bound to the residual's own opener kind
+  (xsResidualKinds): a closer nothing out there opened closes the
+  residual's opener only of its kind, and junk of another kind rides
+  inside the cut. The degenerate-member form (`void A(){0.!%{)}}`)
+  rides the same fix through stmtVerbatim; the declaration-level cut
+  keeps its own discipline — the `vector A=(0,0)%{)}` member of the
+  negative-depth family stays in the open list. Pins:
+  TestXS_WarnBareBodyLiteralOnce (five rows) and the FuzzXS seeds
+  `void A(){if((0,0))0%{)}}` / `void A(){0.!%{)}}`.
 - The include tail-comment drift (#164) is closed: unclosedEOF's
   byte check reads a closing `*/` only where a closer can be — the
   suffix, with its `*` past the opener's own (the opener holds the
