@@ -32,8 +32,9 @@ func legacyHit(s *Store, name string) nuanceHit {
 }
 
 // TestStore_NuancesEmbedded checks the shipped nuances.json: effect_percent
-// keeps its stable public code and verbatim message; no other nuance class
-// carries data yet, so existing diagnostics are unchanged.
+// keeps its stable public code and verbatim message; the object-scaling
+// pairs are no-ops scoped to create_object; the remaining nuance classes
+// carry no data yet.
 func TestStore_NuancesEmbedded(t *testing.T) {
 	t.Parallel()
 
@@ -48,10 +49,20 @@ func TestStore_NuancesEmbedded(t *testing.T) {
 			deprecatedHit(s, "effect_percent"))
 	})
 
-	t.Run("no noop pairs ship", func(t *testing.T) {
+	t.Run("object scaling pairs are no-ops on create_object", func(t *testing.T) {
 		t.Parallel()
 
-		require.False(t, s.NoopAttribute("create_terrain", "border_fuzziness"))
+		require.Equal(t,
+			map[string]bool{
+				"create_object/set_scale_by_size":   true,
+				"create_object/set_scale_by_groups": true,
+				"create_terrain/set_scale_by_size":  false,
+			},
+			map[string]bool{
+				"create_object/set_scale_by_size":   s.NoopAttribute("create_object", "set_scale_by_size"),
+				"create_object/set_scale_by_groups": s.NoopAttribute("create_object", "set_scale_by_groups"),
+				"create_terrain/set_scale_by_size":  s.NoopAttribute("create_terrain", "set_scale_by_size"),
+			})
 	})
 
 	t.Run("no typo aliases ship", func(t *testing.T) {
