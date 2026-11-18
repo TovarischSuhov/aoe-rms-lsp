@@ -60,9 +60,12 @@ machine can hold several, including a bare `0`), each with `local` and
 `<mod>\resources\_common\random-map-scripts`. Local mods appear the
 moment their folder structure exists — deploy creates it on demand.
 
-## MS Store / Xbox (issue #124, not implemented)
+## MS Store / Xbox (issue #124 — deferred indefinitely, 2026-11-19)
 
-Not covered yet: the packaged install lives under the Microsoft Store /
-Xbox app sandbox with a different layout (no `steamapps` nesting; the
-exact resources layout is unverified). Do not reuse the Steam facts for
-it — extend this cook from a live install when implementing #124.
+Deferred by user decision: no live MS Store/Xbox install is available to
+verify the layout, and unverified facts do not enter code or data (the
+rule above). The packaged install has a different layout (no
+`steamapps` nesting; the exact resources layout is unverified) — do not
+reuse the Steam facts for it. Resume the slot from a live install when
+one becomes available; detection on Steam machines is already complete
+(#123).
