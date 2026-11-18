@@ -33,15 +33,18 @@ nuances.json (aliases / deprecated / legacy / noop_attributes), кодовые
 
 ### #99 `set_scale_by_size/groups` на create_object → hint (данные: noop_attributes)
 
-Положительный:
+Положительный (in-game no-op подтверждён 2026-11-18):
 ```
 <OBJECTS_GENERATION>
-create_object HUNTER {
-	set_scale_by_size 3
+create_object HOUSE {
+	set_scale_by_size
 }
 ```
 Отрицательный: тот же атрибут на `create_terrain GRASS {…}` — норм
-(документирован terrain/elevation, ref §3). Факт: 104×/4 карты.
+(документирован terrain/elevation, ref §3; атрибут без аргументов —
+гайд:1462, масштабирует number_of_tiles/clumps; для объектов
+документирован set_scaling_to_map_size, гайд:501 — правильная
+альтернатива для сообщения hint'а). Факт: 104×/4 карты.
 Notes: noop_attributes-пары (attribute, owner-command) — механика
 `probably-ignored` уже реализована.
 
