@@ -56,4 +56,26 @@ ux-wave-2 — три из четырёх задуманных проверок �
 
 ## Result
 
-(заполняется по завершении)
+**Слот 1 (#112) — internal/analysis:**
+- `missing-section` (warning): картообразный файл — ≥4 **реальных**
+  заголовков (неявная секция `global` парсера не считается); единственный
+  required — `terrain_generation` (kb хранит секции в lowercase, display —
+  `TERRAIN_GENERATION`); range — первый реальный заголовок
+- `empty-section` (hint): заголовок без стейтментов; `global` скипается
+- Уточнение из корпуса: duplicate-секции и PLAYER_SETUP-вариации —
+  легитимные паттерны (7 переоткрытий, 3 карты без create_player), не
+  проверяются; порог ≥4 отсекает фрагменты (макс. 3 заголовка у
+  включаемых кусков)
+
+**Слот 2 (#113) — internal/server:**
+- `insertSectionAction`: парсинг имени из message, zero-width вставка
+  скелета `<TERRAIN_GENERATION>\nbase_terrain GRASS\n\n` перед первой
+  секцией (range диагностик указывает туда)
+
+**Приёмка:** corpus-гейт (расширен): duplicate + missing — **0/100**,
+empty — 1 честная находка (050, пустая ELEVATION_GENERATION); harness
+100/100 ok panic 0; 15/15 пакетов ok, lint 0
+**Тесты:** `TestAnalyzeRms_Sections` — 5 кейсов (missing, эскейп
+фрагмента, terrain-present, empty в середине, bare headers);
+`TestServerCodeAction_MissingSectionFix` — title/скелет/zero-width
+**Дока:** codes в checks.md; severityOverrides — общий механизм

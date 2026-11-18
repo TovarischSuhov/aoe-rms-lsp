@@ -179,6 +179,36 @@ func TestServerCodeAction_CreateIncludeFix(t *testing.T) {
 	require.NotNil(t, create.Options.IgnoreIfExists)
 }
 
+// TestServerCodeAction_MissingSectionFix pins the map-structure
+// quickfix: the section skeleton inserts zero-width before the first
+// section header (the diagnostic points there).
+func TestServerCodeAction_MissingSectionFix(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	s.docs.Put("file:///t.rms", "<PLAYER_SETUP>\nrandom_placement\n<LAND_GENERATION>\nbase_terrain GRASS\n", 1)
+
+	actions := codeActionAt(t, s, "file:///t.rms", protocol.Diagnostic{
+		Range: protocol.Range{Start: protocol.Position{Line: 0, Character: 0}},
+		Code:  protocol.String(analysis.CodeMissingSection),
+		Message: protocol.String(
+			"missing required section <TERRAIN_GENERATION>; without it the map generates no terrain"),
+	})
+
+	require.Len(t, actions, 1)
+
+	action := actions[0].(*protocol.CodeAction)
+	require.Equal(t, "Insert <TERRAIN_GENERATION> section", action.Title)
+
+	edits := action.Edit.Changes["file:///t.rms"]
+	require.Len(t, edits, 1)
+	require.Equal(t, "<TERRAIN_GENERATION>\nbase_terrain GRASS\n\n", edits[0].NewText)
+	require.Equal(t, uint32(0), edits[0].Range.Start.Line)
+	require.Equal(t, uint32(0), edits[0].Range.Start.Character)
+	require.Equal(t, edits[0].Range.Start, edits[0].Range.End, "zero-width insert")
+}
+
 // TestServerCodeAction_Filters pins the silence shape: a kind filter
 // without quickfix, diagnostics without a suggestion and foreign codes
 // produce no actions.

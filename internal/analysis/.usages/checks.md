@@ -37,6 +37,8 @@ diags := analyzer.AnalyzeXs(xsFile, externals)
 | unknown-section | error | секция не из справочника |
 | unknown-attribute | error | атрибут не принадлежит команде |
 | bad-argument | error | число/вид аргументов против спецификации |
+| missing-section | warning | картообразный файл (≥4 заголовков секций — тоньше бывают включаемые фрагменты) без `<TERRAIN_GENERATION>`; range — первая секция, на неё же смотрит quickfix вставки (duplicate-секции и PLAYER_SETUP-вариации — легитимные паттерни корпуса, не проверяются) |
+| empty-section | hint | заголовок секции без стейтментов до следующего заголовка — секция ничего не делает |
 | bad-argument-value | error | значение аргумента вне диапазона (percent 0..100) |
 | deprecated-effect-percent | warning | effect_percent устарел в пользу операторов (из kb nuances.json; будущие deprecated-имена получают свои коды из тех же данных) |
 | typo-alias | warning | имя — известная опечатка; сообщение называет правильное написание (данные kb nuances.json) |

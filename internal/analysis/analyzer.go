@@ -44,6 +44,13 @@ const (
 	// CodeDuplicateDeclaration marks a name declared twice in the same
 	// scope: repeated top-level declarations and same-block locals.
 	CodeDuplicateDeclaration = "duplicate-declaration"
+	// CodeMissingSection marks a map-shaped RMS file without a section
+	// the game needs (only TERRAIN_GENERATION qualifies — the corpus
+	// shows every other "required" candidate is a legitimate skip).
+	CodeMissingSection = "missing-section"
+	// CodeEmptySection marks a section header with no statements before
+	// the next header.
+	CodeEmptySection = "empty-section"
 	// CodeUnusedDeclaration marks a declaration with no references:
 	// locals never mentioned again and top-level functions unreachable
 	// from the file's engine entry points (rules and events).
@@ -88,7 +95,93 @@ func (a *Analyzer) AnalyzeRms(file rms.RmsFile) []common.Diagnostic {
 		diags = a.walkStmts(sec.Statements, diags)
 	}
 
+	diags = checkSections(file, diags)
+
 	sortDiags(diags)
+
+	return diags
+}
+
+// minSectionsForMissingCheck separates map-shaped files from include
+// fragments: the corpus contains fragments with up to three headers
+// (included snippet pieces) while real maps carry at least four. Below
+// the threshold the structural checks stay silent.
+const minSectionsForMissingCheck = 4
+
+// requiredSection is the only section a playable map cannot go
+// without. Everything else the formulation called "required" turned
+// out to be a legitimate skip in the corpus (PLAYER_SETUP lives in 29
+// maps' fragments, re-opened sections are second generation passes,
+// PLAYER_SETUP-without-create_player is a published-map pattern).
+// Section names parse lowercased (the kb keys them that way); the
+// display spelling stays uppercase.
+const requiredSection = "terrain_generation"
+
+// requiredSectionDisplay is the user-facing spelling of requiredSection.
+const requiredSectionDisplay = "TERRAIN_GENERATION"
+
+// checkSections runs the structural lints the per-command semantics
+// cannot see: a map-shaped file without the required section and
+// section headers with nothing inside. The missing-section diagnostic
+// points at the first section header — the natural insertion point
+// for the insert-section quickfix.
+func checkSections(file rms.RmsFile, diags []common.Diagnostic) []common.Diagnostic {
+	// the parser buckets statements before the first header into an
+	// implicit "global" section — not a real header
+	headers := 0
+
+	for i := range file.Sections {
+		if file.Sections[i].Name != "global" {
+			headers++
+		}
+	}
+
+	if headers >= minSectionsForMissingCheck {
+		first := file.Sections[0]
+		if first.Name == "global" && len(file.Sections) > 1 {
+			first = file.Sections[1]
+		}
+
+		hasRequired := false
+
+		for i := range file.Sections {
+			if file.Sections[i].Name == requiredSection {
+				hasRequired = true
+
+				break
+			}
+		}
+
+		if !hasRequired {
+			diags = append(diags, common.Diagnostic{
+				Range:    first.Range,
+				Severity: common.SeverityWarning,
+				Message: fmt.Sprintf("missing required section <%s>; without it the map generates no terrain",
+					requiredSectionDisplay),
+				Code: CodeMissingSection,
+			})
+		}
+	}
+
+	for i := range file.Sections {
+		sec := &file.Sections[i]
+		if sec.Name == "global" || len(sec.Statements) > 0 {
+			continue
+		}
+
+		diags = append(diags, common.Diagnostic{
+			Range: common.Range{
+				Start: sec.Range.Start,
+				End: common.Pos{
+					Line:   sec.Range.Start.Line,
+					Column: sec.Range.Start.Column + uint32(len(sec.Name)+2),
+				},
+			},
+			Severity: common.SeverityHint,
+			Message:  fmt.Sprintf("section %q is empty and does nothing", sec.Name),
+			Code:     CodeEmptySection,
+		})
+	}
 
 	return diags
 }

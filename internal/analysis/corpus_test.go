@@ -13,14 +13,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCorpus_NoDuplicateDecls runs the same-scope redeclaration check
-// over the real corpus sample (make corpus): a community-written script
-// tripping the warning is a false positive to fix, not a map to shame.
-// Unused declarations are counted, not gated: true leftovers in wild
-// scripts are findings, while top-level function flags in library-shaped
-// files (no rules or events) would be false positives — the include
-// closure calls them — and fail the gate. The test skips when the corpus
-// has not been fetched.
+// TestCorpus_NoDuplicateDecls runs the analysis gates over the real
+// corpus sample (make corpus): duplicate-declaration and missing-section
+// must stay at zero (a community-written script tripping them is a false
+// positive to fix, not a map to shame); unused-declaration and
+// empty-section are counted, not gated — true leftovers and empty
+// sections in wild scripts are findings. Top-level function hints in
+// library-shaped files (no rules or events) would be false positives —
+// the include closure calls them — and fail the gate. The test skips
+// when the corpus has not been fetched.
 func TestCorpus_NoDuplicateDecls(t *testing.T) {
 	t.Parallel()
 
@@ -37,7 +38,7 @@ func TestCorpus_NoDuplicateDecls(t *testing.T) {
 	require.NoError(t, err)
 	a := NewAnalyzer(store)
 
-	// inline XS blocks inside RMS maps
+	// RMS maps: the structural section checks run here too
 	for _, path := range rmsFiles {
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			t.Parallel()
@@ -46,10 +47,11 @@ func TestCorpus_NoDuplicateDecls(t *testing.T) {
 			require.NoError(t, err)
 
 			file, _ := rms.Parse(string(raw), path)
+			assertAnalysisAcceptance(t, true, a.AnalyzeRms(file))
 
 			for _, block := range file.XsBlocks {
 				xsFile, _ := xs.XsParse(block.Code, "inline:"+filepath.Base(path))
-				assertAnalysisAcceptance(t, xsFile, a.AnalyzeXs(xsFile, nil))
+				assertAnalysisAcceptance(t, xsShaped(xsFile), a.AnalyzeXs(xsFile, nil))
 			}
 		})
 	}
@@ -63,29 +65,37 @@ func TestCorpus_NoDuplicateDecls(t *testing.T) {
 			require.NoError(t, err)
 
 			xsFile, _ := xs.XsParse(string(raw), path)
-			assertAnalysisAcceptance(t, xsFile, a.AnalyzeXs(xsFile, nil))
+			assertAnalysisAcceptance(t, xsShaped(xsFile), a.AnalyzeXs(xsFile, nil))
 		})
 	}
 }
 
-// assertAnalysisAcceptance gates duplicate-declaration at zero, keeps
-// top-level function hints out of library-shaped files and counts the
-// rest of the unused findings for the slot's PR report.
-func assertAnalysisAcceptance(t *testing.T, file xs.XsFile, diags []common.Diagnostic) {
-	t.Helper()
-
-	scriptShaped := false
+// xsShaped reports whether the file has engine entry points (rules or
+// events) — the opposite of library-shaped.
+func xsShaped(file xs.XsFile) bool {
 	for i := range file.Decls {
 		if file.Decls[i].Kind == xs.DeclRule || file.Decls[i].Kind == xs.DeclEvent {
-			scriptShaped = true
+			return true
 		}
 	}
 
-	unused, unusedFunctions := 0, 0
+	return false
+}
+
+// assertAnalysisAcceptance gates duplicate-declaration and
+// missing-section at zero, keeps top-level function hints out of
+// library-shaped files and counts the rest of the findings for the
+// slots' PR reports.
+func assertAnalysisAcceptance(t *testing.T, scriptShaped bool, diags []common.Diagnostic) {
+	t.Helper()
+
+	unused, unusedFunctions, emptySections := 0, 0, 0
 	for _, d := range diags {
 		switch d.Code {
 		case CodeDuplicateDeclaration:
 			t.Errorf("duplicate-declaration fired: %s (line %d)", d.Message, d.Range.Start.Line)
+		case CodeMissingSection:
+			t.Errorf("missing-section fired: %s (line %d)", d.Message, d.Range.Start.Line)
 		case CodeUnusedDeclaration:
 			unused++
 			if isFunctionFlag(d.Message) {
@@ -95,11 +105,14 @@ func assertAnalysisAcceptance(t *testing.T, file xs.XsFile, diags []common.Diagn
 						d.Message, d.Range.Start.Line)
 				}
 			}
+		case CodeEmptySection:
+			emptySections++
 		}
 	}
 
-	if unused > 0 {
-		t.Logf("unused-declaration findings: %d (%d function-level)", unused, unusedFunctions)
+	if unused > 0 || emptySections > 0 {
+		t.Logf("findings: unused-declaration %d (%d function-level), empty-section %d",
+			unused, unusedFunctions, emptySections)
 	}
 }
 
