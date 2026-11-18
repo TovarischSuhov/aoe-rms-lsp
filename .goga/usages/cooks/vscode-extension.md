@@ -134,6 +134,18 @@ import: filesystem goes through the `SteamEnv` seam, unit-tested by
 `test/gamedetect.test.ts` against real tmpdir fixtures (the
 src/install.ts pattern).
 
+## File rename support
+
+`workspace/willRenameFiles` needs no client-side code in VS Code: the
+editor implements the protocol (client capability
+`workspace.fileOperations.willRename` is built in) — renaming a .rms/.xs
+in the explorer fires the request against the server's
+`Workspace.FileOperations.WillRename` capability and applies the
+returned WorkspaceEdit over the `#include` directives, including files
+that are not open. Other clients must support the request themselves
+(e.g. nvim built-in LSP does not send willRenameFiles — no extension
+shim exists; renames there stay manual).
+
 ## Settings pass-through
 
 VS Code answers the server's `workspace/configuration` pull from

@@ -209,6 +209,28 @@ Annotations: |
       - builtin-тёзка объявленного имени: вхождения без локального
         биндинга включаются (name-based merge)
 
+    "Referrers(ctx: Context, targetURI: string) -> refs: []ResolvedInclude": |
+      Обратный include-индекс для цели (workspace/willRenameFiles:
+      «кто меня включает»).
+
+      `targetURI`: включаемый файл; `refs`: резолвы директив с
+      владельцем, директивой (диапазон аргумента пути) и целью
+
+      Algorithm:
+      1. tgt — canonicalPath(targetURI); не file:// → пустой результат
+      2. Корни: каждый открытый uri из URIs() Source (собственное
+         замыкание цели корнем не является — замыкание отвечает «что
+         корень включает», а не «кто включает корень»)
+      3. По каждому замыканию: Resolved с canonicalPath(Target)==tgt →
+         хит; дедуп по (Owner, Range директивы)
+      4. Сортировка: Owner URI, затем позиция директивы
+
+      Requirements:
+      - неоткрытые ссылающиеся файлы покрываются, если их настигает
+        замыкание открытого документа; файлы вне всех открытых
+        замыканий невидимы (та же editor-state модель, что у References)
+      - детерминированность
+
 "Closure(root: string)":
   location: closure.go
   annotations: |

@@ -171,6 +171,7 @@ Annotations: |
       SelectionRangeProvider — Boolean(true);
       RenameProvider — RenameOptions с PrepareProvider;
       DocumentFormattingProvider — Boolean(true);
+      Workspace.FileOperations.WillRename — заявка willRenameFiles;
       SemanticTokensProvider — SemanticTokensOptions{
       Legend: TokenTypes=[known, unknown, deprecated, section, kind],
       TokenModifiers=[]};
@@ -557,6 +558,38 @@ Annotations: |
       - без DocumentChanges/resource-операций и ChangeAnnotations
       - словарные конфликты NewName (keyword/builtin-тёзка) не
         проверяются — лексическая валидация только
+    "WillRenameFiles(ctx: Context, params: RenameFilesParams) -> edit: WorkspaceEdit, err: error": |
+      Правки #include при переименовании файлов (stateless, read-only);
+      имя метода — по интерфейсу go.lsp.dev (WillRenameFiles);
+      capability — Workspace.FileOperations.WillRename в Initialize.
+
+      `params`: список файлов/папок к переименованию (OldURI/NewURI);
+      `edit`: правки аргументов пути директив по ссылающимся файлам;
+      `err`: только протокольные сбои
+
+      Algorithm:
+      1. Для каждой пары Old/New: Referrers у `Resolver` по `closure`
+         (обратный индекс по открытым документам) — ссылающиеся директивы
+      2. Для каждого резолва: новый аргумент пути — filepath.Rel от
+         каталога владельца к NewURI, forward slashes; кавычки
+         сохраняются (ширина диапазона в байтовых колонках отличает
+         кавычковую форму от голой); Rel невозможен (другой диск) или
+         не-file URI — правка пропускается
+      3. TextEdit{Range (positionEncoding), NewText} в Changes[Owner] —
+         включая неоткрытые владельцы (байтовые колонки, прецедент
+         targetRange)
+      4. → WorkspaceEdit{Changes}; без реферреров — пустой edit, не
+         ошибка (переименование продолжается без правок)
+
+      Requirements:
+      - stateless/read-only: сервер правки не применяет и файл не
+        переименовывает — клиент делает это сам после ответа
+      - детерминированность
+
+      Constraints:
+      - без DocumentChanges/resource-операций и ChangeAnnotations
+      - переименование папок не разворачивается в файлы — только
+        директивы, чья цель совпала с OldURI по canonical path
     "Formatting(ctx: Context, params: DocumentFormattingParams) -> edits: []TextEdit, err: error": |
       Каноническая перепечатка текущего документа (stateless, read-only);
       имя метода — по интерфейсу go.lsp.dev (Formatting).

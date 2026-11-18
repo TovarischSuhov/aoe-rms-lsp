@@ -337,6 +337,13 @@ func (s *Server) Initialize(
 			CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
 		},
 		DocumentFormattingProvider: protocol.Boolean(true),
+		// willRenameFiles: the server returns WorkspaceEdits updating
+		// #include directives across the closure when a map file moves.
+		Workspace: &protocol.WorkspaceOptions{
+			FileOperations: &protocol.FileOperationOptions{
+				WillRename: protocol.FileOperationRegistrationOptions{},
+			},
+		},
 	}
 
 	if enc, ok := negotiateEncoding(params); ok {
@@ -1023,6 +1030,74 @@ func (s *Server) Rename(
 		"new_name", params.NewName, "edits", len(sites))
 
 	return &protocol.WorkspaceEdit{Changes: changes}, nil
+}
+
+// WillRenameFiles answers workspace/willRenameFiles with a WorkspaceEdit
+// updating the #include/#include_drs/#includeXS path arguments of every
+// referring file in the open documents' closures — unopened owners
+// included (the client reads them from disk to apply the edit). A rename
+// with no referrers (folders, never-included files) returns an empty
+// edit, not an error: the rename proceeds without changes. A new
+// location a relative include cannot express (a different drive) is
+// skipped — a wrong edit would be worse than a missing one.
+func (s *Server) WillRenameFiles(
+	ctx context.Context,
+	params *protocol.RenameFilesParams,
+) (*protocol.WorkspaceEdit, error) {
+	changes := make(map[uri.URI][]protocol.TextEdit)
+
+	for _, f := range params.Files {
+		for _, res := range s.resolver.Referrers(ctx, f.OldURI) {
+			newPath, ok := renamedIncludeArg(res, f.NewURI)
+			if !ok {
+				continue
+			}
+
+			changes[uri.URI(res.Owner)] = append(changes[uri.URI(res.Owner)], protocol.TextEdit{
+				Range:   s.targetRange(res.Owner, res.Inc.Range),
+				NewText: newPath,
+			})
+		}
+	}
+
+	var edits int
+	for _, list := range changes {
+		edits += len(list)
+	}
+
+	slog.DebugContext(ctx, "will_rename_files", "count", len(params.Files), "edits", edits)
+
+	if len(changes) == 0 {
+		return &protocol.WorkspaceEdit{}, nil
+	}
+
+	return &protocol.WorkspaceEdit{Changes: changes}, nil
+}
+
+// renamedIncludeArg computes the path argument text a referring file's
+// directive must carry after the rename: relative from the owner's
+// directory to the new location, forward slashes (include paths are
+// URI-ish spellings the resolver joins onto directories, not Windows
+// paths). Quoted arguments keep their quotes: the parser stores the
+// quoted span in the range while Path is unquoted, so the byte-column
+// width tells the two forms apart. ok=false when no relative path exists
+// (a cross-drive rename) or either URI is not a file URI.
+func renamedIncludeArg(res include.ResolvedInclude, newTargetURI string) (string, bool) {
+	owner, target := uri.URI(res.Owner), uri.URI(newTargetURI)
+	if !owner.IsFile() || !target.IsFile() {
+		return "", false
+	}
+
+	rel, err := filepath.Rel(filepath.Dir(owner.FsPath()), target.FsPath())
+	if err != nil {
+		return "", false
+	}
+
+	if res.Inc.Range.End.Column-res.Inc.Range.Start.Column == uint32(len(res.Inc.Path))+2 {
+		return "\"" + filepath.ToSlash(rel) + "\"", true
+	}
+
+	return filepath.ToSlash(rel), true
 }
 
 // siteText extracts the name text of a rename site from the document
