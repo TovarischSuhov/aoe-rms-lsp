@@ -46,6 +46,7 @@ diags := analyzer.AnalyzeXs(xsFile, externals)
 | misplaced-attribute | hint | create_*-атрибут (terrain_type / base_terrain — данные noop_statements) записан как самостоятельная команда: движок молча игнорирует (in-game верифицировано 2026-11-18); замещает unknown-command для unknown-имён |
 | create-land-positional | hint | create_land с позиционным аргументом: с ним ленд не создаётся вовсе (in-game 2026-11-18); конфигурация — в блок (land_position, base_size…); create_elevation N валиден |
 | legacy-… | hint | #-директива устарела механически, но работает (код и текст из kb nuances.json) |
+| renamed-symbol | warning | имя переименовано патчем (пары из changelog-дока «переименовано», данные через Store.RenamedTo): игра отвергает старое имя; сообщение называет замену; подавляет undefined-symbol для заготовок имён вне гайда; range — имя/вызов; code-action — замена на новое имя (Rename to '…') |
 | return-parens | error | значение return не заключено в скобки: парсер XS игры отклоняет файл (Error 0324/0141, in-game верифицировано 2026-11-18; ugc-guide xs/programmer.md — «the return value must always be inside parantheses»); различение по флагу Stmt.Parens из парсера |
 | undefined-symbol | error | ident вне объявлений и kb |
 | bad-arity | error | неверное число аргументов вызова |

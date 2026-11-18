@@ -7,6 +7,7 @@ import (
 	"aoe2-lsp/internal/xs"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -151,4 +152,33 @@ func TestAnalyzerTokens_Empty(t *testing.T) {
 
 	xsFile, _ := xs.XsParse("", "t.xs")
 	require.NotNil(t, a.TokensXs(xsFile, nil))
+}
+
+// TestAnalyzerTokens_XsRenamedDeprecated pins the data-driven deprecated
+// token: an identifier a patch renamed (changelog pairs) classifies as
+// deprecated, its replacement stays known.
+func TestAnalyzerTokens_XsRenamedDeprecated(t *testing.T) {
+	t.Parallel()
+
+	a := newTestAnalyzer(t)
+
+	src := "void main() {\n\txsGetLocalPlayerId();\n}"
+	file, _ := xs.XsParse(src, "t.xs")
+
+	toks := a.TokensXs(file, nil)
+
+	for _, tok := range toks {
+		t.Logf("%v %q", tok.Range, src[tok.Range.Start.Offset:tok.Range.End.Offset])
+	}
+
+	assert.Contains(t, typesOf(toks), TokenDeprecated)
+}
+
+// typesOf collects the token classes in order.
+func typesOf(toks []common.Token) []string {
+	out := make([]string, 0, len(toks))
+	for _, tok := range toks {
+		out = append(out, tok.Type)
+	}
+	return out
 }

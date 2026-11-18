@@ -30,6 +30,10 @@ const (
 	CodeBadType = "bad-type"
 	// CodeDeprecatedEffectPercent marks the legacy effect_percent command.
 	CodeDeprecatedEffectPercent = "deprecated-effect-percent"
+	// CodeRenamedSymbol marks a knowledge-base name a patch renamed: the
+	// game rejects the old name; the message names the replacement
+	// (changelog "### XS: переименовано" pairs via kb.Store.RenamedTo).
+	CodeRenamedSymbol = "renamed-symbol"
 	// CodeProbablyIgnored marks a command attribute that is a documented
 	// no-op in its position: the game most likely ignores it.
 	CodeProbablyIgnored = "probably-ignored"
@@ -324,6 +328,13 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 			Severity: common.SeverityWarning,
 			Message:  message,
 			Code:     code,
+		})
+	} else if to, ok := a.store.RenamedTo(stmt.Name); ok {
+		diags = append(diags, common.Diagnostic{
+			Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
+			Severity: common.SeverityWarning,
+			Message:  fmt.Sprintf("%q was renamed to %q — the game rejects the old name", stmt.Name, to),
+			Code:     CodeRenamedSymbol,
 		})
 	}
 
@@ -965,18 +976,19 @@ func knownXsType(typ string) bool {
 	return false
 }
 
-// checkIdent reports one plain identifier when it resolves to nothing.
+// checkIdent reports one plain identifier when it resolves to nothing,
+// and marks it when a patch renamed it (the game rejects the old name).
 func (a *Analyzer) checkIdent(e xs.Expr, declared map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
 	if declared[e.Value] || xsBuiltins[e.Value] {
 		return diags
 	}
 
 	if _, ok := a.store.Function(e.Value); ok {
-		return diags
+		return a.renamedDiag(e.Value, e.Range, diags)
 	}
 
 	if _, ok := a.store.Constant(e.Value); ok {
-		return diags
+		return a.renamedDiag(e.Value, e.Range, diags)
 	}
 
 	return append(diags, common.Diagnostic{
@@ -984,6 +996,29 @@ func (a *Analyzer) checkIdent(e xs.Expr, declared map[string]bool, diags []commo
 		Severity: common.SeverityError,
 		Message:  fmt.Sprintf("undefined symbol %q", e.Value) + a.symbolSuggestion(declared, e.Value),
 		Code:     CodeUndefinedSymbol,
+	})
+}
+
+// renamedDiag warns on a knowledge-base name a patch renamed. The game
+// rejects the old name, so this is an error-level fact dressed as a
+// warning with the replacement spelled out. ok — the name carries no
+// rename.
+func (a *Analyzer) renamedDiag(name string, r common.Range, diags []common.Diagnostic) []common.Diagnostic {
+	to, ok := a.store.RenamedTo(name)
+	if !ok {
+		return diags
+	}
+
+	message := fmt.Sprintf("%q was renamed to %q — the game rejects the old name", name, to)
+	if fn, found := a.store.Function(name); found && fn.SinceUpdate != "" {
+		message += fmt.Sprintf(" (update %s)", fn.SinceUpdate)
+	}
+
+	return append(diags, common.Diagnostic{
+		Range:    r,
+		Severity: common.SeverityWarning,
+		Message:  message,
+		Code:     CodeRenamedSymbol,
 	})
 }
 
@@ -1013,6 +1048,8 @@ func (a *Analyzer) checkCall(e xs.Expr, declared map[string]bool, env *TypeEnv, 
 
 		return diags
 	}
+
+	diags = a.renamedDiag(callee, e.Range, diags)
 
 	minArgs := 0
 	for _, param := range fn.Params {

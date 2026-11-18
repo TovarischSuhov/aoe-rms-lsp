@@ -533,7 +533,7 @@ func TestServe_CompletionAllXsFunctions(t *testing.T) {
 		assert.Nil(t, item.Documentation, "concise-items: documentation stays out")
 	}
 
-	assert.Equal(t, 289, functions, "completion returns all 289 XS functions; the client filters")
+	assert.Equal(t, 291, functions, "completion returns all 291 XS functions; the client filters")
 
 	detail, has := sample.Detail.Get()
 	require.True(t, has)

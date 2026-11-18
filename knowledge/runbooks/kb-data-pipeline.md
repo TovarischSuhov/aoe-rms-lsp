@@ -31,7 +31,7 @@ completion и signature help. Генерируется из локальных �
 | `ugc-guide/xs/functions/functions.json` (204 функции) | `xs-functions.json` |
 | `ugc-guide/xs/constants/constants.json` (27 секций) | `xs-constants.json` |
 | `zetnus-rms-guide.txt` (Syntax Skeleton) — **не вендорится** (`docs/ref/zetnus-rms-guide.txt` в `.gitignore`; у мейнтейнера — локальная копия) | `rms-commands.json` (via ExtractRmsCommands; отсутствует гайд → файл не перегенерируется, WARN, остаётся закоммиченный) |
-| `aoe2de-xs-rms-changelog.md` | обогащение `since_update` |
+| `aoe2de-xs-rms-changelog.md` | обогащение `since_update`; ренеймы (renamed_to) и факты существования имён (заготовки функций из сигнатур «добавлено», guide-wins) |
 | `attribute-descs.json` | опциональный desc-overlay (файл проекта; пустой — норма, отсутствует → WARN, битый → падение сборки) |
 
 ## Регенерация

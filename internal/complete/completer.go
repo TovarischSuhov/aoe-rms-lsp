@@ -46,7 +46,22 @@ const (
 	// the kind field itself stays the symbol's nature (function or
 	// variable) so editor kind-icons keep working.
 	availableSuffix = " · auto-include"
+
+	// renamedPenalty sorts functions a patch renamed after every live
+	// name: the replacement is the primary completion, the old name is
+	// a demoted leftover.
+	renamedPenaltyChar = "~"
 )
+
+// renamedPenalty prefixes the sort key of a renamed function; "" for
+// live names.
+func renamedPenalty(renamedTo string) string {
+	if renamedTo != "" {
+		return renamedPenaltyChar
+	}
+
+	return ""
+}
 
 // Completer computes completion candidates over parsed ASTs and the
 // knowledge base: stateless, protocol-agnostic. The zero value is not
@@ -319,11 +334,19 @@ func (c *Completer) XsAt(file xs.XsFile, pos common.Pos, external []xs.Decl, ava
 			types = append(types, p.Type)
 		}
 
+		detail := kbSignature(fn.ReturnType, fn.Name, types)
+		if fn.RenamedTo != "" {
+			// a renamed function is still listed but demoted past every
+			// live name and annotated — the replacement completes as its
+			// own primary candidate
+			detail = "renamed to " + fn.RenamedTo + " — " + detail
+		}
+
 		out = append(out, Candidate{
 			Label:  fn.Name,
 			Kind:   KindFunction,
-			Detail: kbSignature(fn.ReturnType, fn.Name, types),
-			Sort:   sortKbFunction + fn.Name,
+			Detail: detail,
+			Sort:   sortKbFunction + renamedPenalty(fn.RenamedTo) + fn.Name,
 		})
 	}
 

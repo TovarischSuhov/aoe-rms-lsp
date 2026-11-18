@@ -16,7 +16,7 @@ func TestNewStore_Success(t *testing.T) {
 
 	// headline counters pin the embedded data shape; a kb-refresh
 	// (docs/kb-refresh.md) bumps them deliberately
-	assert.Len(t, store.Functions(), 289)
+	assert.Len(t, store.Functions(), 291)
 
 	all := store.Constants("")
 	require.NotEmpty(t, all)

@@ -366,17 +366,20 @@ Annotations: |
       Algorithm:
       1. Отобрать диагностики контекста с кодами unknown-command/
          unknown-attribute/undefined-symbol/
-         deprecated-effect-percent/missing-include, пересекающиеся
-         с params.Range
+         deprecated-effect-percent/renamed-symbol/missing-include,
+         пересекающиеся с params.Range
       2. unknown-* с суффиксом '; did you mean "X"?' в сообщении →
          Change to 'X': замена слова под началом диагностики
          (ReferencesAt-роутинг как DocumentHighlight)
       3. deprecated-effect-percent → Replace with effect_amount:
          замена токена команды (аргументы не трогаются)
-      4. missing-include → Create '<path>': CreateFile по пути из
+      4. renamed-symbol → Rename to 'X': слово под диагностикой — старое
+         имя, X — новое из Store.RenamedTo (данные, не хардкод); слово
+         без ренейма → nil (квикфикса нет)
+      5. missing-include → Create '<path>': CreateFile по пути из
          сообщения, разрешённому относительно директории документа
          (IgnoreIfExists)
-      5. Only непусто и без QuickFix → пустой ответ
+      6. Only непусто и без QuickFix → пустой ответ
 
       Requirements:
       - пустой результат — пустой slice, не nil

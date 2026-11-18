@@ -344,3 +344,32 @@ func TestToCompletionItems_AutoInclude(t *testing.T) {
 	require.Equal(t, uint32(0), edit.Range.Start.Character)
 	require.Equal(t, edit.Range.Start, edit.Range.End, "zero-width insert")
 }
+
+// TestServerCodeAction_RenamedSymbolFix pins the changelog rename
+// quickfix: the old name under the diagnostic is replaced by its
+// knowledge-base replacement, taken from the data, not a hardcode.
+func TestServerCodeAction_RenamedSymbolFix(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	s.docs.Put("file:///t.xs", "void main() {\n\txsGetLocalPlayerId();\n}\n", 1)
+
+	actions := codeActionAt(t, s, "file:///t.xs", protocol.Diagnostic{
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 1, Character: 7},
+			End:   protocol.Position{Line: 1, Character: 25},
+		},
+		Code:    protocol.String(analysis.CodeRenamedSymbol),
+		Message: protocol.String(`"xsGetLocalPlayerId" was renamed to "xsUnsyncGetLocalPlayerId" — the game rejects the old name`),
+	})
+
+	require.Len(t, actions, 1)
+
+	action := actions[0].(*protocol.CodeAction)
+	require.Equal(t, "Rename to 'xsUnsyncGetLocalPlayerId'", action.Title)
+
+	edits := action.Edit.Changes["file:///t.xs"]
+	require.Len(t, edits, 1)
+	require.Equal(t, "xsUnsyncGetLocalPlayerId", edits[0].NewText)
+}
