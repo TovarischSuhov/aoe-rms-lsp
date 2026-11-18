@@ -106,6 +106,14 @@ elevation/terrain: значит на `create_object` они, скорее все
 | `create_elevation` | `clumping_factor` | 16× / 8 | **create_land, create_terrain** (гайд:258, 306) | [Acropolis](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Acropolis.rms) |
 | `create_terrain` | `other_zone_avoidance_distance` | 13× / 5 | **create_land** (гайд:263) | [Tiger Woods](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/Tiger_Woods_1.0.rms) |
 | `create_object` | `set_avoid_player_start_areas` | 12× / 2 | **create_terrain** (гайд:308) | [es@pilgrims_v2](https://github.com/Naramsim/AoE2-random-map-scripts/blob/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40pilgrims_v2.rms) |
+
+`set_scale_by_size`/`set_scale_by_groups` на `create_object`
+**подтверждены no-op в игре** (2026-11-18, DE): дом с атрибутом и
+контрольный дом — одинакового размера. Бонус-контекст гайда (1462–1500):
+атрибуты без аргументов, масштабируют `number_of_tiles`/`number_of_clumps`
+— полей, которых у объектов нет; для объектов документирован отдельный
+`set_scaling_to_map_size` (гайд:501) — формулировка hint'а должна его
+называть как правильную альтернативу.
 | `create_terrain` | `left/right/top/bottom_border`, `base_size` | 6× / 2 | **create_land** (гайд:248, 253–256) | [es@paradiseisland_v2](https://github.com/Naramsim/AoE2-random-map-scripts/blob/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40paradiseisland_v2.rms) |
 | `create_terrain` | `distance_to_other_terrain_types` | 2× / 2 | не найден (похож: `spacing_to_other_terrain_types`, гайд:301) | [T90CG_BoA_MapPack_v4](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_MapPack_v4.rms) |
 | `create_elevation` | `spacing_to_other_terrain_types` | 2× / 2 | **create_terrain** (гайд:301) | [Mountain Pass](https://github.com/Naramsim/AoE2-random-map-scripts/blob/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Mountain%20Pass.rms) |
