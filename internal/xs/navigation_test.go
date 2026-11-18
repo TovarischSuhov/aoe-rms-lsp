@@ -419,7 +419,7 @@ func TestXsSymbols_PreludeInvariantSweep(t *testing.T) {
 		require.Nil(t, sym.Children, "flat outline")
 	}
 
-	require.Equal(t, 884, externs, "the prelude declares 884 externs")
+	require.Equal(t, 1172, externs, "the prelude declares 1172 externs")
 	require.Len(t, syms, len(file.Decls), "extern and function declarations alike")
 }
 

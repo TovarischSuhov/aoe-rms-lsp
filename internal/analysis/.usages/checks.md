@@ -37,14 +37,21 @@ diags := analyzer.AnalyzeXs(xsFile, externals)
 | unknown-section | error | секция не из справочника |
 | unknown-attribute | error | атрибут не принадлежит команде |
 | bad-argument | error | число/вид аргументов против спецификации |
+| missing-section | warning | картообразный файл (≥4 заголовков секций — тоньше бывают включаемые фрагменты) без `<TERRAIN_GENERATION>`; range — первая секция, на неё же смотрит quickfix вставки (duplicate-секции и PLAYER_SETUP-вариации — легитимные паттерни корпуса, не проверяются) |
+| empty-section | hint | заголовок секции без стейтментов до следующего заголовка — секция ничего не делает |
 | bad-argument-value | error | значение аргумента вне диапазона (percent 0..100) |
 | deprecated-effect-percent | warning | effect_percent устарел в пользу операторов (из kb nuances.json; будущие deprecated-имена получают свои коды из тех же данных) |
 | typo-alias | warning | имя — известная опечатка; сообщение называет правильное написание (данные kb nuances.json) |
-| probably-ignored | hint | атрибут — задокументированный no-op в этой позиции, игра его игнорирует (данные kb nuances.json) |
+| probably-ignored | hint | атрибут — задокументированный no-op в этой позиции, игра его игнорирует (данные kb nuances.json; in-game верифицированные пары: set_scale_by_size/groups на create_object — правильная альтернатива set_scaling_to_map_size; вложенный create_terrain на create_terrain) |
+| misplaced-attribute | hint | create_*-атрибут (terrain_type / base_terrain — данные noop_statements) записан как самостоятельная команда: движок молча игнорирует (in-game верифицировано 2026-11-18); замещает unknown-command для unknown-имён |
+| create-land-positional | hint | create_land с позиционным аргументом: с ним ленд не создаётся вовсе (in-game 2026-11-18); конфигурация — в блок (land_position, base_size…); create_elevation N валиден |
 | legacy-… | hint | #-директива устарела механически, но работает (код и текст из kb nuances.json) |
+| return-parens | error | значение return не заключено в скобки: парсер XS игры отклоняет файл (Error 0324/0141, in-game верифицировано 2026-11-18; ugc-guide xs/programmer.md — «the return value must always be inside parantheses»); различение по флагу Stmt.Parens из парсера |
 | undefined-symbol | error | ident вне объявлений и kb |
 | bad-arity | error | неверное число аргументов вызова |
 | bad-type | error | несовместимый тип аргумента/присваивания/return |
+| duplicate-declaration | warning | повтор декларации в одном скоупе: повтор top-level имени (функции/переменные/именованные rules) или локала в одном блоке; вложенные скоупы затеняют легально и молчат (приёмка — `TestCorpus_NoDuplicateDecls`) |
+| unused-declaration | hint | нет ссылок: локаль без упоминаний (инициализатор с вызовом молчит — side effect) или топ-левел функция, недостижимая из rules/events. Entry-point model: rules/events — engine-roots; файл без них — библиотека, её топ-левел не помечается (cross-file вызовы невидимы); top-level переменные не помечаются вовсе |
 
 ## Nuance ladder for unknown names
 

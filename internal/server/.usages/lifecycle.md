@@ -145,20 +145,23 @@ Preconditions:
 
 ## Document formatting
 
-textDocument/formatting reprints the whole .rms document in the
-canonical printer's shape and returns a single full-document edit —
-one replacement spanning the file, the current trailing newline
-included in the range so applying it does not double. Indentation is
-the only knob: the request's TabSize and InsertSpaces are honored,
-there are no formatting settings in the `"aoe2lsp"` section.
+textDocument/formatting reprints the whole document in the canonical
+printer's shape and returns a single full-document edit — one
+replacement spanning the file, the current trailing newline included
+in the range so applying it does not double. The printer is chosen by
+URI suffix: .rms goes through the RMS printer, .xs through the XS one —
+same single-edit shape, same refusal and convergence contract for both.
+Indentation is the only knob: the request's TabSize and InsertSpaces
+are honored, there are no formatting settings in the `"aoe2lsp"`
+section.
 
 Preconditions:
 - Documents with error-severity parse diagnostics answer an empty edit
   list (not an error) — the reason is already published as diagnostics;
   analyzer-level findings (unknown-command and friends) do not block
   formatting.
-- .xs documents are not formatted yet (slot 3 of #120) and also answer
-  an empty list.
+- Documents in neither language (no .rms/.xs suffix) answer an empty
+  list the same way.
 
 ## Selection ranges
 

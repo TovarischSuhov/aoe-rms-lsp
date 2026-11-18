@@ -16,8 +16,6 @@ set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 sources="$here/corpus-sources.txt"
-dest="${1:-.corpus}"
-count="${CORPUS_COUNT:-100}"
 
 repos=(
 	"HSZemi/rms"
@@ -74,6 +72,31 @@ if [[ ! -f "$sources" ]]; then
 	echo "no $sources — run scripts/corpus-fetch.sh --update first" >&2
 	exit 2
 fi
+
+# --check reports whether the sample on disk was fetched from the current
+# pin: the fetch skip of every caller gates on it, so a sample downloaded
+# before a re-pin is re-fetched instead of living forever (#127). No
+# network, no writes.
+if [[ "${1:-}" == "--check" ]]; then
+	check_dest="${2:-.corpus}"
+	manifest="$check_dest/.sources-hash"
+
+	if [[ ! -f "$manifest" ]]; then
+		echo "corpus: no .sources-hash in $check_dest — fetch once (scripts/corpus-fetch.sh $check_dest)" >&2
+		exit 1
+	fi
+
+	want="$(sha256sum "$sources" | cut -d' ' -f1):${CORPUS_COUNT:-100}"
+	if [[ "$(cat "$manifest")" != "$want" ]]; then
+		echo "corpus: sample in $check_dest predates $sources — re-fetch (make corpus)" >&2
+		exit 1
+	fi
+
+	exit 0
+fi
+
+dest="${1:-.corpus}"
+count="${CORPUS_COUNT:-100}"
 
 mkdir -p "$dest"
 
@@ -164,5 +187,15 @@ PY
 
 	accepted=$((accepted + 1))
 done <<<"$shuffled"
+
+if (( accepted < count )); then
+	echo "corpus: fetched $accepted of $count scripts — network or pool broken, manifest not recorded" >&2
+	exit 1
+fi
+
+# The manifest ties the sample to its pin; --check compares it, so a
+# partial fetch must never record one.
+sha="$(sha256sum "$sources" | cut -d' ' -f1)"
+printf '%s:%s\n' "$sha" "$count" > "$dest/.sources-hash"
 
 echo "corpus: $accepted text scripts in $dest (requested $count)"

@@ -131,6 +131,15 @@ elevation/terrain: значит на `create_object` они, скорее все
 | `create_elevation` | `clumping_factor` | 16× / 8 | **create_land, create_terrain** (гайд:258, 306) | [Acropolis](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Acropolis.rms) |
 | `create_terrain` | `other_zone_avoidance_distance` | 13× / 5 | **create_land** (гайд:263) | [Tiger Woods](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/FREE_FOR_ALL_MAPS/Tiger_Woods_1.0.rms) |
 | `create_object` | `set_avoid_player_start_areas` | 12× / 2 | **create_terrain** (гайд:308) | [es@pilgrims_v2](https://github.com/Naramsim/AoE2-random-map-scripts/blob/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40pilgrims_v2.rms) |
+
+`set_scale_by_size`/`set_scale_by_groups` на `create_object`
+**подтверждены no-op в игре** (2026-11-18, DE): дом с атрибутом и
+контрольный дом — одинакового размера; проверены оба атрибута и обе
+формы (с аргументом и каноническая без). Бонус-контекст гайда (1462–1500):
+атрибуты без аргументов, масштабируют `number_of_tiles`/`number_of_clumps`
+— полей, которых у объектов нет; для объектов документирован отдельный
+`set_scaling_to_map_size` (гайд:501) — формулировка hint'а должна его
+называть как правильную альтернативу.
 | `create_terrain` | `left/right/top/bottom_border`, `base_size` | 6× / 2 | **create_land** (гайд:248, 253–256) | [es@paradiseisland_v2](https://github.com/Naramsim/AoE2-random-map-scripts/blob/018d0bfc05d2b5851fdd06ef27e503c026a168b5/Others/es%40paradiseisland_v2.rms) |
 | `create_terrain` | `distance_to_other_terrain_types` | 2× / 2 | не найден (похож: `spacing_to_other_terrain_types`, гайд:301) | [T90CG_BoA_MapPack_v4](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/NON_FREE_FOR_ALL_MAPS/T90CG_BoA_MapPack_v4.rms) |
 | `create_elevation` | `spacing_to_other_terrain_types` | 2× / 2 | **create_terrain** (гайд:301) | [Mountain Pass](https://github.com/Naramsim/AoE2-random-map-scripts/blob/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/Mountain%20Pass.rms) |
@@ -141,13 +150,22 @@ elevation/terrain: значит на `create_object` они, скорее все
 | `create_terrain` | `number` | 1× / 1 | не найден | [KHR_WSVG_Atacama](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Atacama.rms) |
 | `create_terrain` | `create_terrain` (вложенный!) | 2× / 1 | — | [Crater_Lake](https://github.com/Naramsim/AoE2-random-map-scripts) |
 
+Вложенный `create_terrain` (brace-less, внутри attribute-блока
+внешнего) **подтверждён no-op в игре** (2026-11-18, DE): контрольная
+карта — внешний `create_terrain DIRT { … create_terrain WATER }`
+отработал (пятна DIRT есть), вложенный WATER — воды нет; рекурсии в
+attribute-блоки движок не входит.
+
 Паттерн очевиден: авторы копируют атрибуты между `create_land` /
 `create_terrain` / `create_elevation` / `create_object` — движок глотает.
 
 `create_land N` с позиционным аргументом (8×,
 [!Infinite Forest!](https://github.com/dundass/rms-playground/blob/74471f709f52338918d2cae5a7a7ef1694fd0e5a/%21Infinite%20Forest%21%200.4%20AI%20Friendly%20by%20vjaz.rms))
 — гайд-скелет показывает `create_land {}` без аргументов (гайд:244) —
-❓ вероятно игнорируется.
+**подтверждено в игре (2026-11-18, DE): форма ломает команду** —
+`create_land 2 { land_position 5 5, base_size 12 }` генерация проходит,
+но земля не создаётся вовсе (контрольная `create_land {}` с теми же
+атрибутами — земля есть). Не «игнорируется», а нерабочая форма.
 
 ## 4. Опечатки и мусор (✍️ / 💬 — точно не работают)
 
@@ -169,6 +187,12 @@ elevation/terrain: значит на `create_object` они, скорее все
 create_terrain-обёртки — 50×. Это атрибуты, а не команды: движок молча
 игнорирует, выбор террейна не работает (❓/💬 мёртвый код — находка
 расширенного корпуса).
+
+**Подтверждено в игре (2026-11-18, DE):** контрольные карты —
+`create_land { terrain_type GRASS }` и `create_terrain DIRT` дали
+ожидаемый ландшафт (оба контроля сработали), а `terrain_type WATER` и
+`base_terrain WATER` под `start_random` без create_terrain-обёртки —
+воды на картах нет: bare-форма **обоих** имён игнорируется движком.
 
 ## 5. XS (по vendored UGC Guide, `docs/ref/ugc-guide/xs`)
 

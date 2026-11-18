@@ -337,6 +337,13 @@ func (s *Server) Initialize(
 			CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
 		},
 		DocumentFormattingProvider: protocol.Boolean(true),
+		// willRenameFiles: the server returns WorkspaceEdits updating
+		// #include directives across the closure when a map file moves.
+		Workspace: &protocol.WorkspaceOptions{
+			FileOperations: &protocol.FileOperationOptions{
+				WillRename: protocol.FileOperationRegistrationOptions{},
+			},
+		},
 	}
 
 	if enc, ok := negotiateEncoding(params); ok {
@@ -706,7 +713,15 @@ func (s *Server) Completion(
 	slog.DebugContext(ctx, "completion", "uri", params.TextDocument.URI,
 		"line", params.Position.Line, "col", params.Position.Character, "items", len(cands))
 
-	return &protocol.CompletionList{IsIncomplete: false, Items: toCompletionItems(cands)}, nil
+	// auto-include edits add an include directive; the kind follows the
+	// document: .xs documents include .xs files, inline-XS blocks in a
+	// .rms document connect them through #includeXS
+	directive := "#include"
+	if strings.HasSuffix(name, ".rms") {
+		directive = "#includeXS"
+	}
+
+	return &protocol.CompletionList{IsIncomplete: false, Items: toCompletionItems(cands, directive)}, nil
 }
 
 // completionRms parses the .rms document: a position inside an inline
@@ -735,6 +750,7 @@ func (s *Server) completionRms(
 			xsFile,
 			unshiftPos(pos, block.Range.Start),
 			closure.ExternalDecls(""),
+			s.availableFiles(ctx, docURI),
 		)
 	}
 
@@ -743,7 +759,8 @@ func (s *Server) completionRms(
 
 // completionXs parses the .xs document and computes the candidates with
 // the closure's external declarations (the analyzed file is excluded
-// from its own externals — the analyzeXs pattern).
+// from its own externals — the analyzeXs pattern) plus auto-include
+// candidates from available-but-not-included files.
 func (s *Server) completionXs(
 	ctx context.Context,
 	text string,
@@ -754,7 +771,29 @@ func (s *Server) completionXs(
 	file, _ := xs.XsParse(text, name)
 	closure := s.resolver.Closure(ctx, docURI)
 
-	return s.completer.XsAt(file, pos, closure.ExternalDecls(docURI))
+	return s.completer.XsAt(
+		file,
+		pos,
+		closure.ExternalDecls(docURI),
+		s.availableFiles(ctx, docURI),
+	)
+}
+
+// availableFiles maps the resolver's available-but-not-included scan to
+// the complete cell's shape.
+func (s *Server) availableFiles(ctx context.Context, docURI string) []complete.AvailableFile {
+	entries := s.resolver.Available(ctx, docURI)
+	if len(entries) == 0 {
+		return nil
+	}
+
+	out := make([]complete.AvailableFile, 0, len(entries))
+
+	for _, e := range entries {
+		out = append(out, complete.AvailableFile{Path: e.Path, Decls: e.Decls})
+	}
+
+	return out
 }
 
 // completionKinds maps the complete cell's candidate kinds to protocol
@@ -773,8 +812,10 @@ var completionKinds = map[string]protocol.CompletionItemKind{
 // toCompletionItems renders candidates per lsp-protocol (Completion
 // Items): Label, the kind-table Kind, one-line Detail, SortText; the
 // insert text equals the label and stays unset, documentation stays
-// out of completion (concise-items rule).
-func toCompletionItems(cands []complete.Candidate) []protocol.CompletionItem {
+// out of completion (concise-items rule). Auto-include candidates gain
+// AdditionalTextEdits: the include line (directive per document kind)
+// inserted at the document start on acceptance.
+func toCompletionItems(cands []complete.Candidate, directive string) []protocol.CompletionItem {
 	items := make([]protocol.CompletionItem, 0, len(cands))
 
 	for _, c := range cands {
@@ -788,10 +829,23 @@ func toCompletionItems(cands []complete.Candidate) []protocol.CompletionItem {
 			item.Detail = protocol.NewOptional(c.Detail)
 		}
 
+		if c.Include != "" {
+			item.AdditionalTextEdits = []protocol.TextEdit{includeInsertEdit(directive, c.Include)}
+		}
+
 		items = append(items, item)
 	}
 
 	return items
+}
+
+// includeInsertEdit builds the zero-width document-start insert of an
+// include directive for the given include argument.
+func includeInsertEdit(directive string, path string) protocol.TextEdit {
+	return protocol.TextEdit{
+		Range:   protocol.Range{Start: protocol.Position{Line: 0, Character: 0}, End: protocol.Position{Line: 0, Character: 0}},
+		NewText: directive + " \"" + path + "\"\n",
+	}
 }
 
 // Definition answers textDocument/definition across the document's
@@ -978,6 +1032,74 @@ func (s *Server) Rename(
 	return &protocol.WorkspaceEdit{Changes: changes}, nil
 }
 
+// WillRenameFiles answers workspace/willRenameFiles with a WorkspaceEdit
+// updating the #include/#include_drs/#includeXS path arguments of every
+// referring file in the open documents' closures — unopened owners
+// included (the client reads them from disk to apply the edit). A rename
+// with no referrers (folders, never-included files) returns an empty
+// edit, not an error: the rename proceeds without changes. A new
+// location a relative include cannot express (a different drive) is
+// skipped — a wrong edit would be worse than a missing one.
+func (s *Server) WillRenameFiles(
+	ctx context.Context,
+	params *protocol.RenameFilesParams,
+) (*protocol.WorkspaceEdit, error) {
+	changes := make(map[uri.URI][]protocol.TextEdit)
+
+	for _, f := range params.Files {
+		for _, res := range s.resolver.Referrers(ctx, f.OldURI) {
+			newPath, ok := renamedIncludeArg(res, f.NewURI)
+			if !ok {
+				continue
+			}
+
+			changes[uri.URI(res.Owner)] = append(changes[uri.URI(res.Owner)], protocol.TextEdit{
+				Range:   s.targetRange(res.Owner, res.Inc.Range),
+				NewText: newPath,
+			})
+		}
+	}
+
+	var edits int
+	for _, list := range changes {
+		edits += len(list)
+	}
+
+	slog.DebugContext(ctx, "will_rename_files", "count", len(params.Files), "edits", edits)
+
+	if len(changes) == 0 {
+		return &protocol.WorkspaceEdit{}, nil
+	}
+
+	return &protocol.WorkspaceEdit{Changes: changes}, nil
+}
+
+// renamedIncludeArg computes the path argument text a referring file's
+// directive must carry after the rename: relative from the owner's
+// directory to the new location, forward slashes (include paths are
+// URI-ish spellings the resolver joins onto directories, not Windows
+// paths). Quoted arguments keep their quotes: the parser stores the
+// quoted span in the range while Path is unquoted, so the byte-column
+// width tells the two forms apart. ok=false when no relative path exists
+// (a cross-drive rename) or either URI is not a file URI.
+func renamedIncludeArg(res include.ResolvedInclude, newTargetURI string) (string, bool) {
+	owner, target := uri.URI(res.Owner), uri.URI(newTargetURI)
+	if !owner.IsFile() || !target.IsFile() {
+		return "", false
+	}
+
+	rel, err := filepath.Rel(filepath.Dir(owner.FsPath()), target.FsPath())
+	if err != nil {
+		return "", false
+	}
+
+	if res.Inc.Range.End.Column-res.Inc.Range.Start.Column == uint32(len(res.Inc.Path))+2 {
+		return "\"" + filepath.ToSlash(rel) + "\"", true
+	}
+
+	return filepath.ToSlash(rel), true
+}
+
 // siteText extracts the name text of a rename site from the document
 // text: the RMS parser (and its inline blocks) counts offsets after CRLF
 // normalization, XS files on the raw bytes — the site is sliced against
@@ -1135,8 +1257,11 @@ func (s *Server) CodeAction(
 		switch fmt.Sprint(diag.Code) {
 		case analysis.CodeUnknownCommand, analysis.CodeUnknownAttribute, analysis.CodeUndefinedSymbol:
 			out = appendAction(out, s.renameAction(params, diag))
+			out = appendAction(out, s.addIncludeAction(ctx, params, diag))
 		case analysis.CodeDeprecatedEffectPercent:
 			out = appendAction(out, s.replaceEffectPercentAction(params, diag))
+		case analysis.CodeMissingSection:
+			out = appendAction(out, s.insertSectionAction(params, diag))
 		case codeMissingInclude:
 			out = appendAction(out, s.createIncludeAction(params, diag))
 		}
@@ -1215,6 +1340,119 @@ func (s *Server) replaceWordAction(
 		Diagnostics: []protocol.Diagnostic{*diag},
 		Edit: &protocol.WorkspaceEdit{Changes: map[uri.URI][]protocol.TextEdit{
 			params.TextDocument.URI: {{Range: s.toProtocolRange(text, word), NewText: newText}},
+		}},
+	}
+}
+
+// addIncludeAction builds the auto-include fix for an undefined XS
+// symbol: when exactly one available-but-not-included file declares
+// the name, the fix inserts the include line at the document start.
+// Zero or several candidate files stay silent — a wrong guess would
+// add a broken include. Non-undefined-symbol codes and non-file
+// documents answer nil.
+func (s *Server) addIncludeAction(
+	ctx context.Context,
+	params *protocol.CodeActionParams,
+	diag *protocol.Diagnostic,
+) *protocol.CodeAction {
+	if fmt.Sprint(diag.Code) != analysis.CodeUndefinedSymbol {
+		return nil
+	}
+
+	name := undefinedSymbolName(messageText(diag.Message))
+	if name == "" {
+		return nil
+	}
+
+	docURI := string(params.TextDocument.URI)
+
+	var owners []string
+
+	for _, entry := range s.resolver.Available(ctx, docURI) {
+		for _, d := range entry.Decls {
+			if d.Name == name {
+				owners = append(owners, entry.Path)
+
+				break
+			}
+		}
+	}
+
+	if len(owners) != 1 {
+		return nil
+	}
+
+	directive := "#include"
+	if strings.HasSuffix(docURI, ".rms") {
+		directive = "#includeXS"
+	}
+
+	kind := protocol.CodeActionKindQuickFix
+
+	return &protocol.CodeAction{
+		Title:       "Add include '" + owners[0] + "'",
+		Kind:        &kind,
+		Diagnostics: []protocol.Diagnostic{*diag},
+		Edit: &protocol.WorkspaceEdit{Changes: map[uri.URI][]protocol.TextEdit{
+			params.TextDocument.URI: {includeInsertEdit(directive, owners[0])},
+		}},
+	}
+}
+
+// undefinedSymbolName extracts the symbol name from the undefined-
+// symbol message (`undefined symbol "x"…`); other message shapes
+// answer "".
+func undefinedSymbolName(message string) string {
+	rest, ok := strings.CutPrefix(message, "undefined symbol \"")
+	if !ok {
+		return ""
+	}
+
+	end := strings.Index(rest, "\"")
+	if end <= 0 {
+		return ""
+	}
+
+	return rest[:end]
+}
+
+// insertSectionAction builds the missing-section fix: a zero-width
+// insert of the section skeleton before the first section header (the
+// diagnostic range start — the analyzer points it there). The terrain
+// skeleton carries a base_terrain line so the fixed map generates
+// something valid right away.
+func (s *Server) insertSectionAction(
+	params *protocol.CodeActionParams,
+	diag *protocol.Diagnostic,
+) *protocol.CodeAction {
+	message := messageText(diag.Message)
+	name, ok := strings.CutPrefix(message, "missing required section <")
+	if !ok {
+		return nil
+	}
+	end := strings.Index(name, ">")
+	if end <= 0 {
+		return nil
+	}
+	name = name[:end]
+
+	skeleton := "<" + name + ">\n"
+	if name == "TERRAIN_GENERATION" {
+		skeleton += "base_terrain GRASS\n"
+	}
+	skeleton += "\n"
+
+	kind := protocol.CodeActionKindQuickFix
+
+	return &protocol.CodeAction{
+		Title:       "Insert <" + name + "> section",
+		Kind:        &kind,
+		Diagnostics: []protocol.Diagnostic{*diag},
+		Edit: &protocol.WorkspaceEdit{Changes: map[uri.URI][]protocol.TextEdit{
+			params.TextDocument.URI: {{
+				Range:   protocol.Range{Start: diag.Range.Start, End: diag.Range.Start},
+				NewText: skeleton,
+			}},
 		}},
 	}
 }
@@ -1727,11 +1965,11 @@ func lineRange(text string, line uint32) common.Range {
 
 // Formatting answers textDocument/formatting with a single full-document
 // edit whose text is the format cell's canonical print. Inputs the
-// printer refuses (error-severity parse diagnostics) and non-RMS
-// documents answer an empty slice — the refusal is already published as
-// diagnostics, so no JSON-RPC error is warranted. The range end sits
-// just past the last byte: ending on the last meaningful line would
-// leave a trailing newline outside the edit and double it once the
+// printer refuses (error-severity parse diagnostics) and documents in
+// other languages answer an empty slice — the refusal is already
+// published as diagnostics, so no JSON-RPC error is warranted. The range
+// end sits just past the last byte: ending on the last meaningful line
+// would leave a trailing newline outside the edit and double it once the
 // client applies the replacement.
 func (s *Server) Formatting(
 	ctx context.Context,
@@ -1739,22 +1977,29 @@ func (s *Server) Formatting(
 ) ([]protocol.TextEdit, error) {
 	text, name, _ := s.openDocument(params.TextDocument.URI) // editor state, not the FS
 
-	if !strings.HasSuffix(name, ".rms") {
-		return []protocol.TextEdit{}, nil
-	}
-
 	// TrimTrailingWhitespace and friends stay unread: the printer owns
 	// the whole canonical shape, indentation is the only per-request
 	// knob left to the client.
 	opts := format.Options{TabSize: int(params.Options.TabSize), IndentTabs: !params.Options.InsertSpaces}
 
-	formatted, err := format.RMS(text, opts)
+	var printer func(string, format.Options) (string, error)
+
+	switch {
+	case strings.HasSuffix(name, ".rms"):
+		printer = format.RMS
+	case strings.HasSuffix(name, ".xs"):
+		printer = format.XS
+	default:
+		return []protocol.TextEdit{}, nil
+	}
+
+	formatted, err := printer(text, opts)
 	if errors.Is(err, format.ErrParseErrors) {
 		return []protocol.TextEdit{}, nil
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("format %s: %w", name, err) // defensive: format.RMS returns no other errors today
+		return nil, fmt.Errorf("format %s: %w", name, err) // defensive: the printers return no other errors today
 	}
 
 	slog.DebugContext(ctx, "formatting", "uri", name, "bytes", len(formatted))

@@ -313,3 +313,110 @@ func TestServerRename_IntegrationStdio(t *testing.T) {
 
 	assert.Equal(t, "renamedFn", mainEdits[0].NewText)
 }
+
+// TestInitialize_AdvertisesWillRenameFiles pins the capability surface:
+// the workspace fileOperations block declares willRename so clients may
+// send workspace/willRenameFiles.
+func TestInitialize_AdvertisesWillRenameFiles(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	res, err := s.Initialize(context.Background(), &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	require.NotNil(t, res.Capabilities.Workspace, "workspace capabilities must be advertised")
+	require.NotNil(t, res.Capabilities.Workspace.FileOperations, "fileOperations must be advertised")
+}
+
+// TestServerWillRenameFiles_UpdatesClosureIncludes pins the handler end
+// to end: renaming a file returns a WorkspaceEdit rewriting the path
+// arguments of every referring directive — in the open owner, in a
+// transitively reached unopened owner, for #include, #include_drs (the
+// archive id survives — the range covers the path argument only) and
+// #includeXS. A rename with no referrers yields an empty edit, not an
+// error.
+func TestServerWillRenameFiles_UpdatesClosureIncludes(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	mainSrc := "#include \"part.rms\"\n#include_drs \"shared.rms\" 54000\n#includeXS \"shared.xs\"\n#include \"mid.rms\"\n#include_drs bare.rms 54000\n"
+	midSrc := "<PLAYER_SETUP>\n#include \"shared.rms\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "part.rms"), []byte("<PLAYER_SETUP>\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.rms"), []byte("<PLAYER_SETUP>\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.xs"), []byte("void f() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "bare.rms"), []byte("<PLAYER_SETUP>\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "mid.rms"), []byte(midSrc), 0o644))
+
+	mainURI := uri.File(filepath.Join(dir, "main.rms"))
+	s.docs.Put(string(mainURI), mainSrc, 1)
+
+	edit, err := s.WillRenameFiles(context.Background(), &protocol.RenameFilesParams{
+		Files: []protocol.FileRename{
+			{OldURI: uri.File(filepath.Join(dir, "part.rms")).String(), NewURI: uri.File(filepath.Join(dir, "renamed_part.rms")).String()},
+			{OldURI: uri.File(filepath.Join(dir, "shared.rms")).String(), NewURI: uri.File(filepath.Join(dir, "renamed_shared.rms")).String()},
+			{OldURI: uri.File(filepath.Join(dir, "shared.xs")).String(), NewURI: uri.File(filepath.Join(dir, "renamed_shared.xs")).String()},
+			{OldURI: uri.File(filepath.Join(dir, "bare.rms")).String(), NewURI: uri.File(filepath.Join(dir, "renamed_bare.rms")).String()},
+			{OldURI: uri.File(filepath.Join(dir, "unreferenced.rms")).String(), NewURI: uri.File(filepath.Join(dir, "renamed_unreferenced.rms")).String()},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, edit)
+	assert.Empty(t, edit.DocumentChanges, "plain WorkspaceEdit{Changes}")
+
+	changes := edit.Changes
+	require.Len(t, changes, 2, "main.rms (open) and mid.rms (unopened, reached via main's closure)")
+
+	mainEdits := changes[mainURI]
+	require.Len(t, mainEdits, 4, "part.rms, shared.rms, shared.xs and bare.rms directives; mid.rms itself is not renamed")
+	assert.Equal(t, "\"renamed_part.rms\"", mainEdits[0].NewText, "quoted arguments keep their quotes")
+	assert.Equal(t, uint32(0), mainEdits[0].Range.Start.Line)
+	assert.Equal(t, "\"renamed_shared.rms\"", mainEdits[1].NewText, "#include_drs quoted path argument")
+	assert.Equal(t, "\"renamed_shared.xs\"", mainEdits[2].NewText, "#includeXS quoted path argument")
+	assert.Equal(t, "renamed_bare.rms", mainEdits[3].NewText, "bare arguments stay bare")
+	assert.Equal(t, uint32(4), mainEdits[3].Range.Start.Line)
+
+	// The unopened mid.rms gets its edit with byte columns (its text is
+	// not at hand): "#include \"shared.rms\"" on line 1.
+	midEdits := changes[uri.File(filepath.Join(dir, "mid.rms"))]
+	require.Len(t, midEdits, 1)
+	assert.Equal(t, "\"renamed_shared.rms\"", midEdits[0].NewText)
+	assert.Equal(t, protocol.Range{
+		Start: protocol.Position{Line: 1, Character: 9},
+		End:   protocol.Position{Line: 1, Character: 21},
+	}, midEdits[0].Range)
+
+	// Same-file rename keeps the argument spelling stable: nothing to do.
+	edit, err = s.WillRenameFiles(context.Background(), &protocol.RenameFilesParams{
+		Files: []protocol.FileRename{{
+			OldURI: uri.File(filepath.Join(dir, "part.rms")).String(),
+			NewURI: uri.File(filepath.Join(dir, "part.rms")).String(),
+		}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, edit)
+	assert.Len(t, edit.Changes[mainURI], 1, "the edit still rewrites the argument (same spelling)")
+}
+
+// TestServerWillRenameFiles_NoReferrers pins the silence convention: a
+// never-included file (or a folder rename) answers an empty edit, not an
+// error — the rename proceeds without changes.
+func TestServerWillRenameFiles_NoReferrers(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	s.docs.Put("file:///t.rms", "<PLAYER_SETUP>\n", 1)
+
+	edit, err := s.WillRenameFiles(context.Background(), &protocol.RenameFilesParams{
+		Files: []protocol.FileRename{{
+			OldURI: "file:///t.rms",
+			NewURI: "file:///t2.rms",
+		}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, edit)
+	assert.Empty(t, edit.Changes)
+}

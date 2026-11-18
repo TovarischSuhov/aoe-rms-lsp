@@ -1,0 +1,2 @@
+// c49-lead
+void f(){while{x}{y}}

@@ -2,9 +2,14 @@ package server
 
 import (
 	"aoe2-lsp/internal/analysis"
+	"aoe2-lsp/internal/complete"
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
@@ -179,6 +184,36 @@ func TestServerCodeAction_CreateIncludeFix(t *testing.T) {
 	require.NotNil(t, create.Options.IgnoreIfExists)
 }
 
+// TestServerCodeAction_MissingSectionFix pins the map-structure
+// quickfix: the section skeleton inserts zero-width before the first
+// section header (the diagnostic points there).
+func TestServerCodeAction_MissingSectionFix(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	s.docs.Put("file:///t.rms", "<PLAYER_SETUP>\nrandom_placement\n<LAND_GENERATION>\nbase_terrain GRASS\n", 1)
+
+	actions := codeActionAt(t, s, "file:///t.rms", protocol.Diagnostic{
+		Range: protocol.Range{Start: protocol.Position{Line: 0, Character: 0}},
+		Code:  protocol.String(analysis.CodeMissingSection),
+		Message: protocol.String(
+			"missing required section <TERRAIN_GENERATION>; without it the map generates no terrain"),
+	})
+
+	require.Len(t, actions, 1)
+
+	action := actions[0].(*protocol.CodeAction)
+	require.Equal(t, "Insert <TERRAIN_GENERATION> section", action.Title)
+
+	edits := action.Edit.Changes["file:///t.rms"]
+	require.Len(t, edits, 1)
+	require.Equal(t, "<TERRAIN_GENERATION>\nbase_terrain GRASS\n\n", edits[0].NewText)
+	require.Equal(t, uint32(0), edits[0].Range.Start.Line)
+	require.Equal(t, uint32(0), edits[0].Range.Start.Character)
+	require.Equal(t, edits[0].Range.Start, edits[0].Range.End, "zero-width insert")
+}
+
 // TestServerCodeAction_Filters pins the silence shape: a kind filter
 // without quickfix, diagnostics without a suggestion and foreign codes
 // produce no actions.
@@ -219,4 +254,93 @@ func TestServerCodeAction_Filters(t *testing.T) {
 		Message: protocol.String(`command "creat_object" takes at most 0 argument(s), got 1`),
 	})
 	require.Empty(t, actions)
+}
+
+// TestServerCodeAction_AddIncludeFix pins the auto-include quickfix: an
+// undefined symbol declared by exactly one available file gains an
+// Add-include action; two owners and non-matching codes stay silent.
+func TestServerCodeAction_AddIncludeFix(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	mainURI := uri.File(dir + "/main.xs")
+
+	require.NoError(t, os.WriteFile(filepath.FromSlash(dir+"/lib.xs"),
+		[]byte("int uniqueName = 1;\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.FromSlash(dir+"/other.xs"),
+		[]byte("int twinName = 1;\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.FromSlash(dir+"/second.xs"),
+		[]byte("int twinName = 2;\n"), 0o644))
+
+	s := newNavigationServer(t)
+	s.docs.Put(mainURI.String(), "void main() {\n\ttwinName = 1;\n}\n", 1)
+
+	t.Run("single owner inserts the include", func(t *testing.T) {
+		t.Parallel()
+
+		actions := codeActionAt(t, s, mainURI, protocol.Diagnostic{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: 1, Character: 1},
+				End:   protocol.Position{Line: 1, Character: 9},
+			},
+			Code:    protocol.String(analysis.CodeUndefinedSymbol),
+			Message: protocol.String(`undefined symbol "uniqueName"; did you mean "uniqueName"?`),
+		})
+
+		var add *protocol.CodeAction
+
+		for _, a := range actions {
+			if ca, ok := a.(*protocol.CodeAction); ok && strings.HasPrefix(ca.Title, "Add include '") {
+				add = ca
+			}
+		}
+
+		require.NotNil(t, add, "the unique-owner quickfix fires")
+		require.Equal(t, "Add include 'lib.xs'", add.Title)
+
+		edits := add.Edit.Changes[uri.URI(mainURI.String())]
+		require.Len(t, edits, 1)
+		require.Equal(t, "#include \"lib.xs\"\n", edits[0].NewText)
+		require.Equal(t, uint32(0), edits[0].Range.Start.Line)
+		require.Equal(t, uint32(0), edits[0].Range.Start.Character)
+	})
+
+	t.Run("two owners stay silent", func(t *testing.T) {
+		t.Parallel()
+
+		actions := codeActionAt(t, s, mainURI, protocol.Diagnostic{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: 1, Character: 1},
+				End:   protocol.Position{Line: 1, Character: 9},
+			},
+			Code:    protocol.String(analysis.CodeUndefinedSymbol),
+			Message: protocol.String(`undefined symbol "twinName"`),
+		})
+
+		for _, a := range actions {
+			ca, ok := a.(*protocol.CodeAction)
+			require.True(t, ok)
+			assert.NotContains(t, ca.Title, "twinName", "ambiguous candidates get no include fix")
+		}
+	})
+}
+
+// TestToCompletionItems_AutoInclude pins the auto-include completion
+// item shape: the include path rides as AdditionalTextEdits at the
+// document start.
+func TestToCompletionItems_AutoInclude(t *testing.T) {
+	t.Parallel()
+
+	items := toCompletionItems([]complete.Candidate{
+		{Label: "exportedFn", Kind: complete.KindFunction, Detail: "int exportedFn() · auto-include lib.xs", Sort: "1exportedFn", Include: "lib.xs"},
+	}, "#include")
+
+	require.Len(t, items, 1)
+	require.Len(t, items[0].AdditionalTextEdits, 1)
+
+	edit := items[0].AdditionalTextEdits[0]
+	require.Equal(t, "#include \"lib.xs\"\n", edit.NewText)
+	require.Equal(t, uint32(0), edit.Range.Start.Line)
+	require.Equal(t, uint32(0), edit.Range.Start.Character)
+	require.Equal(t, edit.Range.Start, edit.Range.End, "zero-width insert")
 }

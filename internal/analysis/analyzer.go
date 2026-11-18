@@ -41,6 +41,33 @@ const (
 	CodeUndefinedSymbol = "undefined-symbol"
 	// CodeBadArity marks a call with a wrong number of arguments.
 	CodeBadArity = "bad-arity"
+	// CodeDuplicateDeclaration marks a name declared twice in the same
+	// scope: repeated top-level declarations and same-block locals.
+	CodeDuplicateDeclaration = "duplicate-declaration"
+	// CodeMissingSection marks a map-shaped RMS file without a section
+	// the game needs (only TERRAIN_GENERATION qualifies — the corpus
+	// shows every other "required" candidate is a legitimate skip).
+	CodeMissingSection = "missing-section"
+	// CodeEmptySection marks a section header with no statements before
+	// the next header.
+	CodeEmptySection = "empty-section"
+	// CodeMisplacedAttribute marks a create_* attribute written as a
+	// standalone statement (terrain_type / base_terrain in curated data):
+	// the engine silently ignores it.
+	CodeMisplacedAttribute = "misplaced-attribute"
+	// CodeCreateLandPositional marks create_land with positional
+	// arguments: with one, the land is not created at all (in-game
+	// verified).
+	CodeCreateLandPositional = "create-land-positional"
+	// CodeReturnParens marks a return value not enclosed in parentheses:
+	// the game's XS parser rejects the file (Error 0324/0141, in-game
+	// verified; ugc-guide xs/programmer.md: "the return value must always
+	// be inside parantheses").
+	CodeReturnParens = "return-parens"
+	// CodeUnusedDeclaration marks a declaration with no references:
+	// locals never mentioned again and top-level functions unreachable
+	// from the file's engine entry points (rules and events).
+	CodeUnusedDeclaration = "unused-declaration"
 )
 
 // xsBuiltins are language-level identifiers no knowledge base covers.
@@ -81,7 +108,93 @@ func (a *Analyzer) AnalyzeRms(file rms.RmsFile) []common.Diagnostic {
 		diags = a.walkStmts(sec.Statements, diags)
 	}
 
+	diags = checkSections(file, diags)
+
 	sortDiags(diags)
+
+	return diags
+}
+
+// minSectionsForMissingCheck separates map-shaped files from include
+// fragments: the corpus contains fragments with up to three headers
+// (included snippet pieces) while real maps carry at least four. Below
+// the threshold the structural checks stay silent.
+const minSectionsForMissingCheck = 4
+
+// requiredSection is the only section a playable map cannot go
+// without. Everything else the formulation called "required" turned
+// out to be a legitimate skip in the corpus (PLAYER_SETUP lives in 29
+// maps' fragments, re-opened sections are second generation passes,
+// PLAYER_SETUP-without-create_player is a published-map pattern).
+// Section names parse lowercased (the kb keys them that way); the
+// display spelling stays uppercase.
+const requiredSection = "terrain_generation"
+
+// requiredSectionDisplay is the user-facing spelling of requiredSection.
+const requiredSectionDisplay = "TERRAIN_GENERATION"
+
+// checkSections runs the structural lints the per-command semantics
+// cannot see: a map-shaped file without the required section and
+// section headers with nothing inside. The missing-section diagnostic
+// points at the first section header — the natural insertion point
+// for the insert-section quickfix.
+func checkSections(file rms.RmsFile, diags []common.Diagnostic) []common.Diagnostic {
+	// the parser buckets statements before the first header into an
+	// implicit "global" section — not a real header
+	headers := 0
+
+	for i := range file.Sections {
+		if file.Sections[i].Name != "global" {
+			headers++
+		}
+	}
+
+	if headers >= minSectionsForMissingCheck {
+		first := file.Sections[0]
+		if first.Name == "global" && len(file.Sections) > 1 {
+			first = file.Sections[1]
+		}
+
+		hasRequired := false
+
+		for i := range file.Sections {
+			if file.Sections[i].Name == requiredSection {
+				hasRequired = true
+
+				break
+			}
+		}
+
+		if !hasRequired {
+			diags = append(diags, common.Diagnostic{
+				Range:    first.Range,
+				Severity: common.SeverityWarning,
+				Message: fmt.Sprintf("missing required section <%s>; without it the map generates no terrain",
+					requiredSectionDisplay),
+				Code: CodeMissingSection,
+			})
+		}
+	}
+
+	for i := range file.Sections {
+		sec := &file.Sections[i]
+		if sec.Name == "global" || len(sec.Statements) > 0 {
+			continue
+		}
+
+		diags = append(diags, common.Diagnostic{
+			Range: common.Range{
+				Start: sec.Range.Start,
+				End: common.Pos{
+					Line:   sec.Range.Start.Line,
+					Column: sec.Range.Start.Column + uint32(len(sec.Name)+2),
+				},
+			},
+			Severity: common.SeverityHint,
+			Message:  fmt.Sprintf("section %q is empty and does nothing", sec.Name),
+			Code:     CodeEmptySection,
+		})
+	}
 
 	return diags
 }
@@ -103,6 +216,49 @@ func (a *Analyzer) walkStmts(stmts []rms.Statement, diags []common.Diagnostic) [
 			// positional args of the block statement itself.
 			diags = a.checkBlockStmt(stmt, diags)
 		}
+
+		diags = a.checkStatementNuances(stmt, diags)
+	}
+
+	return diags
+}
+
+// checkStatementNuances runs the curated statement-level nuances on
+// every statement (commands and structural blocks alike):
+//
+//   - terrain_type / base_terrain written as standalone commands are
+//     attributes of create_* blocks, not commands; the engine silently
+//     ignores them (in-game verified 2026-11-18, REDv1/v2 pattern)
+//   - create_land with positional arguments breaks land creation — the
+//     map generates without the land (in-game verified 2026-11-18).
+//     Only create_land: create_elevation legitimately takes a number
+//     (guide:293).
+func (a *Analyzer) checkStatementNuances(stmt *rms.Statement, diags []common.Diagnostic) []common.Diagnostic {
+	if stmt.Name == "" {
+		return diags
+	}
+
+	if a.store.NoopStatement(stmt.Name) {
+		// unknown names were already replaced by the misplaced hint in
+		// checkCommand; a kb-known command (base_terrain parses as one)
+		// still needs the nuance on top
+		if _, known := a.store.Command(stmt.Name); known {
+			diags = append(diags, common.Diagnostic{
+				Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
+				Severity: common.SeverityHint,
+				Message:  fmt.Sprintf("%q is an attribute of create_* blocks, not a standalone command; the game ignores it — move it inside a create_terrain block", stmt.Name),
+				Code:     CodeMisplacedAttribute,
+			})
+		}
+	}
+
+	if stmt.Name == "create_land" && len(stmt.Args) > 0 {
+		diags = append(diags, common.Diagnostic{
+			Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
+			Severity: common.SeverityHint,
+			Message:  "create_land does not take positional arguments; with one, the land is not created at all — move the configuration into the braces (land_position, base_size, …)",
+			Code:     CodeCreateLandPositional,
+		})
 	}
 
 	return diags
@@ -198,6 +354,20 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 			})
 		}
 
+		// a known no-op statement (terrain_type, base_terrain — curated
+		// in-game data): replaces the unknown-command error with the
+		// precise misplaced-attribute hint (the nuance ladder)
+		if a.store.NoopStatement(stmt.Name) {
+			diags = append(diags, common.Diagnostic{
+				Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
+				Severity: common.SeverityHint,
+				Message:  fmt.Sprintf("%q is an attribute of create_* blocks, not a standalone command; the game ignores it — move it inside a create_terrain block", stmt.Name),
+				Code:     CodeMisplacedAttribute,
+			})
+
+			return diags
+		}
+
 		diags = append(diags, common.Diagnostic{
 			Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
 			Severity: common.SeverityError,
@@ -272,6 +442,8 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 // behavior. The result is sorted by position.
 func (a *Analyzer) AnalyzeXs(file xs.XsFile, externals []xs.Decl) []common.Diagnostic {
 	declared := map[string]bool{}
+	diags := checkDuplicateDecls(file)
+	diags = checkUnusedDecls(file, diags)
 
 	for i := range file.Decls {
 		decl := &file.Decls[i]
@@ -288,8 +460,6 @@ func (a *Analyzer) AnalyzeXs(file xs.XsFile, externals []xs.Decl) []common.Diagn
 
 	env := NewTypeEnv(file)
 	seedExternals(env, declared, externals)
-
-	var diags []common.Diagnostic
 
 	for i := range file.Decls {
 		decl := &file.Decls[i]
@@ -340,6 +510,333 @@ func collectLocals(stmts []xs.Stmt, declared map[string]bool) {
 	}
 }
 
+// checkDuplicateDecls reports same-scope redeclarations: repeated
+// top-level declarations and locals declared twice in one block.
+// Nested scopes shadow legally (C-like semantics) and stay silent —
+// the check is deliberately conservative against false positives.
+func checkDuplicateDecls(file xs.XsFile) []common.Diagnostic {
+	var diags []common.Diagnostic
+
+	top := map[string]bool{}
+	for i := range file.Decls {
+		decl := &file.Decls[i]
+
+		// include is a file path, not a symbol; unnamed rules cannot
+		// collide
+		if decl.Kind == xs.DeclInclude || decl.Name == "" {
+			continue
+		}
+
+		if top[decl.Name] {
+			diags = append(diags, common.Diagnostic{
+				Range:    decl.Range,
+				Severity: common.SeverityWarning,
+				Message: fmt.Sprintf("duplicate declaration of %q; the earlier declaration stays in effect",
+					decl.Name),
+				Code: CodeDuplicateDeclaration,
+			})
+		}
+		top[decl.Name] = true
+
+		diags = dupBlock(decl.Body, diags)
+	}
+
+	return diags
+}
+
+// dupBlock walks one block scope: repeated declarators are duplicates,
+// each nested construct opens its own scope.
+func dupBlock(stmts []xs.Stmt, diags []common.Diagnostic) []common.Diagnostic {
+	return dupWalk(stmts, map[string]bool{}, diags)
+}
+
+// dupWalk checks the statements of one scope; scope maps names already
+// declared at this level.
+func dupWalk(stmts []xs.Stmt, scope map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
+	for i := range stmts {
+		stmt := &stmts[i]
+
+		switch stmt.Kind {
+		case xs.StmtDecl:
+			// declarations land in the current scope
+			diags = dupDeclarators(stmt.Exprs, scope, diags)
+			continue
+		case xs.StmtIf:
+			// Body[0] = then, Body[1] = else: independent scopes
+			for j := range stmt.Body {
+				diags = dupBlock(stmt.Body[j:j+1], diags)
+			}
+		case xs.StmtFor:
+			// the init section owns the loop's scope; the body nests
+			// inside it, so sibling loops may redeclare freely
+			loop := map[string]bool{}
+			diags = dupDeclarators(stmt.Exprs, loop, diags)
+			diags = dupWalk(stmt.Body, loop, diags)
+		case xs.StmtSwitch:
+			// each case body is its own scope (conservative: shared-scope
+			// case declarations stay unflagged)
+			for j := range stmt.Body {
+				if stmt.Body[j].Kind == xs.StmtCase {
+					diags = dupBlock(stmt.Body[j].Body, diags)
+				}
+			}
+		case xs.StmtCondition, xs.StmtAction:
+			// permissive rule blocks: independent scopes
+			diags = dupBlock(stmt.Body, diags)
+		default:
+			// block wrappers and bare statements: child scope for the
+			// body, loop/while/do bodies included
+			diags = dupBlock(stmt.Body, diags)
+		}
+	}
+
+	return diags
+}
+
+// dupDeclarators checks the names one declaration introduces (bare
+// declarators and assignment targets) against the current scope.
+func dupDeclarators(exprs []xs.Expr, scope map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
+	for _, e := range exprs {
+		name := ""
+		switch {
+		case e.Kind == xs.ExprIdent:
+			name = e.Value // bare declarator: int x;
+		case e.Kind == xs.ExprBinary && e.Value == "=" && len(e.Children) > 0 &&
+			e.Children[0].Kind == xs.ExprIdent:
+			name = e.Children[0].Value
+		}
+		if name == "" {
+			continue
+		}
+
+		if scope[name] {
+			diags = append(diags, common.Diagnostic{
+				Range:    e.Range,
+				Severity: common.SeverityWarning,
+				Message: fmt.Sprintf("duplicate declaration of %q; the earlier declaration stays in effect",
+					name),
+				Code: CodeDuplicateDeclaration,
+			})
+		}
+		scope[name] = true
+	}
+
+	return diags
+}
+
+// checkUnusedDecls reports declarations with no references. The
+// entry-point model: rules and events are called by the engine and are
+// the roots of the reachability walk; a file with none of them is a
+// library whose top-level functions are exported through include
+// closures, so its top level stays unflagged (cross-file callers are
+// invisible at file level). Top-level variables are skipped too —
+// their initializers may carry load-time side effects. Locals need no
+// entry-point reasoning: an initializer with a call keeps the hint
+// quiet for the same side-effect reason.
+func checkUnusedDecls(file xs.XsFile, diags []common.Diagnostic) []common.Diagnostic {
+	functions := map[string]*xs.Decl{}
+	scriptShaped := false
+
+	for i := range file.Decls {
+		decl := &file.Decls[i]
+		if decl.Kind == xs.DeclFunction && decl.Name != "" {
+			functions[decl.Name] = decl
+		}
+		if decl.Kind == xs.DeclRule || decl.Kind == xs.DeclEvent {
+			scriptShaped = true
+		}
+	}
+
+	if scriptShaped {
+		// walk the transitive call graph from the engine entry points;
+		// names reachable from a root are used
+		used := map[string]bool{}
+		expanded := map[string]bool{}
+
+		for i := range file.Decls {
+			decl := &file.Decls[i]
+			if decl.Kind == xs.DeclRule || decl.Kind == xs.DeclEvent {
+				expandUses(decl.Body, functions, used, expanded)
+			}
+		}
+
+		for i := range file.Decls {
+			decl := &file.Decls[i]
+			if decl.Kind != xs.DeclFunction || decl.Name == "" {
+				continue
+			}
+			if !used[decl.Name] {
+				diags = append(diags, common.Diagnostic{
+					Range:    decl.Range,
+					Severity: common.SeverityHint,
+					Message: fmt.Sprintf("function %q is never called from rules or events",
+						decl.Name),
+					Code: CodeUnusedDeclaration,
+				})
+			}
+		}
+	}
+
+	// locals inside executable bodies only: top-level `local` statements
+	// are file globals the prelude exports by the dozen, and top-level
+	// variables carry load-time side effects
+	for i := range file.Decls {
+		decl := &file.Decls[i]
+		if decl.Kind != xs.DeclFunction && decl.Kind != xs.DeclRule && decl.Kind != xs.DeclEvent {
+			continue
+		}
+
+		// name-based per enclosing declaration; the declaration itself
+		// does not count as a use, everything else does (shadowing
+		// collisions are duplicate-declaration's domain instead)
+		used := collectIdents(decl.Body, true)
+
+		diags = unusedLocals(decl.Body, used, diags)
+	}
+
+	return diags
+}
+
+// expandUses adds every name mentioned in body to used and recurses
+// into the bodies of the top-level functions it calls.
+func expandUses(body []xs.Stmt, functions map[string]*xs.Decl, used map[string]bool, expanded map[string]bool) {
+	for ident := range collectIdents(body, false) {
+		used[ident] = true
+
+		if _, isLocalFn := functions[ident]; isLocalFn && !expanded[ident] {
+			expanded[ident] = true
+			expandUses(functions[ident].Body, functions, used, expanded)
+		}
+	}
+}
+
+// collectIdents gathers every identifier mentioned in a statement tree:
+// idents, call callees and assignment targets alike. With skipDecls the
+// declared names are excluded — the declaration target of a declarator
+// does not count as a use of itself — while initializers still do.
+func collectIdents(stmts []xs.Stmt, skipDecls bool) map[string]bool {
+	used := map[string]bool{}
+
+	var walkExpr func(e xs.Expr)
+	walkExpr = func(e xs.Expr) {
+		if e.Kind == xs.ExprIdent {
+			used[e.Value] = true
+		}
+		if e.Kind == xs.ExprCall {
+			used[e.Callee] = true
+		}
+		for _, child := range e.Children {
+			walkExpr(child)
+		}
+	}
+
+	// walkDeclarator walks one declarator: a bare `int x;` has no
+	// mentions, `x = init` mentions everything except the target x
+	walkDeclarator := func(e xs.Expr) {
+		if e.Kind == xs.ExprBinary && e.Value == "=" {
+			for _, child := range e.Children[min(1, len(e.Children)-1):] {
+				walkExpr(child)
+			}
+		}
+	}
+
+	walkExprs := func(exprs []xs.Expr, inDecl bool) {
+		for j := range exprs {
+			if inDecl && skipDecls {
+				walkDeclarator(exprs[j])
+			} else {
+				walkExpr(exprs[j])
+			}
+		}
+	}
+
+	var walk func(stmts []xs.Stmt)
+	walk = func(stmts []xs.Stmt) {
+		for i := range stmts {
+			stmt := &stmts[i]
+
+			if stmt.Kind == xs.StmtFor && len(stmt.Exprs) > 0 && skipDecls {
+				// Exprs[0] is the init section (a declarator or an
+				// assignment to an outer variable, whose cond repeats it
+				// anyway), the rest reads variables normally
+				walkExprs(stmt.Exprs[:1], true)
+				walkExprs(stmt.Exprs[1:], false)
+			} else {
+				walkExprs(stmt.Exprs, stmt.Kind == xs.StmtDecl)
+			}
+
+			walk(stmt.Body)
+		}
+	}
+
+	walk(stmts)
+
+	return used
+}
+
+// unusedLocals reports locals whose name is never mentioned in decl's
+// body; an initializer with a call may carry side effects and stays
+// quiet.
+func unusedLocals(stmts []xs.Stmt, used map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
+	for i := range stmts {
+		stmt := &stmts[i]
+
+		if stmt.Kind == xs.StmtDecl || stmt.Kind == xs.StmtFor {
+			for _, e := range stmt.Exprs {
+				name := declaratorName(e)
+				if name == "" || used[name] {
+					continue
+				}
+				if initializerHasCall(e) {
+					continue
+				}
+
+				diags = append(diags, common.Diagnostic{
+					Range:    e.Range,
+					Severity: common.SeverityHint,
+					Message:  fmt.Sprintf("local %q is declared but never used", name),
+					Code:     CodeUnusedDeclaration,
+				})
+			}
+		}
+
+		diags = unusedLocals(stmt.Body, used, diags)
+	}
+
+	return diags
+}
+
+// declaratorName returns the declared name of one declarator
+// expression: a bare ident or an assignment target.
+func declaratorName(e xs.Expr) string {
+	switch {
+	case e.Kind == xs.ExprIdent:
+		return e.Value
+	case e.Kind == xs.ExprBinary && e.Value == "=" && len(e.Children) > 0 &&
+		e.Children[0].Kind == xs.ExprIdent:
+		return e.Children[0].Value
+	}
+
+	return ""
+}
+
+// initializerHasCall reports whether the declarator's initializer
+// subtree contains a call (a side effect the deletion hint must not
+// suggest removing).
+func initializerHasCall(e xs.Expr) bool {
+	if e.Kind == xs.ExprCall {
+		return true
+	}
+
+	for _, child := range e.Children {
+		if initializerHasCall(child) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // declareItems marks the names introduced by one declaration's expression
 // list: bare identifiers and assignment targets.
 func declareItems(exprs []xs.Expr, declared map[string]bool) {
@@ -369,8 +866,19 @@ func (a *Analyzer) walkStmtsXs(stmts []xs.Stmt, declared map[string]bool, env *T
 			env.declareLocals(stmt.Exprs)
 		}
 
-		if stmt.Kind == xs.StmtReturn && len(stmt.Exprs) > 0 && knownXsType(fnType) {
-			diags = a.checkReturnType(stmt.Exprs[0], env, fnType, diags)
+		if stmt.Kind == xs.StmtReturn && len(stmt.Exprs) > 0 {
+			if !stmt.Parens {
+				diags = append(diags, common.Diagnostic{
+					Range:    stmt.Exprs[0].Range,
+					Severity: common.SeverityError,
+					Message:  "return value must be enclosed in parentheses: return (value); the game rejects a bare return value",
+					Code:     CodeReturnParens,
+				})
+			}
+
+			if knownXsType(fnType) {
+				diags = a.checkReturnType(stmt.Exprs[0], env, fnType, diags)
+			}
 		}
 
 		for j := range stmt.Exprs {

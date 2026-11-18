@@ -44,7 +44,6 @@ func TestAnalyzeRms_Checks(t *testing.T) {
 		{
 			name: "valid commands and attributes are clean",
 			src: `<LAND_GENERATION>
-base_terrain GRASS
 create_land {
 	land_percent 20
 }`,
@@ -76,9 +75,9 @@ create_land {
 		{
 			name: "too many arguments",
 			src: `<LAND_GENERATION>
-base_terrain GRASS JUNK
+create_land 1 2 3
 `,
-			want: []string{CodeBadArgument},
+			want: []string{CodeCreateLandPositional, CodeBadArgument},
 		},
 		{
 			name: "effect_percent is deprecated",
@@ -140,7 +139,8 @@ land_percent rand_float(10, 20)
 			name: "directives are not commands",
 			src: `#const START_GOLD 800
 <LAND_GENERATION>
-base_terrain GRASS
+create_land {
+}
 `,
 			want: []string{},
 		},
@@ -204,6 +204,9 @@ func TestAnalyzeXs_Checks(t *testing.T) {
 void tick(int step) {
 	int local = step + counter;
 	int seed = xsGetMapSeed();
+	local = local + 1;
+	if (seed > 0) {
+	}
 }
 `,
 			want: []string{},
@@ -230,6 +233,8 @@ void tick(int step) {
 	vector v = vector(0, 0, 0);
 	v.x = pos.x;
 	bool done = true;
+	if (done) {
+	}
 }
 `,
 			want: []string{},
@@ -275,10 +280,29 @@ void f() {
 		{
 			name: "return type mismatch",
 			src: `int f() {
-	return 1.5;
+	return (1.5);
 }
 `,
 			want: []string{CodeBadType},
+		},
+		{
+			name: "bare return value is rejected by the game",
+			src: `float f() {
+	return 1.5;
+}
+`,
+			want: []string{CodeReturnParens},
+		},
+		{
+			name: "parenthesized return value is clean",
+			src: `float f() {
+	return (1.5);
+}
+void g() {
+	return;
+}
+`,
+			want: []string{},
 		},
 		{
 			name: "untyped locals stay silent",
@@ -307,6 +331,384 @@ void f() {
 			file, _ := xs.XsParse(tt.src, "test.xs")
 
 			assert.Equal(t, tt.want, codes(a.AnalyzeXs(file, nil)))
+		})
+	}
+}
+
+// TestAnalyzeXs_DuplicateDecls checks the same-scope redeclaration
+// warning: repeated top-level names and same-block locals fire;
+// nested scopes, branches and sibling loops shadow legally and stay
+// silent.
+func TestAnalyzeXs_DuplicateDecls(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "duplicate top-level functions",
+			src: `void f() {
+}
+
+void f() {
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "top-level name reused across kinds",
+			src: `int value = 1;
+
+void value() {
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "duplicate named rules",
+			src: `rule dup inactive min-interval 10 {
+}
+
+rule dup {
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "same-block local duplicate",
+			src: `void f() {
+	int x = 1;
+	int x = 2;
+	x = 3;
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "bare declarator repeated",
+			src: `void f() {
+	int x;
+	int x;
+	x = 1;
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "nested block shadowing is legal",
+			src: `void f(int c) {
+	int x = 1;
+	if (c) {
+		int x = 2;
+		c = x;
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "if and else branches are independent scopes",
+			src: `void f(int c) {
+	if (c) {
+		int x = 1;
+		if (x > 0) {
+		}
+	} else {
+		int x = 2;
+		if (x > 1) {
+		}
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "sibling three-section for loops redeclare freely",
+			src: `void f() {
+	for (int i = 0; i < 3; i++) {
+	}
+	for (int i = 0; i < 3; i++) {
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "sibling two-section for loops redeclare freely",
+			src: `void f() {
+	int total = 0;
+	for (total = 1; <= 3) {
+	}
+	for (total = 1; <= 3) {
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "switch cases are independent scopes",
+			src: `void f(int c) {
+	switch (c) {
+		case 1:
+			int x = 1;
+			if (x > 0) {
+			}
+		case 2:
+			int x = 2;
+			if (x > 1) {
+			}
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "unnamed rules do not collide",
+			src: `rule {
+}
+
+rule {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "include directives are skipped",
+			src: `#include "lib.xs"
+#include "lib.xs"
+`,
+			want: []string{},
+		},
+	}
+
+	a := newAnalyzer(t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			file, _ := xs.XsParse(tt.src, "test.xs")
+
+			assert.Equal(t, tt.want, codes(a.AnalyzeXs(file, nil)))
+		})
+	}
+}
+
+// TestAnalyzeXs_UnusedDecls checks the entry-point model: rules and
+// events are engine-called roots, functions unreachable from them in a
+// script-shaped file are flagged, library files (no rules) keep their
+// top level quiet, and unused locals fire unless their initializer
+// carries a call.
+func TestAnalyzeXs_UnusedDecls(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "unused local",
+			src: `void f() {
+	int stale = 1;
+}
+`,
+			want: []string{CodeUnusedDeclaration},
+		},
+		{
+			name: "call initializer keeps the local quiet",
+			src: `void f() {
+	int seed = xsGetMapSeed();
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "local used in a nested scope is used",
+			src: `void f(int c) {
+	int x = 1;
+	if (c) {
+		x = 2;
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "unused function in a script-shaped file",
+			src: `rule checker inactive {
+	condition {
+		xsGetMapSeed();
+	}
+}
+
+void orphan() {
+}
+`,
+			want: []string{CodeUnusedDeclaration},
+		},
+		{
+			name: "function called transitively from a rule is used",
+			src: `rule checker inactive {
+	condition {
+		entry();
+	}
+}
+
+void entry() {
+	helper();
+}
+
+void helper() {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "recursion without entry is unused",
+			src: `rule checker inactive {
+	condition {
+		xsGetMapSeed();
+	}
+}
+
+void loop() {
+	loop();
+}
+`,
+			want: []string{CodeUnusedDeclaration},
+		},
+		{
+			name: "library file keeps its top level quiet",
+			src: `void exported(vector key) {
+}
+
+void alsoExported() {
+	exported(vector(0, 0, 0));
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "rules and events are never flagged",
+			src: `rule quiet inactive {
+	condition {
+	}
+}
+
+event onTick {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "top-level variables stay quiet",
+			src: `int forgotten = 5;
+`,
+			want: []string{},
+		},
+	}
+
+	a := newAnalyzer(t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			file, _ := xs.XsParse(tt.src, "test.xs")
+
+			assert.Equal(t, tt.want, codes(a.AnalyzeXs(file, nil)))
+		})
+	}
+}
+
+// TestAnalyzeRms_Sections checks the structural section lints: the
+// required-section warning fires only on map-shaped files (four or
+// more headers — thinner files are include fragments) and the
+// empty-section hint fires on headers without statements.
+func TestAnalyzeRms_Sections(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "map-shaped without terrain fires missing-section",
+			src: `<PLAYER_SETUP>
+random_placement
+<LAND_GENERATION>
+create_land {
+}
+<ELEVATION_GENERATION>
+<CLIFF_GENERATION>
+<OBJECTS_GENERATION>
+`,
+			want: []string{
+				CodeMissingSection,
+				CodeEmptySection, CodeEmptySection, CodeEmptySection,
+			},
+		},
+		{
+			name: "fragment with three headers escapes missing-section",
+			src: `<PLAYER_SETUP>
+random_placement
+<LAND_GENERATION>
+create_land {
+}
+<OBJECTS_GENERATION>
+`,
+			want: []string{CodeEmptySection},
+		},
+		{
+			name: "terrain present means no missing-section",
+			src: `<PLAYER_SETUP>
+random_placement
+<LAND_GENERATION>
+create_land {
+}
+<ELEVATION_GENERATION>
+<CLIFF_GENERATION>
+<TERRAIN_GENERATION>
+create_terrain DIRT {
+}
+`,
+			want: []string{CodeEmptySection, CodeEmptySection},
+		},
+		{
+			name: "empty section in the middle",
+			src: `<PLAYER_SETUP>
+random_placement
+<LAND_GENERATION>
+create_land {
+}
+<ELEVATION_GENERATION>
+<TERRAIN_GENERATION>
+create_terrain DIRT {
+}
+<CLIFF_GENERATION>
+<OBJECTS_GENERATION>
+`,
+			want: []string{
+				CodeEmptySection,
+				CodeEmptySection, CodeEmptySection,
+			},
+		},
+		{
+			name: "bare headers only are empty sections, not missing",
+			src: `<LAND_GENERATION>
+<ELEVATION_GENERATION>
+`,
+			want: []string{CodeEmptySection, CodeEmptySection},
+		},
+	}
+
+	a := newAnalyzer(t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			file, _ := rms.Parse(tt.src, "test.rms")
+
+			assert.Equal(t, tt.want, codes(a.AnalyzeRms(file)))
 		})
 	}
 }
@@ -396,7 +798,7 @@ func TestAnalyzeXs_ForLoopVarNoUndefined(t *testing.T) {
 	t.Parallel()
 	// the review repro: the loop variable used in init/cond/step/body
 	// must not fire undefined-symbol (previously 4 false errors)
-	src := "void main() { for (int i = 0; i < 10; i++) { int j = i + 1; } }"
+	src := "void main() { for (int i = 0; i < 10; i++) { int j = i + 1; if (j > 0) { } } }"
 
 	file, _ := xs.XsParse(src, "for.xs")
 	a := newAnalyzer(t)
@@ -441,7 +843,7 @@ func TestAnalyzeXs_ConstQualifierCompatible(t *testing.T) {
 	// returned and assigned freely (xslibs: 490 false bad-type before)
 	src := `extern const int cOk = 0;
 int status() {
-	return cOk;
+	return (cOk);
 }
 void main() {
 	int last = status();
@@ -454,4 +856,119 @@ int _stringLast = 0;
 	a := newAnalyzer(t)
 
 	assert.Equal(t, []string{}, codes(a.AnalyzeXs(file, nil)))
+}
+
+// TestAnalyzeRms_StatementNuances pins the in-game verified statement
+// nuances (2026-11-18): bare terrain_type/base_terrain statements and
+// positional create_land args are flagged, attribute-position usages
+// and create_elevation N stay quiet, noop pairs fire probably-ignored.
+func TestAnalyzeRms_StatementNuances(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "bare terrain_type statement is misplaced",
+			src: `<TERRAIN_GENERATION>
+start_random
+	percent_chance 100
+		terrain_type WATER
+end_random
+`,
+			want: []string{CodeMisplacedAttribute},
+		},
+		{
+			name: "bare base_terrain statement is misplaced",
+			src: `<TERRAIN_GENERATION>
+start_random
+	percent_chance 100
+		base_terrain WATER
+end_random
+`,
+			want: []string{CodeMisplacedAttribute},
+		},
+		{
+			name: "terrain_type as an attribute stays quiet",
+			src: `<LAND_GENERATION>
+create_land {
+	terrain_type GRASS
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "positional create_land is flagged",
+			src: `<LAND_GENERATION>
+create_land 2 {
+}
+`,
+			want: []string{CodeCreateLandPositional, CodeBadArgument},
+		},
+		{
+			name: "create_land without args is quiet",
+			src: `<LAND_GENERATION>
+create_land {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "create_elevation keeps its positional number",
+			src: `<ELEVATION_GENERATION>
+create_elevation 3 {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "set_scale_by_size on create_object is probably ignored",
+			src: `<OBJECTS_GENERATION>
+create_object HOUSE {
+	set_scale_by_size
+}
+`,
+			want: []string{CodeProbablyIgnored},
+		},
+		{
+			name: "set_scale_by_groups on create_object is probably ignored",
+			src: `<OBJECTS_GENERATION>
+create_object HOUSE {
+	set_scale_by_groups
+}
+`,
+			want: []string{CodeProbablyIgnored},
+		},
+		{
+			name: "nested create_terrain is probably ignored",
+			src: `<TERRAIN_GENERATION>
+create_terrain DIRT {
+	base_terrain GRASS
+	create_terrain WATER
+}
+`,
+			want: []string{CodeProbablyIgnored},
+		},
+		{
+			name: "set_scale_by_size on create_terrain stays quiet",
+			src: `<TERRAIN_GENERATION>
+create_terrain DIRT {
+	set_scale_by_size
+}
+`,
+			want: []string{},
+		},
+	}
+
+	a := newAnalyzer(t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			file, _ := rms.Parse(tt.src, "test.rms")
+
+			assert.Equal(t, tt.want, codes(a.AnalyzeRms(file)))
+		})
+	}
 }

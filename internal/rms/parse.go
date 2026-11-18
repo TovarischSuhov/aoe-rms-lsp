@@ -87,7 +87,7 @@ func (p *parser) run(source string) {
 		p.starts[i] = p.starts[i-1] + len(p.lines[i-1]) + 1
 	}
 
-	visible, comments := blankComments(p.lines, p.starts)
+	visible, comments, unclosed, hasUnclosed := blankComments(p.lines, p.starts)
 	p.cur = &sect{name: "global", start: common.Pos{}}
 
 	for i := range p.lines {
@@ -143,7 +143,7 @@ func (p *parser) run(source string) {
 		p.statementLine(line, i)
 	}
 
-	p.file.Comments = mergeComments(comments, p.hashes)
+	p.file.Comments = mergeComments(comments, p.hashes, unclosed, hasUnclosed)
 
 	p.closeAll()
 }
@@ -965,14 +965,16 @@ func xsTerminator(trimmed string) bool {
 // replaced by spaces (preserving all offsets) together with the exact
 // comment extents: multi-line block comments span from "/*" past "*/"
 // across the recorded lines; line comments span to the end of their line.
-// The scan mirrors the walk's inline-XS regions: a region body is scanned
-// as its own unit, so block-comment state opened inside the region cannot
-// leak past its terminator (#93) — an unclosed /* there clamps to the
-// region's end and the terminator line stays visible to the walk.
-// Entering, a block opened on the directive line itself is clamped to
-// that line; a block opened before the directive blanks it (no region —
-// the walk's view too).
-func blankComments(lines []string, starts []int) ([]string, []common.Range) {
+// It also returns the extent of the block the scan ended inside — the
+// EOF-clipped unterminated tail; hasUnclosed is false when every block
+// found its terminator. The scan mirrors the walk's inline-XS regions: a
+// region body is scanned as its own unit, so block-comment state opened
+// inside the region cannot leak past its terminator (#93) — an unclosed /*
+// there clamps to the region's end and the terminator line stays visible
+// to the walk. Entering, a block opened on the directive line itself is
+// clamped to that line; a block opened before the directive blanks it
+// (no region — the walk's view too).
+func blankComments(lines []string, starts []int) ([]string, []common.Range, common.Range, bool) {
 	out := make([]string, len(lines))
 	copy(out, lines)
 
@@ -1052,12 +1054,17 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range) {
 		}
 	}
 
+	var unclosed common.Range
+	hasUnclosed := false
+
 	if inBlock {
 		last := len(out) - 1
-		comments = append(comments, common.Range{Start: blockStart, End: at(last, len(out[last]))})
+		unclosed = common.Range{Start: blockStart, End: at(last, len(out[last]))}
+		hasUnclosed = true
+		comments = append(comments, unclosed)
 	}
 
-	return out, comments
+	return out, comments, unclosed, hasUnclosed
 }
 
 // xsRegionDirective is the directive word that opens an inline XS region;
@@ -1098,17 +1105,24 @@ func xsTerminatorPrefix(raw string) bool {
 // its bytes — while a merely adjacent one (`/* x */ #foo`) stays. A block
 // comment opened on a #-line and running past it truncates the #-extent
 // to the comment's start (`#foo /* start\nstill in block */`), so every
-// byte is covered exactly once. The result is stable-sorted by position
-// and never overlaps.
-func mergeComments(scanned []common.Range, hashes []common.Range) []common.Range {
+// byte is covered exactly once — and the EOF-clipped unterminated tail
+// (unclosed, hasUnclosed from the scan) truncates the #-extent even when
+// it ends exactly at it: the formatter appends a trailing EOL, and the
+// reparse of that output scans the comment past the #-line, so pass one
+// must already see the split form. The truncation happens in place on
+// hashes — the insideRange pass below tests the truncated extents, or
+// the tail its own cut freed would still sit inside the original extent
+// and be dropped. The result is stable-sorted by position and never
+// overlaps.
+func mergeComments(scanned []common.Range, hashes []common.Range, unclosed common.Range, hasUnclosed bool) []common.Range {
 	out := make([]common.Range, 0, len(scanned)+len(hashes))
 
-	for _, h := range hashes {
-		if cut, ok := commentCut(scanned, h); ok {
-			h.End = cut
+	for i := range hashes {
+		if cut, ok := commentCut(scanned, hashes[i], unclosed, hasUnclosed); ok {
+			hashes[i].End = cut
 		}
 
-		out = append(out, h)
+		out = append(out, hashes[i])
 	}
 
 	for _, c := range scanned {
@@ -1132,10 +1146,12 @@ func mergeComments(scanned []common.Range, hashes []common.Range) []common.Range
 
 // commentCut returns where the #-extent h must yield to a scanned /*
 // */ opened on its line: an unterminated block comment starts inside the
-// #-extent and runs past it, so the #-extent ends where the comment
-// begins and the comment keeps its own bytes. ok=false when no scanned
+// #-extent and runs past it — or EOF clips it exactly at h's end — so
+// the #-extent ends where the comment begins and the comment keeps its
+// own bytes. The carve-out is the scan's unclosed tail only: a closed
+// block ending at h's end stays swallowed. ok=false when no scanned
 // extent crosses h's end.
-func commentCut(scanned []common.Range, h common.Range) (common.Pos, bool) {
+func commentCut(scanned []common.Range, h common.Range, unclosed common.Range, hasUnclosed bool) (common.Pos, bool) {
 	var cut common.Pos
 
 	found := false
@@ -1145,7 +1161,7 @@ func commentCut(scanned []common.Range, h common.Range) (common.Pos, bool) {
 			continue // starts outside the #-extent
 		}
 
-		if !c.End.After(h.End) {
+		if !c.End.After(h.End) && (!hasUnclosed || c.Start != unclosed.Start) {
 			continue // swallowed whole by the #-extent
 		}
 

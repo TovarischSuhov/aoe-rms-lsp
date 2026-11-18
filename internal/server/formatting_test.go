@@ -27,8 +27,9 @@ func TestServe_InitializeAdvertisesFormatting(t *testing.T) {
 
 // TestServe_Formatting drives textDocument/formatting through the real
 // stdio harness: the answer is one full-document edit whose text is the
-// cell's canonical print; refusals and non-RMS documents answer an empty
-// slice, and positions follow the negotiated encoding.
+// cell's canonical print — format.RMS for .rms documents, format.XS for
+// .xs ones; refusals answer an empty slice, and positions follow the
+// negotiated encoding.
 func TestServe_Formatting(t *testing.T) {
 	cleanRMS := "<LAND_GENERATION>\ncreate_land {\nland_percent 50\n}\n</LAND_GENERATION>\n"
 
@@ -40,6 +41,18 @@ func TestServe_Formatting(t *testing.T) {
 	// what the encoding negotiation is about
 	cyrillicRMS := "<LAND_GENERATION>\n/* Поколение */ base_terrain GRASS"
 
+	// two top-level functions with broken body indentation and no blank
+	// line between them: the canonical print rebuilds both
+	cleanXS := "int one() {\nreturn 1;\n}\nint two() {\nreturn 2;\n}\n"
+
+	// the parse-level refusal fixture of internal/format (TestXS_RefusalOnError):
+	// the ternary `?:` is outside the parsed expression grammar — an
+	// error-severity diagnostic, not a recoverable shape
+	parseErrorXS := "void f() {\na ? b : c;\n}\n"
+
+	// CRLF document: the XS print keeps the input's dominant line ending
+	crlfXS := "int one() {\r\nreturn 1;\r\n}\r\n"
+
 	tests := []struct {
 		name          string
 		docURI        uri.URI
@@ -48,6 +61,7 @@ func TestServe_Formatting(t *testing.T) {
 		negotiateUTF8 bool
 		options       protocol.FormattingOptions
 		formatOpts    format.Options // the oracle options the request maps to
+		xsDoc         bool           // the oracle prints with format.XS, not format.RMS
 		wantTabs      bool           // the print must indent with tabs
 		wantEmpty     bool           // empty non-nil answer: format not invoked
 	}{
@@ -89,12 +103,44 @@ func TestServe_Formatting(t *testing.T) {
 			wantEmpty:     true,
 		},
 		{
-			name:          "xs documents are not formatted",
+			name:          "xs document is formatted",
 			docURI:        uri.URI("file:///work/script.xs"),
 			languageID:    "aoe2xs",
-			text:          "<LAND_GENERATION>\ncreate_land\n</LAND_GENERATION>\n",
+			text:          cleanXS,
 			negotiateUTF8: true,
 			options:       protocol.FormattingOptions{TabSize: 2, InsertSpaces: true},
+			formatOpts:    format.Options{TabSize: 2},
+			xsDoc:         true,
+		},
+		{
+			name:          "xs crlf line endings are preserved",
+			docURI:        uri.URI("file:///work/crlf.xs"),
+			languageID:    "aoe2xs",
+			text:          crlfXS,
+			negotiateUTF8: true,
+			options:       protocol.FormattingOptions{TabSize: 2, InsertSpaces: true},
+			formatOpts:    format.Options{TabSize: 2},
+			xsDoc:         true,
+		},
+		{
+			name:          "xs insert spaces false indents with tabs",
+			docURI:        uri.URI("file:///work/tabs.xs"),
+			languageID:    "aoe2xs",
+			text:          cleanXS,
+			negotiateUTF8: true,
+			options:       protocol.FormattingOptions{TabSize: 4},
+			formatOpts:    format.Options{TabSize: 4, IndentTabs: true},
+			xsDoc:         true,
+			wantTabs:      true,
+		},
+		{
+			name:          "xs parse errors refuse the format",
+			docURI:        uri.URI("file:///work/broken.xs"),
+			languageID:    "aoe2xs",
+			text:          parseErrorXS,
+			negotiateUTF8: true,
+			options:       protocol.FormattingOptions{TabSize: 4, InsertSpaces: true},
+			xsDoc:         true,
 			wantEmpty:     true,
 		},
 		{
@@ -120,7 +166,7 @@ func TestServe_Formatting(t *testing.T) {
 
 			// the one decisive comparison: DeepEqual pins the single edit's
 			// range and bytes, and for the empty cases non-nil emptiness
-			require.Equal(t, wantFormattingEdits(t, tt.text, tt.formatOpts, tt.wantEmpty, tt.negotiateUTF8), edits)
+			require.Equal(t, wantFormattingEdits(t, tt.text, tt.formatOpts, tt.xsDoc, tt.wantEmpty, tt.negotiateUTF8), edits)
 
 			if tt.wantTabs {
 				require.Contains(t, edits[0].NewText, "\t", "the print must indent with tabs")
@@ -130,12 +176,14 @@ func TestServe_Formatting(t *testing.T) {
 }
 
 // wantFormattingEdits builds the expected answer from the cell's format
-// oracle: one edit covering the whole document whose text is the canonical
-// print — or the empty non-nil slice where no format may happen at all.
+// oracle — format.RMS for .rms documents, format.XS for .xs: one edit
+// covering the whole document whose text is the canonical print — or the
+// empty non-nil slice where no format may happen at all.
 func wantFormattingEdits(
 	t *testing.T,
 	text string,
 	opts format.Options,
+	xsDoc bool,
 	wantEmpty bool,
 	utf8Encoding bool,
 ) []protocol.TextEdit {
@@ -145,7 +193,12 @@ func wantFormattingEdits(
 		return []protocol.TextEdit{}
 	}
 
-	want, err := format.RMS(text, opts)
+	oracle := format.RMS
+	if xsDoc {
+		oracle = format.XS
+	}
+
+	want, err := oracle(text, opts)
 	require.NoError(t, err, "the oracle must accept the fixture")
 
 	return []protocol.TextEdit{{

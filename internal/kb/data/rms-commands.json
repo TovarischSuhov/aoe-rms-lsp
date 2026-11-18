@@ -150,7 +150,7 @@
       }
     ],
     "attributes": [],
-    "desc": "Provides information about the map to AI players.  Many AIs do not rely on this information regardless or whether or not you include it.  If your map is not very similar to an existing map, it is best to leave out the command entirely, or to use CUSTOM as the map type. This command works differently in different versions of the game:",
+    "desc": "Provides information about the map to AI players.  Many AIs do not rely on this information regardless of whether or not you include it.  If your map is not very similar to an existing map, it is best to leave out the command entirely! This command works differently in different versions of the game:",
     "game_versions": "All",
     "since_update": ""
   },
@@ -1121,7 +1121,7 @@
       }
     ],
     "attributes": [],
-    "desc": "Set the minimum and maximum number of distinct cliffs to create.  The actual number of cliffs is chosen at random from between min (inclusive) and max (exclusive).  Does not scale with map size, so you must do so manually using Conditionals or using Math Expressions.",
+    "desc": "Set the minimum and maximum number of distinct cliffs to create.  The actual number of cliffs is chosen at random from between min (inclusive) and max (exclusive).  If min=max, that number of cliffs will be placed.  Does not scale with map size, so you must do so manually using Conditionals or using Math Expressions.",
     "game_versions": "All",
     "since_update": ""
   },
@@ -1141,7 +1141,7 @@
       }
     ],
     "attributes": [],
-    "desc": "Set the minimum and maximum number of distinct cliffs to create.  The actual number of cliffs is chosen at random from between min (inclusive) and max (exclusive).  Does not scale with map size, so you must do so manually using Conditionals or using Math Expressions.",
+    "desc": "Set the minimum and maximum number of distinct cliffs to create.  The actual number of cliffs is chosen at random from between min (inclusive) and max (exclusive).  If min=max, that number of cliffs will be placed.  Does not scale with map size, so you must do so manually using Conditionals or using Math Expressions.",
     "game_versions": "All",
     "since_update": ""
   },

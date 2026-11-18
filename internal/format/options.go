@@ -1,5 +1,5 @@
-// Package format prints RMS sources in the cell's canonical style from
-// parsed ASTs: indentation and blank lines are rebuilt, semantics are
+// Package format prints RMS and XS sources in the cell's canonical style
+// from parsed ASTs: indentation and blank lines are rebuilt, semantics are
 // unchanged. Stateless and protocol-independent — no LSP types.
 package format
 

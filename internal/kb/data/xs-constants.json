@@ -1,5 +1,341 @@
 [
   {
+    "name": "cActionTypeDefault",
+    "section": "Action Type Constants",
+    "value": "0",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeMove",
+    "section": "Action Type Constants",
+    "value": "1",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypePatrol",
+    "section": "Action Type Constants",
+    "value": "2",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeGuard",
+    "section": "Action Type Constants",
+    "value": "3",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeFollow",
+    "section": "Action Type Constants",
+    "value": "4",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeStop",
+    "section": "Action Type Constants",
+    "value": "5",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeAttackGround",
+    "section": "Action Type Constants",
+    "value": "6",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeGarrison",
+    "section": "Action Type Constants",
+    "value": "7",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeKill",
+    "section": "Action Type Constants",
+    "value": "8",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cctionTypeUnload",
+    "section": "Action Type Constants",
+    "value": "9",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cctionTypeGatherPoint",
+    "section": "Action Type Constants",
+    "value": "10",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeLock",
+    "section": "Action Type Constants",
+    "value": "11",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeWork",
+    "section": "Action Type Constants",
+    "value": "12",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeUngarrison",
+    "section": "Action Type Constants",
+    "value": "13",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeDropRelic",
+    "section": "Action Type Constants",
+    "value": "14",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypePack",
+    "section": "Action Type Constants",
+    "value": "15",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeUnpack",
+    "section": "Action Type Constants",
+    "value": "16",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeAttackMove",
+    "section": "Action Type Constants",
+    "value": "17",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeFormationLine",
+    "section": "Action Type Constants",
+    "value": "18",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeFormationBox",
+    "section": "Action Type Constants",
+    "value": "19",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeFormationStaggered",
+    "section": "Action Type Constants",
+    "value": "20",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeFormationFlank",
+    "section": "Action Type Constants",
+    "value": "21",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeTransform",
+    "section": "Action Type Constants",
+    "value": "22",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeSellFood",
+    "section": "Action Type Constants",
+    "value": "23",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeSellWood",
+    "section": "Action Type Constants",
+    "value": "24",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeSellStone",
+    "section": "Action Type Constants",
+    "value": "25",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeBuyFood",
+    "section": "Action Type Constants",
+    "value": "26",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeBuyWood",
+    "section": "Action Type Constants",
+    "value": "27",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeBuyStone",
+    "section": "Action Type Constants",
+    "value": "28",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeRingTownBell",
+    "section": "Action Type Constants",
+    "value": "29",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeBackToWork",
+    "section": "Action Type Constants",
+    "value": "30",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeAllBackToWork",
+    "section": "Action Type Constants",
+    "value": "31",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cActionTypeForceDropOff",
+    "section": "Action Type Constants",
+    "value": "32",
+    "desc": "Enum value for Unit Task/Action Type TYPE_NAME. See [xsTaskUnits](../../functions/functions/#956-xstaskunits)",
+    "since_update": ""
+  },
+  {
+    "name": "cCaptureFlagNever",
+    "section": "Capture Flag Constants",
+    "value": "0",
+    "desc": "Enum value for Unit Capture Flag TYPE_NAME. Units with this capture flag cannot be converted",
+    "since_update": ""
+  },
+  {
+    "name": "cCaptureFlagOnce",
+    "section": "Capture Flag Constants",
+    "value": "1",
+    "desc": "Enum value for Unit Capture Flag TYPE_NAME. Units with this capture flag will convert once (Gaia units by default)",
+    "since_update": ""
+  },
+  {
+    "name": "cCaptureFlagMultipleTimes",
+    "section": "Capture Flag Constants",
+    "value": "2",
+    "desc": "Enum value for Unit Capture Flag TYPE_NAME. Units with this capture flag will convert multiple times (sheep/monuments)",
+    "since_update": ""
+  },
+  {
+    "name": "cCaptureFlagNeverGaiaAggressive",
+    "section": "Capture Flag Constants",
+    "value": "3",
+    "desc": "Enum value for Unit Capture Flag TYPE_NAME. Units with this capture flag cannot be converted. Gaia units with this flag will behave aggressively towards player units.",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassRemoval",
+    "section": "Class Flags",
+    "value": "-1",
+    "desc": "",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassOffset",
+    "section": "Class Flags",
+    "value": "1000",
+    "desc": "",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassInfantry",
+    "section": "Class Flags",
+    "value": "1",
+    "desc": "Includes the following classes: `cInfantryClass`",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassCavalry",
+    "section": "Class Flags",
+    "value": "2",
+    "desc": "Includes the following classes: `cCavalryClass, cScoutCavalryClass`",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassArchers",
+    "section": "Class Flags",
+    "value": "4",
+    "desc": "Includes the following classes: `cArcherClass, cHandCannoneerClass`",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassCavalryArchers",
+    "section": "Class Flags",
+    "value": "8",
+    "desc": "Includes the following classes: `cCavalryArcherClass`, `cConquistadorClass`",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassMonk",
+    "section": "Class Flags",
+    "value": "16",
+    "desc": "Includes the following classes: `cMonkClass`, `cMonkWithRelicClass`",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassCivilian",
+    "section": "Class Flags",
+    "value": "32",
+    "desc": "Includes the following classes: `cVillagerClass`, `cTradeCartClass`, `cKingClass`",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassShip",
+    "section": "Class Flags",
+    "value": "64",
+    "desc": "Includes the following classes: `cWarshipClass`, `cTransportShipClass`, `cFishingBoatClass`, `cTradeBoatClass`, `cBoardingShipClass`",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassSiege",
+    "section": "Class Flags",
+    "value": "128",
+    "desc": "Includes the following classes: `cSiegeWeaponClass`, `cScorpionClass`, `cPackedUnitClass`, `cUnpackedSiegeUnitClass`, `cPetardClass`",
+    "since_update": ""
+  },
+  {
+    "name": "cFlagClassBuilding",
+    "section": "Class Flags",
+    "value": "256",
+    "desc": "Includes the following classes: `cBuildingClass`, `cFarmClass`, `cWallClass`, `cGateClass`, `cTowerClass`, `cMiscBuildingClass`",
+    "since_update": ""
+  },
+  {
     "name": "cColorBlue",
     "section": "Color",
     "value": "\"\u003cBLUE\u003e\"",
@@ -70,31 +406,101 @@
     "since_update": ""
   },
   {
+    "name": "cColorIdBlue",
+    "section": "Color ID Constants",
+    "value": "0",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cColorIdRed",
+    "section": "Color ID Constants",
+    "value": "1",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cColorIdGreen",
+    "section": "Color ID Constants",
+    "value": "2",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cColorIdYellow",
+    "section": "Color ID Constants",
+    "value": "3",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cColorIdAqua",
+    "section": "Color ID Constants",
+    "value": "4",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cColorIdPurple",
+    "section": "Color ID Constants",
+    "value": "5",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cColorIdGray",
+    "section": "Color ID Constants",
+    "value": "6",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cColorIdOrange",
+    "section": "Color ID Constants",
+    "value": "7",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cColorIdWhite",
+    "section": "Color ID Constants",
+    "value": "8",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cColorIdBlack",
+    "section": "Color ID Constants",
+    "value": "9",
+    "desc": "Enum value for the Color ID TYPE_NAME",
+    "since_update": ""
+  },
+  {
     "name": "cAttributeDisable",
     "section": "EffectAmount Effect Operations",
     "value": "0",
-    "desc": "This is the ID of the `Attribute Disbale` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "desc": "This is the ID of the `Attribute Disable` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function. Use these with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate)",
     "since_update": ""
   },
   {
     "name": "cAttributeEnable",
     "section": "EffectAmount Effect Operations",
     "value": "1",
-    "desc": "This is the ID of the `Attribute Enable` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "desc": "This is the ID of the `Attribute Enable` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function. Use these with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate)",
     "since_update": ""
   },
   {
     "name": "cAttributeForce",
     "section": "EffectAmount Effect Operations",
     "value": "2",
-    "desc": "This is the ID of the `Attribute Force` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "desc": "This is the ID of the `Attribute Force` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function. Use these with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate)",
     "since_update": ""
   },
   {
     "name": "cAttributeResearch",
     "section": "EffectAmount Effect Operations",
     "value": "2",
-    "desc": "This is the ID of the `Attribute Research` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "desc": "This is the ID of the `Attribute Research` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function. Use these with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate)",
     "since_update": ""
   },
   {
@@ -511,6 +917,139 @@
     "since_update": ""
   },
   {
+    "name": "cAttrSetExtendedDescription",
+    "section": "EffectAmount Technology Attribute",
+    "value": "19",
+    "desc": "This is the ID of the `Attribute Set Extended Description` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cAttrAmountFirstCost",
+    "section": "EffectAmount Technology Attribute",
+    "value": "20",
+    "desc": "This is the ID of the `Attribute Set First Cost` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cAttrAmountSecondCost",
+    "section": "EffectAmount Technology Attribute",
+    "value": "21",
+    "desc": "This is the ID of the `Attribute Set Second Cost` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cAttrAmountThirdCost",
+    "section": "EffectAmount Technology Attribute",
+    "value": "22",
+    "desc": "This is the ID of the `Attribute Set Third Cost` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cAttrTypeFirstCost",
+    "section": "EffectAmount Technology Attribute",
+    "value": "23",
+    "desc": "This is the ID of the `Attribute Resource ID of the First Cost` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cAttrTypeSecondCost",
+    "section": "EffectAmount Technology Attribute",
+    "value": "24",
+    "desc": "This is the ID of the `Attribute Resource ID of the Second Cost` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cAttrTypeThirdCost",
+    "section": "EffectAmount Technology Attribute",
+    "value": "25",
+    "desc": "This is the ID of the `Attribute Resource ID of the Third Cost` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cAttrDeductFlagFirstCost",
+    "section": "EffectAmount Technology Attribute",
+    "value": "26",
+    "desc": "This is the ID of the `Attribute Deduct Flag of the First Cost` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cAttrDeductFlagSecondCost",
+    "section": "EffectAmount Technology Attribute",
+    "value": "27",
+    "desc": "This is the ID of the `Attribute Deduct Flag of the Second Cost` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cAttrDeductFlagThirdCost",
+    "section": "EffectAmount Technology Attribute",
+    "value": "28",
+    "desc": "This is the ID of the `Attribute Deduct Flag of the Third Cost` modifier for the [xsEffectAmount](../../functions/functions/#71-xseffectamount \"Jump To: XS \u003e Functions \u003e xsEffectAmount\") function",
+    "since_update": ""
+  },
+  {
+    "name": "cFogFlagNotInFog",
+    "section": "Fog Flag Constants",
+    "value": "0",
+    "desc": "Enum value for the [Fog Visibility](../../../attributes/attributes/#28-fog-visibility) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cFogFlagAlways",
+    "section": "Fog Flag Constants",
+    "value": "1",
+    "desc": "Enum value for the [Fog Visibility](../../../attributes/attributes/#28-fog-visibility) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cFogFlagOnlyIfAlive",
+    "section": "Fog Flag Constants",
+    "value": "2",
+    "desc": "Enum value for the [Fog Visibility](../../../attributes/attributes/#28-fog-visibility) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cFogFlagDoppelganger",
+    "section": "Fog Flag Constants",
+    "value": "3",
+    "desc": "Enum value for the [Fog Visibility](../../../attributes/attributes/#28-fog-visibility) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cFogFlagCheckDoppel",
+    "section": "Fog Flag Constants",
+    "value": "4",
+    "desc": "Enum value for the [Fog Visibility](../../../attributes/attributes/#28-fog-visibility) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cHillModeNoRestriction",
+    "section": "Hill Mode Constants",
+    "value": "0",
+    "desc": "Enum value for the [Hill Mode](../../../attributes/attributes/#187-hill-mode) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cHillModeNoCornersOfHills",
+    "section": "Hill Mode Constants",
+    "value": "1",
+    "desc": "Enum value for the [Hill Mode](../../../attributes/attributes/#187-hill-mode) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cHillModeFlatOnly",
+    "section": "Hill Mode Constants",
+    "value": "2",
+    "desc": "Enum value for the [Hill Mode](../../../attributes/attributes/#187-hill-mode) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cHillModeOneElevationDifference",
+    "section": "Hill Mode Constants",
+    "value": "3",
+    "desc": "Enum value for the [Hill Mode](../../../attributes/attributes/#187-hill-mode) attribute.",
+    "since_update": ""
+  },
+  {
     "name": "cLocalePortugese",
     "section": "Locale",
     "value": "0",
@@ -634,6 +1173,83 @@
     "section": "Locale",
     "value": "17",
     "desc": "Enum value for Locale TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cTileTerrainId",
+    "section": "Map Tile Constants",
+    "value": "0",
+    "desc": "Enum value for Map Tile Attribute TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cTileElevation",
+    "section": "Map Tile Constants",
+    "value": "1",
+    "desc": "Enum value for Map Tile Attribute TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cTileMaskId",
+    "section": "Map Tile Constants",
+    "value": "2",
+    "desc": "Enum value for Map Tile Attribute TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cTileLayerId",
+    "section": "Map Tile Constants",
+    "value": "3",
+    "desc": "Enum value for Map Tile Attribute TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cMinimapModeNone",
+    "section": "Minimap Mode Constants",
+    "value": "0",
+    "desc": "Enum value for the [Minimap Mode](../../../attributes/attributes/#144-minimap-mode) attribute",
+    "since_update": ""
+  },
+  {
+    "name": "cMinimapModeUnit",
+    "section": "Minimap Mode Constants",
+    "value": "1",
+    "desc": "Enum value for the [Minimap Mode](../../../attributes/attributes/#144-minimap-mode) attribute",
+    "since_update": ""
+  },
+  {
+    "name": "cMinimapModeBuilding",
+    "section": "Minimap Mode Constants",
+    "value": "2",
+    "desc": "Enum value for the [Minimap Mode](../../../attributes/attributes/#144-minimap-mode) attribute",
+    "since_update": ""
+  },
+  {
+    "name": "cMinimapModeTerrain",
+    "section": "Minimap Mode Constants",
+    "value": "3",
+    "desc": "Enum value for the [Minimap Mode](../../../attributes/attributes/#144-minimap-mode) attribute",
+    "since_update": ""
+  },
+  {
+    "name": "cMinimapModeTerrainBig",
+    "section": "Minimap Mode Constants",
+    "value": "4",
+    "desc": "Enum value for the [Minimap Mode](../../../attributes/attributes/#144-minimap-mode) attribute",
+    "since_update": ""
+  },
+  {
+    "name": "cMoveAlgorithmNone",
+    "section": "Move Algorithm Constants",
+    "value": "0",
+    "desc": "Enum value for the [Move Algorithm](../../../attributes/attributes/#218-move-algorithm) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cMoveAlgorithmUseStopSprite",
+    "section": "Move Algorithm Constants",
+    "value": "1",
+    "desc": "Enum value for the [Move Algorithm](../../../attributes/attributes/#218-move-algorithm) attribute.",
     "since_update": ""
   },
   {
@@ -829,7 +1445,7 @@
     "name": "cFogFlag",
     "section": "Object Attribute",
     "value": "28",
-    "desc": "This is the attribute [Fog Visibility](../../../attributes/attributes/#28-fog-visibility)",
+    "desc": "This is the attribute [Fog Visibility](../../../attributes/attributes/#28-fog-visibility). See [cFogFlag Constants](./#41-fog-flag-constants)",
     "since_update": ""
   },
   {
@@ -1543,7 +2159,7 @@
     "name": "cRunPattern",
     "section": "Object Attribute",
     "value": "140",
-    "desc": "This is the attribute [Run Pattern](../../../attributes/attributes/#140-run-pattern).",
+    "desc": "This is the attribute [Run Pattern](../../../attributes/attributes/#140-run-pattern). See [Run Pattern Constants](./#44-run-pattern-constants)",
     "since_update": ""
   },
   {
@@ -1571,7 +2187,7 @@
     "name": "cMinimapMode",
     "section": "Object Attribute",
     "value": "144",
-    "desc": "This is the attribute [Minimap Mode](../../../attributes/attributes/#144-minimap-mode).",
+    "desc": "This is the attribute [Minimap Mode](../../../attributes/attributes/#144-minimap-mode). See [cMinimapMode Constants](./#40-minimap-mode-constants)",
     "since_update": ""
   },
   {
@@ -1719,6 +2335,398 @@
     "section": "Object Attribute",
     "value": "165",
     "desc": "This is the attribute [Add Attack Type](../../../attributes/attributes/#161-add-attack-type).",
+    "since_update": ""
+  },
+  {
+    "name": "cUndeadFlag",
+    "section": "Object Attribute",
+    "value": "166",
+    "desc": "This is the attribute [Undead Flag](../../../attributes/attributes/#166-undead-flag). See [cUndeadFlag Constants](./#28-undead-flag-constants).",
+    "since_update": ""
+  },
+  {
+    "name": "cBuildAndGoAway",
+    "section": "Object Attribute",
+    "value": "167",
+    "desc": "This is the attribute [Build And Go Away](../../../attributes/attributes/#167-build-and-go-away)",
+    "since_update": ""
+  },
+  {
+    "name": "cTypeFirstStorage",
+    "section": "Object Attribute",
+    "value": "168",
+    "desc": "This is the attribute [Type First Storage](../../../attributes/attributes/#168-type-first-storage)",
+    "since_update": ""
+  },
+  {
+    "name": "cTypeSecondStorage",
+    "section": "Object Attribute",
+    "value": "169",
+    "desc": "This is the attribute [Type Second Storage](../../../attributes/attributes/#169-type-second-storage)",
+    "since_update": ""
+  },
+  {
+    "name": "cTypeThirdStorage",
+    "section": "Object Attribute",
+    "value": "170",
+    "desc": "This is the attribute [Type Third Storage](../../../attributes/attributes/#170-type-third-storage)",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagFirstStorage",
+    "section": "Object Attribute",
+    "value": "171",
+    "desc": "This is the attribute [Store Flag First Storage](../../../attributes/attributes/#171-store-flag-first-storage). See [cStoreFlag Constants](./#39-store-flag-constants)",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagSecondStorage",
+    "section": "Object Attribute",
+    "value": "172",
+    "desc": "This is the attribute [Store Flag Second Storage](../../../attributes/attributes/#172-store-flag-second-storage). See [cStoreFlag Constants](./#39-store-flag-constants)",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagThirdStorage",
+    "section": "Object Attribute",
+    "value": "173",
+    "desc": "This is the attribute [Store Flag Third Storage](../../../attributes/attributes/#173-store-flag-third-storage). See [cStoreFlag Constants](./#39-store-flag-constants)",
+    "since_update": ""
+  },
+  {
+    "name": "cAmountFirstCost",
+    "section": "Object Attribute",
+    "value": "174",
+    "desc": "This is the attribute [Amount First Cost](../../../attributes/attributes/#174-amount-first-cost)",
+    "since_update": ""
+  },
+  {
+    "name": "cAmountSecondCost",
+    "section": "Object Attribute",
+    "value": "175",
+    "desc": "This is the attribute [Amount Second Cost](../../../attributes/attributes/#175-amount-second-cost)",
+    "since_update": ""
+  },
+  {
+    "name": "cAmountThirdCost",
+    "section": "Object Attribute",
+    "value": "176",
+    "desc": "This is the attribute [Amount Third Cost](../../../attributes/attributes/#176-amount-third-cost)",
+    "since_update": ""
+  },
+  {
+    "name": "cTypeFirstCost",
+    "section": "Object Attribute",
+    "value": "177",
+    "desc": "This is the attribute [Type First Cost](../../../attributes/attributes/#177-type-first-cost)",
+    "since_update": ""
+  },
+  {
+    "name": "cTypeSecondCost",
+    "section": "Object Attribute",
+    "value": "178",
+    "desc": "This is the attribute [Type Second Cost](../../../attributes/attributes/#178-type-second-cost)",
+    "since_update": ""
+  },
+  {
+    "name": "cTypeThirdCost",
+    "section": "Object Attribute",
+    "value": "179",
+    "desc": "This is the attribute [Type Third Cost](../../../attributes/attributes/#179-type-third-cost)",
+    "since_update": ""
+  },
+  {
+    "name": "cDeductFlagFirstCost",
+    "section": "Object Attribute",
+    "value": "180",
+    "desc": "This is the attribute [Deduct Flag First Cost](../../../attributes/attributes/#180-deduct-flag-first-cost)",
+    "since_update": ""
+  },
+  {
+    "name": "cDeductFlagSecondCost",
+    "section": "Object Attribute",
+    "value": "181",
+    "desc": "This is the attribute [Deduct Flag Second Cost](../../../attributes/attributes/#181-deduct-flag-second-cost)",
+    "since_update": ""
+  },
+  {
+    "name": "cDeductFlagThirdCost",
+    "section": "Object Attribute",
+    "value": "182",
+    "desc": "This is the attribute [Deduct Flag Third Cost](../../../attributes/attributes/#182-deduct-flag-third-cost)",
+    "since_update": ""
+  },
+  {
+    "name": "cSpawningGraphic",
+    "section": "Object Attribute",
+    "value": "183",
+    "desc": "This is the attribute [Spawning Graphic](../../../attributes/attributes/#183-spawning-graphic)",
+    "since_update": ""
+  },
+  {
+    "name": "cUpgradeGraphic",
+    "section": "Object Attribute",
+    "value": "184",
+    "desc": "This is the attribute [Upgrade Graphic](../../../attributes/attributes/#184-upgrade-graphic)",
+    "since_update": ""
+  },
+  {
+    "name": "cFlyMode",
+    "section": "Object Attribute",
+    "value": "185",
+    "desc": "This is the attribute [Fly Mode](../../../attributes/attributes/#185-fly-mode)",
+    "since_update": ""
+  },
+  {
+    "name": "cCanBeGathered",
+    "section": "Object Attribute",
+    "value": "186",
+    "desc": "This is the attribute [Can Be Gathered](../../../attributes/attributes/#186-can-be-gathered)",
+    "since_update": ""
+  },
+  {
+    "name": "cHillMode",
+    "section": "Object Attribute",
+    "value": "187",
+    "desc": "This is the attribute [Hill Mode](../../../attributes/attributes/#187-hill-mode). See [cHillMode Constants](./#42-hill-mode-constants)",
+    "since_update": ""
+  },
+  {
+    "name": "cDoppelganger",
+    "section": "Object Attribute",
+    "value": "188",
+    "desc": "This is the attribute [Doppelganger](../../../attributes/attributes/#188-doppelganger)",
+    "since_update": ""
+  },
+  {
+    "name": "cGatherGroup",
+    "section": "Object Attribute",
+    "value": "189",
+    "desc": "This is the attribute [Gather Group](../../../attributes/attributes/#189-gather-group)",
+    "since_update": ""
+  },
+  {
+    "name": "cTaskSwapGroup",
+    "section": "Object Attribute",
+    "value": "190",
+    "desc": "This is the attribute [Task Swap Group](../../../attributes/attributes/#190-task-swap-group)",
+    "since_update": ""
+  },
+  {
+    "name": "cPlacementTerrain1",
+    "section": "Object Attribute",
+    "value": "191",
+    "desc": "This is the attribute [Placement Terrain1](../../../attributes/attributes/#191-placement-terrain1)",
+    "since_update": ""
+  },
+  {
+    "name": "cPlacementTerrain2",
+    "section": "Object Attribute",
+    "value": "192",
+    "desc": "This is the attribute [Placement Terrain2](../../../attributes/attributes/#192-placement-terrain2)",
+    "since_update": ""
+  },
+  {
+    "name": "cPlacementCenterTerrain1",
+    "section": "Object Attribute",
+    "value": "193",
+    "desc": "This is the attribute [Placement Center Terrain 1](../../../attributes/attributes/#193-placement-center-terrain-1)",
+    "since_update": ""
+  },
+  {
+    "name": "cPlacementCenterTerrain2",
+    "section": "Object Attribute",
+    "value": "194",
+    "desc": "This is the attribute [Placement Center Terrain 2](../../../attributes/attributes/#194-placement-center-terrain-2)",
+    "since_update": ""
+  },
+  {
+    "name": "cInitiatedTechId",
+    "section": "Object Attribute",
+    "value": "195",
+    "desc": "This is the attribute [Initiated Tech Id](../../../attributes/attributes/#195-initiated-tech-id)",
+    "since_update": ""
+  },
+  {
+    "name": "cMinSizeMultiplier",
+    "section": "Object Attribute",
+    "value": "196",
+    "desc": "This is the attribute [Min Size Multiplier](../../../attributes/attributes/#196-min-size-multiplier)",
+    "since_update": ""
+  },
+  {
+    "name": "cSelectionOutlineSizeX",
+    "section": "Object Attribute",
+    "value": "197",
+    "desc": "This is the attribute [Selection Outline Size X](../../../attributes/attributes/#197-selection-outline-size-x)",
+    "since_update": ""
+  },
+  {
+    "name": "cSelectionOutlineSizeY",
+    "section": "Object Attribute",
+    "value": "198",
+    "desc": "This is the attribute [Selection Outline Size Y](../../../attributes/attributes/#198-selection-outline-size-y)",
+    "since_update": ""
+  },
+  {
+    "name": "cSelectionOutlineSizeZ",
+    "section": "Object Attribute",
+    "value": "199",
+    "desc": "This is the attribute [Selection Outline Size Z](../../../attributes/attributes/#199-selection-outline-size-z)",
+    "since_update": ""
+  },
+  {
+    "name": "cClearanceSizeX",
+    "section": "Object Attribute",
+    "value": "200",
+    "desc": "This is the attribute [Clearance Size X](../../../attributes/attributes/#200-clearance-size-x)",
+    "since_update": ""
+  },
+  {
+    "name": "cClearanceSizeY",
+    "section": "Object Attribute",
+    "value": "201",
+    "desc": "This is the attribute [Clearance Size Y](../../../attributes/attributes/#201-clearance-size-y)",
+    "since_update": ""
+  },
+  {
+    "name": "cStackUnit",
+    "section": "Object Attribute",
+    "value": "202",
+    "desc": "This is the attribute [Stack Unit](../../../attributes/attributes/#202-stack-unit)",
+    "since_update": ""
+  },
+  {
+    "name": "cHeadUnit",
+    "section": "Object Attribute",
+    "value": "203",
+    "desc": "This is the attribute [Head Unit](../../../attributes/attributes/#203-head-unit)",
+    "since_update": ""
+  },
+  {
+    "name": "cTransformUnit",
+    "section": "Object Attribute",
+    "value": "204",
+    "desc": "This is the attribute [Transform Unit](../../../attributes/attributes/#204-transform-unit)",
+    "since_update": ""
+  },
+  {
+    "name": "cPileUnit",
+    "section": "Object Attribute",
+    "value": "205",
+    "desc": "This is the attribute [Pile Unit](../../../attributes/attributes/#205-pile-unit)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit1",
+    "section": "Object Attribute",
+    "value": "206",
+    "desc": "This is the attribute [Annex Unit 1](../../../attributes/attributes/#206-annex-unit-1)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit2",
+    "section": "Object Attribute",
+    "value": "207",
+    "desc": "This is the attribute [Annex Unit 2](../../../attributes/attributes/#207-annex-unit-2)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit3",
+    "section": "Object Attribute",
+    "value": "208",
+    "desc": "This is the attribute [Annex Unit 3](../../../attributes/attributes/#208-annex-unit-3)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit4",
+    "section": "Object Attribute",
+    "value": "209",
+    "desc": "This is the attribute [Annex Unit 4](../../../attributes/attributes/#209-annex-unit-4)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit1OffsetX",
+    "section": "Object Attribute",
+    "value": "210",
+    "desc": "This is the attribute [Annex Unit 1 Offset X](../../../attributes/attributes/#210-annex-unit-1-offset-x)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit1OffsetY",
+    "section": "Object Attribute",
+    "value": "211",
+    "desc": "This is the attribute [Annex Unit 1 Offset Y](../../../attributes/attributes/#211-annex-unit-1-offset-y)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit2OffsetX",
+    "section": "Object Attribute",
+    "value": "212",
+    "desc": "This is the attribute [Annex Unit 2 Offset X](../../../attributes/attributes/#212-annex-unit-2-offset-x)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit2OffsetY",
+    "section": "Object Attribute",
+    "value": "213",
+    "desc": "This is the attribute [Annex Unit 2 Offset Y](../../../attributes/attributes/#213-annex-unit-2-offset-y)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit3OffsetX",
+    "section": "Object Attribute",
+    "value": "214",
+    "desc": "This is the attribute [Annex Unit 3 Offset X](../../../attributes/attributes/#214-annex-unit-3-offset-x)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit3OffsetY",
+    "section": "Object Attribute",
+    "value": "215",
+    "desc": "This is the attribute [Annex Unit 3 Offset Y](../../../attributes/attributes/#215-annex-unit-3-offset-y)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit4OffsetX",
+    "section": "Object Attribute",
+    "value": "216",
+    "desc": "This is the attribute [Annex Unit 4 Offset X](../../../attributes/attributes/#216-annex-unit-4-offset-x)",
+    "since_update": ""
+  },
+  {
+    "name": "cAnnexUnit4OffsetY",
+    "section": "Object Attribute",
+    "value": "217",
+    "desc": "This is the attribute [Annex Unit 4 Offset Y](../../../attributes/attributes/#217-annex-unit-4-offset-y)",
+    "since_update": ""
+  },
+  {
+    "name": "cMoveAlgorithm",
+    "section": "Object Attribute",
+    "value": "218",
+    "desc": "This is the attribute [Move Algorithm](../../../attributes/attributes/#218-move-algorithm). See [cMoveAlgorithm Constants](./#43-move-algorithm-constants)",
+    "since_update": ""
+  },
+  {
+    "name": "cSpacingModifier",
+    "section": "Object Attribute",
+    "value": "219",
+    "desc": "This is the attribute [Spacing Modifier](../../../attributes/attributes/#219-spacing-modifier)",
+    "since_update": ""
+  },
+  {
+    "name": "cCanBurn",
+    "section": "Object Attribute",
+    "value": "220",
+    "desc": "This is the attribute [Can Burn](../../../attributes/attributes/#220-can-burn)",
+    "since_update": ""
+  },
+  {
+    "name": "cGatherFlag",
+    "section": "Object Attribute",
+    "value": "221",
+    "desc": "This is the attribute [Gather Flag](../../../attributes/attributes/#221-gather-flag)",
     "since_update": ""
   },
   {
@@ -2198,6 +3206,62 @@
     "since_update": ""
   },
   {
+    "name": "cDoubleClickSelectById",
+    "section": "Run Pattern Constants",
+    "value": "255",
+    "desc": "Enum value for the [Run Pattern](../../../attributes/attributes/#140-run-pattern) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagKeep",
+    "section": "Store Flag Constants",
+    "value": "0",
+    "desc": "Enum value for the [Store Flag First Storage](../../../attributes/attributes/#171-store-flag-first-storage), [Store Flag Second Storage](../../../attributes/attributes/#171-store-flag-second-storage), and [Store Flag Third Storage](../../../attributes/attributes/#171-store-flag-third-storage) attributes.",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagGive",
+    "section": "Store Flag Constants",
+    "value": "1",
+    "desc": "Enum value for the [Store Flag First Storage](../../../attributes/attributes/#171-store-flag-first-storage), [Store Flag Second Storage](../../../attributes/attributes/#171-store-flag-second-storage), and [Store Flag Third Storage](../../../attributes/attributes/#171-store-flag-third-storage) attributes.",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagGiveAndTakeOnDeath",
+    "section": "Store Flag Constants",
+    "value": "2",
+    "desc": "Enum value for the [Store Flag First Storage](../../../attributes/attributes/#171-store-flag-first-storage), [Store Flag Second Storage](../../../attributes/attributes/#171-store-flag-second-storage), and [Store Flag Third Storage](../../../attributes/attributes/#171-store-flag-third-storage) attributes.",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagGiveOnCompletionAndTakeOnDeath",
+    "section": "Store Flag Constants",
+    "value": "4",
+    "desc": "Enum value for the [Store Flag First Storage](../../../attributes/attributes/#171-store-flag-first-storage), [Store Flag Second Storage](../../../attributes/attributes/#171-store-flag-second-storage), and [Store Flag Third Storage](../../../attributes/attributes/#171-store-flag-third-storage) attributes.",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagGiveOnCompletion",
+    "section": "Store Flag Constants",
+    "value": "8",
+    "desc": "Enum value for the [Store Flag First Storage](../../../attributes/attributes/#171-store-flag-first-storage), [Store Flag Second Storage](../../../attributes/attributes/#171-store-flag-second-storage), and [Store Flag Third Storage](../../../attributes/attributes/#171-store-flag-third-storage) attributes.",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagTake",
+    "section": "Store Flag Constants",
+    "value": "16",
+    "desc": "Enum value for the [Store Flag First Storage](../../../attributes/attributes/#171-store-flag-first-storage), [Store Flag Second Storage](../../../attributes/attributes/#171-store-flag-second-storage), and [Store Flag Third Storage](../../../attributes/attributes/#171-store-flag-third-storage) attributes.",
+    "since_update": ""
+  },
+  {
+    "name": "cStoreFlagGiveAndTakeOnDeathAfterAnimation",
+    "section": "Store Flag Constants",
+    "value": "32",
+    "desc": "Enum value for the [Store Flag First Storage](../../../attributes/attributes/#171-store-flag-first-storage), [Store Flag Second Storage](../../../attributes/attributes/#171-store-flag-second-storage), and [Store Flag Third Storage](../../../attributes/attributes/#171-store-flag-third-storage) attributes.",
+    "since_update": ""
+  },
+  {
     "name": "cTechState",
     "section": "Tech Attribute",
     "value": "0",
@@ -2296,6 +3360,27 @@
     "since_update": ""
   },
   {
+    "name": "cTechNumResearchLocations",
+    "section": "Tech Attribute",
+    "value": "14",
+    "desc": "Enum value for Tech Attribute TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cTechCostType",
+    "section": "Tech Attribute",
+    "value": "15",
+    "desc": "Enum value for Tech Attribute TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cTechDeductFlag",
+    "section": "Tech Attribute",
+    "value": "16",
+    "desc": "Enum value for Tech Attribute TYPE_NAME",
+    "since_update": ""
+  },
+  {
     "name": "cTimerUnitYears",
     "section": "Timer Unit",
     "value": "0",
@@ -2321,6 +3406,839 @@
     "section": "Timer Unit",
     "value": "3",
     "desc": "Enum value for Timer Unit TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUndeadFlagShowUndeadGraphic",
+    "section": "Undead Flag Constants",
+    "value": "1",
+    "desc": "Enum value for the [Undead Flag](../../../attributes/attributes/#166-undead-flag) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cUndeadFlagIgnoreInKillStats",
+    "section": "Undead Flag Constants",
+    "value": "2",
+    "desc": "Enum value for the [Undead Flag](../../../attributes/attributes/#166-undead-flag) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cUndeadFlagGarrisonInvincibility",
+    "section": "Undead Flag Constants",
+    "value": "4",
+    "desc": "Enum value for the [Undead Flag](../../../attributes/attributes/#166-undead-flag) attribute.",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionAttack",
+    "section": "Unit Action Constants",
+    "value": "600",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionDefend",
+    "section": "Unit Action Constants",
+    "value": "601",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionBuild",
+    "section": "Unit Action Constants",
+    "value": "602",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionHeal",
+    "section": "Unit Action Constants",
+    "value": "603",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionConvert",
+    "section": "Unit Action Constants",
+    "value": "604",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionExplore",
+    "section": "Unit Action Constants",
+    "value": "605",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionStop",
+    "section": "Unit Action Constants",
+    "value": "606",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionRunAway",
+    "section": "Unit Action Constants",
+    "value": "607",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionRetreat",
+    "section": "Unit Action Constants",
+    "value": "608",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionGather",
+    "section": "Unit Action Constants",
+    "value": "609",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionMove",
+    "section": "Unit Action Constants",
+    "value": "610",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionPatrol",
+    "section": "Unit Action Constants",
+    "value": "611",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionFollow",
+    "section": "Unit Action Constants",
+    "value": "612",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionHunt",
+    "section": "Unit Action Constants",
+    "value": "613",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionTransport",
+    "section": "Unit Action Constants",
+    "value": "614",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionTrade",
+    "section": "Unit Action Constants",
+    "value": "615",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionEvasiveMove",
+    "section": "Unit Action Constants",
+    "value": "616",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionEnter",
+    "section": "Unit Action Constants",
+    "value": "617",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionRepair",
+    "section": "Unit Action Constants",
+    "value": "618",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionTrain",
+    "section": "Unit Action Constants",
+    "value": "619",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionResearch",
+    "section": "Unit Action Constants",
+    "value": "620",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionUnload",
+    "section": "Unit Action Constants",
+    "value": "621",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionSeekAndDestroy",
+    "section": "Unit Action Constants",
+    "value": "622",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionExploreAndDestroy",
+    "section": "Unit Action Constants",
+    "value": "623",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionGroupGather",
+    "section": "Unit Action Constants",
+    "value": "624",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionWait",
+    "section": "Unit Action Constants",
+    "value": "628",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionAttackRoundup",
+    "section": "Unit Action Constants",
+    "value": "629",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionScout",
+    "section": "Unit Action Constants",
+    "value": "630",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionControl",
+    "section": "Unit Action Constants",
+    "value": "631",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionShepherd",
+    "section": "Unit Action Constants",
+    "value": "632",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionAttackMove",
+    "section": "Unit Action Constants",
+    "value": "633",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionWaitForSolidify",
+    "section": "Unit Action Constants",
+    "value": "634",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionReleased",
+    "section": "Unit Action Constants",
+    "value": "699",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionUnloadOverWall",
+    "section": "Unit Action Constants",
+    "value": "700",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionAutoScout",
+    "section": "Unit Action Constants",
+    "value": "701",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionAutoBoarLure",
+    "section": "Unit Action Constants",
+    "value": "702",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionEvacuate",
+    "section": "Unit Action Constants",
+    "value": "703",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionEvacuateInGroup",
+    "section": "Unit Action Constants",
+    "value": "704",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionBackToWork",
+    "section": "Unit Action Constants",
+    "value": "705",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionHeroPower",
+    "section": "Unit Action Constants",
+    "value": "706",
+    "desc": "Enum value for Unit Action TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cFormationLine",
+    "section": "Unit Formation Constants",
+    "value": "2",
+    "desc": "Enum value for Unit Formation TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cFormationBox",
+    "section": "Unit Formation Constants",
+    "value": "4",
+    "desc": "Enum value for Unit Formation TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cFormationStaggered",
+    "section": "Unit Formation Constants",
+    "value": "7",
+    "desc": "Enum value for Unit Formation TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cFormationFlank",
+    "section": "Unit Formation Constants",
+    "value": "8",
+    "desc": "Enum value for Unit Formation TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cLosVisible",
+    "section": "Unit LoS constants",
+    "value": "0",
+    "desc": "Enum value for Unit LoS TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cLosExplored",
+    "section": "Unit LoS constants",
+    "value": "1",
+    "desc": "Enum value for Unit LoS TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cLosInvisible",
+    "section": "Unit LoS constants",
+    "value": "2",
+    "desc": "Enum value for Unit LoS TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderAttack",
+    "section": "Unit Order Constants",
+    "value": "700",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderDefend",
+    "section": "Unit Order Constants",
+    "value": "701",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderBuild",
+    "section": "Unit Order Constants",
+    "value": "702",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderHeal",
+    "section": "Unit Order Constants",
+    "value": "703",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderConvert",
+    "section": "Unit Order Constants",
+    "value": "704",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderExplore",
+    "section": "Unit Order Constants",
+    "value": "705",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderStop",
+    "section": "Unit Order Constants",
+    "value": "706",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderRunAway",
+    "section": "Unit Order Constants",
+    "value": "707",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderRetreat",
+    "section": "Unit Order Constants",
+    "value": "708",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderGather",
+    "section": "Unit Order Constants",
+    "value": "709",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderMove",
+    "section": "Unit Order Constants",
+    "value": "710",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderPatrol",
+    "section": "Unit Order Constants",
+    "value": "711",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderFollow",
+    "section": "Unit Order Constants",
+    "value": "712",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderHunt",
+    "section": "Unit Order Constants",
+    "value": "713",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderTransport",
+    "section": "Unit Order Constants",
+    "value": "714",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderTrade",
+    "section": "Unit Order Constants",
+    "value": "715",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderEvasiveMove",
+    "section": "Unit Order Constants",
+    "value": "716",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderEnter",
+    "section": "Unit Order Constants",
+    "value": "717",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderRepair",
+    "section": "Unit Order Constants",
+    "value": "718",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderTrain",
+    "section": "Unit Order Constants",
+    "value": "719",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderResearch",
+    "section": "Unit Order Constants",
+    "value": "720",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderUnload",
+    "section": "Unit Order Constants",
+    "value": "721",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderUnloadOverWall",
+    "section": "Unit Order Constants",
+    "value": "800",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderSeekAndDestroy",
+    "section": "Unit Order Constants",
+    "value": "722",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderGroupGather",
+    "section": "Unit Order Constants",
+    "value": "724",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderExploreAndDestroy",
+    "section": "Unit Order Constants",
+    "value": "723",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderWait",
+    "section": "Unit Order Constants",
+    "value": "728",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderAttackRoundup",
+    "section": "Unit Order Constants",
+    "value": "729",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderScout",
+    "section": "Unit Order Constants",
+    "value": "730",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderActionControl",
+    "section": "Unit Order Constants",
+    "value": "731",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderShepherd",
+    "section": "Unit Order Constants",
+    "value": "732",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderAttackMove",
+    "section": "Unit Order Constants",
+    "value": "733",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderAutoScout",
+    "section": "Unit Order Constants",
+    "value": "801",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderWaitForSolidify",
+    "section": "Unit Order Constants",
+    "value": "734",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderAutoBoarLure",
+    "section": "Unit Order Constants",
+    "value": "802",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderEvacuate",
+    "section": "Unit Order Constants",
+    "value": "803",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderEvacuateInGroup",
+    "section": "Unit Order Constants",
+    "value": "804",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderBackToWork",
+    "section": "Unit Order Constants",
+    "value": "805",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderHeroPower",
+    "section": "Unit Order Constants",
+    "value": "806",
+    "desc": "Enum value for Unit Order TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitHitpoints",
+    "section": "Unit Property Constants",
+    "value": "0",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitBuildpoints",
+    "section": "Unit Property Constants",
+    "value": "1",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitCharge",
+    "section": "Unit Property Constants",
+    "value": "2",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitCaptionStringId",
+    "section": "Unit Property Constants",
+    "value": "3",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitAttributeHeld",
+    "section": "Unit Property Constants",
+    "value": "4",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitGarrisonedInId",
+    "section": "Unit Property Constants",
+    "value": "5",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitCaptureFlag",
+    "section": "Unit Property Constants",
+    "value": "6",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitDeletable",
+    "section": "Unit Property Constants",
+    "value": "7",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitTargetable",
+    "section": "Unit Property Constants",
+    "value": "8",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitAttackable",
+    "section": "Unit Property Constants",
+    "value": "9",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitSelectable",
+    "section": "Unit Property Constants",
+    "value": "10",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitStance",
+    "section": "Unit Property Constants",
+    "value": "11",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitVisibility",
+    "section": "Unit Property Constants",
+    "value": "12",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitColorId",
+    "section": "Unit Property Constants",
+    "value": "13",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitLocked",
+    "section": "Unit Property Constants",
+    "value": "14",
+    "desc": "Enum value for Unit Property TYPE_NAME. This can be both get and set. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty) and [xsSetUnitProperty](../../functions/functions/#951-xssetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitGroupId",
+    "section": "Unit Property Constants",
+    "value": "10000",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitObjectId",
+    "section": "Unit Property Constants",
+    "value": "10001",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitCopyId",
+    "section": "Unit Property Constants",
+    "value": "10002",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitClassType",
+    "section": "Unit Property Constants",
+    "value": "10003",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitObjectType",
+    "section": "Unit Property Constants",
+    "value": "10004",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitAttributeTypesHeld",
+    "section": "Unit Property Constants",
+    "value": "10005",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitGarrisonedUnitIds",
+    "section": "Unit Property Constants",
+    "value": "10006",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitTargetId",
+    "section": "Unit Property Constants",
+    "value": "10007",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitTarget2Id",
+    "section": "Unit Property Constants",
+    "value": "10008",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitActionId",
+    "section": "Unit Property Constants",
+    "value": "10009",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cUnitOrderId",
+    "section": "Unit Property Constants",
+    "value": "10010",
+    "desc": "Enum value for the Unit Property TYPE_NAME. This can only be get. See [xsGetUnitProperty](../../functions/functions/#950-xsgetunitproperty)",
+    "since_update": ""
+  },
+  {
+    "name": "cStanceAggressive",
+    "section": "Unit Stance Constants",
+    "value": "0",
+    "desc": "Enum value for Unit Stance TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cStanceDefensive",
+    "section": "Unit Stance Constants",
+    "value": "1",
+    "desc": "Enum value for Unit Stance TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cStanceStandGround",
+    "section": "Unit Stance Constants",
+    "value": "2",
+    "desc": "Enum value for Unit Stance TYPE_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cStanceNoAttack",
+    "section": "Unit Stance Constants",
+    "value": "3",
+    "desc": "Enum value for Unit Stance TYPE_NAME",
     "since_update": ""
   },
   {
@@ -2758,9 +4676,30 @@
     "since_update": ""
   },
   {
-    "name": "cNumCivs",
+    "name": "cSaxons",
     "section": "aoe2 civs",
     "value": "60",
+    "desc": "This is the civilization ID of CIV_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cVarangians",
+    "section": "aoe2 civs",
+    "value": "61",
+    "desc": "This is the civilization ID of CIV_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cDanes",
+    "section": "aoe2 civs",
+    "value": "62",
+    "desc": "This is the civilization ID of CIV_NAME",
+    "since_update": ""
+  },
+  {
+    "name": "cNumCivs",
+    "section": "aoe2 civs",
+    "value": "63",
     "desc": "The number of civilizations for AoE2",
     "since_update": ""
   },
@@ -4298,6 +6237,13 @@
     "since_update": ""
   },
   {
+    "name": "cAttributeHunRelicBonus",
+    "section": "resource",
+    "value": "198",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
     "name": "cAttributeMapReveal",
     "section": "resource",
     "value": "203",
@@ -4364,6 +6310,13 @@
     "name": "cAttributeElevationBonusLower",
     "section": "resource",
     "value": "212",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
+    "name": "cAttributeExtraForageProductivity",
+    "section": "resource",
+    "value": "215",
     "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
     "since_update": ""
   },
@@ -4781,6 +6734,34 @@
     "since_update": ""
   },
   {
+    "name": "cAttributeInfantryFyrdLevel",
+    "section": "resource",
+    "value": "275",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
+    "name": "cAttributeExtraGoldProductivity",
+    "section": "resource",
+    "value": "276",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
+    "name": "cAttributeRedCliffTactics",
+    "section": "resource",
+    "value": "277",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
+    "name": "cAttributeRazingBounty",
+    "section": "resource",
+    "value": "278",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
     "name": "cAttributeMilitaryCanConvert",
     "section": "resource",
     "value": "279",
@@ -4865,6 +6846,13 @@
     "since_update": ""
   },
   {
+    "name": "cAttributeRazingPillage",
+    "section": "resource",
+    "value": "291",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
     "name": "cAttributeDisableAnimalDecay",
     "section": "resource",
     "value": "292",
@@ -4896,6 +6884,27 @@
     "name": "cAttributeForagingProductivity",
     "section": "resource",
     "value": "296",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
+    "name": "cAttributeVarangianGold",
+    "section": "resource",
+    "value": "297",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
+    "name": "cAttributeButcherGoldProductivity",
+    "section": "resource",
+    "value": "298",
+    "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
+    "since_update": ""
+  },
+  {
+    "name": "cAttributeExtraFoodProductivity",
+    "section": "resource",
+    "value": "299",
     "desc": "ID of the player resource RES_NAME. Check [here](../../../resources/resources/#ID_HERE-RES_HEAD \"Jump to: Game Mecahnicsc \u003e Resources \u003e #ID_HERE-RES_HEAD\") for more info about what this resource does.",
     "since_update": ""
   },
@@ -6097,52 +8106,59 @@
     "since_update": ""
   },
   {
+    "name": "cTaskTypeAdditionalResource",
+    "section": "task type",
+    "value": "164",
+    "desc": "ID for the task TASK_NAME",
+    "since_update": ""
+  },
+  {
     "name": "cTechStateNotReady",
     "section": "tech state",
     "value": "0",
-    "desc": "Enum value for the tech state STATE_NAME",
+    "desc": "Enum value for the tech state STATE_NAME. Note, these constants cannot be used with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate).",
     "since_update": ""
   },
   {
     "name": "cTechStateReady",
     "section": "tech state",
     "value": "1",
-    "desc": "Enum value for the tech state STATE_NAME",
+    "desc": "Enum value for the tech state STATE_NAME. Note, these constants cannot be used with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate).",
     "since_update": ""
   },
   {
     "name": "cTechStateQueued",
     "section": "tech state",
     "value": "4",
-    "desc": "Enum value for the tech state STATE_NAME",
+    "desc": "Enum value for the tech state STATE_NAME. Note, these constants cannot be used with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate).",
     "since_update": ""
   },
   {
     "name": "cTechStateResearching",
     "section": "tech state",
     "value": "2",
-    "desc": "Enum value for the tech state STATE_NAME",
+    "desc": "Enum value for the tech state STATE_NAME. Note, these constants cannot be used with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate).",
     "since_update": ""
   },
   {
     "name": "cTechStateDone",
     "section": "tech state",
     "value": "3",
-    "desc": "Enum value for the tech state STATE_NAME",
+    "desc": "Enum value for the tech state STATE_NAME. Note, these constants cannot be used with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate).",
     "since_update": ""
   },
   {
     "name": "cTechStateDisabled",
     "section": "tech state",
     "value": "-1",
-    "desc": "Enum value for the tech state STATE_NAME",
+    "desc": "Enum value for the tech state STATE_NAME. Note, these constants cannot be used with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate).",
     "since_update": ""
   },
   {
     "name": "cTechStateInvalid",
     "section": "tech state",
     "value": "-2",
-    "desc": "Enum value for the tech state STATE_NAME",
+    "desc": "Enum value for the tech state STATE_NAME. Note, these constants cannot be used with [cModifyTech](./#89-cmodifytech) and [cAttrSetState](./#1026-cattrsetstate).",
     "since_update": ""
   },
   {

@@ -1,0 +1,23 @@
+// c47-lead
+vector home = (1, 2, 3);
+
+void bare() {
+    int y = { int x = 1; x; };
+    // c47-after-bare
+    int t = { /* c47-in-block */ int z = 2; z > 1 ? 10 : 20; };
+    /* c47-pre-brace */
+    int u = { int v = 3; v; };
+    // c47-pre-slash
+    int w = { int q = 4; q; };
+    y = t;
+}
+
+void calls() {
+    int r = 0;
+    r = home.x;
+    home.spot(3);
+    r = get(1)(2) + r;
+    // c47-side
+    (0)(1);
+    q.;
+}

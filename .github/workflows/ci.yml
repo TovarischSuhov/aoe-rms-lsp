@@ -161,8 +161,8 @@ jobs:
 
       - name: Fetch corpus (skipped on cache hit)
         run: |
-          if [ "$(find .corpus -type f 2>/dev/null | wc -l)" -ge 100 ]; then
-            echo "corpus: sample cached ($(find .corpus -type f | wc -l) files)"
+          if [ "$(find .corpus -type f 2>/dev/null | wc -l)" -ge 100 ] && scripts/corpus-fetch.sh --check .corpus; then
+            echo "corpus: sample cached ($(find .corpus -type f | wc -l) files, manifest matches)"
           else
             scripts/corpus-fetch.sh .corpus
           fi

@@ -214,7 +214,10 @@ func (r *Resolver) Drop(paths []string) {
 }
 
 // withinRoot reports whether target stays inside rootDir; an empty
-// rootDir (non-disk root) disables the bound.
+// rootDir (non-disk root) disables the bound. The escape check goes
+// through filepath.IsLocal so the platform separator is honored: on
+// Windows filepath.Rel yields `..\`-prefixed relatives, which a
+// literal `../` prefix test lets through.
 func withinRoot(rootDir string, target string) bool {
 	if rootDir == "" {
 		return true
@@ -222,7 +225,7 @@ func withinRoot(rootDir string, target string) bool {
 
 	rel, err := filepath.Rel(rootDir, target)
 
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../")
+	return err == nil && filepath.IsLocal(rel)
 }
 
 // load returns the file for uriArg: the editor-state text when open

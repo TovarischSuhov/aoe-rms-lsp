@@ -341,6 +341,50 @@ Rules:
   prepare) answers with a `ResponseError` as well — an empty edit would
   read as success.
 
+### Will Rename Files
+
+`workspace/willRenameFiles` returns the edits a file rename implies
+before it happens: for aoe2-lsp, the `#include`/`#include_drs`/
+`#includeXS` path arguments of every referring directive. Advertise the
+capability inside the workspace block (NOT a top-level field):
+
+```go
+Workspace: &protocol.WorkspaceOptions{
+	FileOperations: &protocol.FileOperationOptions{
+		WillRename: protocol.FileOperationRegistrationOptions{},
+	},
+},
+```
+
+```go
+func (s *Server) WillRenameFiles(ctx context.Context, params *protocol.RenameFilesParams) (*protocol.WorkspaceEdit, error) {
+	edits := map[uri.URI][]protocol.TextEdit{}
+	for _, f := range params.Files {
+		for _, res := range s.resolver.Referrers(ctx, f.OldURI) { // reverse index: who includes the old path
+			newArg, ok := renamedIncludeArg(res, f.NewURI) // relative path, quoting preserved
+			if !ok {
+				continue // cross-drive: no relative spelling exists
+			}
+			edits[uri.URI(res.Owner)] = append(edits[uri.URI(res.Owner)],
+				protocol.TextEdit{Range: s.targetRange(res.Owner, res.Inc.Range), NewText: newArg})
+		}
+	}
+	return &protocol.WorkspaceEdit{Changes: edits}, nil
+}
+```
+
+Rules:
+- **The parser stores the quoted span in `Include.Range` while `Path`
+  is unquoted** — the byte-column width (`len(Path)+2`) separates the
+  quoted form from the bare one; the replacement must reproduce the
+  same spelling (quotes included, bare without).
+- **No referrers is an empty edit, not an error** — folders and
+  never-included files rename without changes. Folder renames are not
+  expanded into per-file edits: only directives whose target matches
+  `OldURI` by canonical path.
+- **The client does the rename**; the server only computes the edits —
+  do not touch the filesystem and do not return resource operations.
+
 ### Workspace Symbols
 
 `workspace/symbol` lists symbols matching a query across the server's
@@ -412,8 +456,9 @@ diagnostics (the parse-level refusal, not analyzer findings such as
 unknown-command — those documents format normally) answers
 `[]protocol.TextEdit{}` — an empty slice, not nil, never a JSON-RPC
 error; the client keeps its text and the reason is already visible in
-the published diagnostics. Non-matching documents (e.g. .xs) answer an
-empty slice the same way.
+the published diagnostics. The printer is selected per document by URI
+suffix — .rms and .xs both format in this server; a document in neither
+language answers an empty slice the same way.
 
 ## Cross-file Navigation Results
 

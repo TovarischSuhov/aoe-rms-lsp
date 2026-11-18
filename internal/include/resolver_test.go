@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -309,6 +310,37 @@ func readFile(t *testing.T, uriArg string) string {
 	return string(raw)
 }
 
+// TestWithinRoot checks the workspace bound on the unit level: targets
+// inside the root pass, parent-directory escapes fail on the native
+// path separator (on Windows filepath.Rel yields `..\`-prefixed
+// relatives), absolute paths elsewhere fail.
+func TestWithinRoot(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join(t.TempDir(), "workspace")
+	cases := []struct {
+		name    string
+		rootDir string
+		target  string
+		want    bool
+	}{
+		{"empty root disables the bound", "", filepath.Join(root, "inc.rms"), true},
+		{"target inside root", root, filepath.Join(root, "inc.rms"), true},
+		{"target is the root itself", root, root, true},
+		{"target in a subdirectory", root, filepath.Join(root, "sub", "inc.rms"), true},
+		{"direct parent escape", root, filepath.Join(root, "..", "outside.rms"), false},
+		{"nested parent escape", root, filepath.Join(root, "maps", "..", "..", "outside.rms"), false},
+		{"absolute path outside root", root, filepath.Join(t.TempDir(), "other.rms"), false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, withinRoot(tc.rootDir, tc.target))
+		})
+	}
+}
+
 // TestResolver_EscapeBeyondRootMissing checks the workspace bound: a
 // #include escaping the root document's directory becomes MissingInclude
 // even when the target exists on disk.
@@ -359,7 +391,10 @@ func TestResolver_TwoSpellingsOwnTargetURI(t *testing.T) {
 	})
 
 	plain := uri.File(filepath.Join(dir, "sub", "main.rms")).String()
-	dotted := "file://" + filepath.ToSlash(dir) + "/sub/../sub/main.rms"
+	// a dot-segment spelling of the same document; building it by hand
+	// (file:// + path) puts the drive letter in the host position on
+	// Windows, so it is spliced into the canonical spelling instead
+	dotted := strings.Replace(plain, "/sub/main.rms", "/sub/../sub/main.rms", 1)
 	require.NotEqual(t, plain, dotted)
 	require.Equal(t, canonicalPath(plain), canonicalPath(dotted), "same cache key")
 
@@ -403,14 +438,16 @@ func TestResolver_SetRootsFallback(t *testing.T) {
 	c = r.Closure(context.Background(), uris["main.rms"])
 	require.Empty(t, c.Missing)
 	require.Len(t, c.Rms, 2)
-	assert.Contains(t, c.Resolved[0].Target, first, "the first root wins")
+	// Target is a URI string; the raw path never appears in it on
+	// Windows (drive percent-encoding, forward slashes)
+	assert.Contains(t, c.Resolved[0].Target, uri.File(first).String(), "the first root wins")
 
 	// replacement: only the second root stays
 	r.SetRoots([]string{second})
 
 	c = r.Closure(context.Background(), uris["main.rms"])
 	require.Empty(t, c.Missing)
-	assert.Contains(t, c.Resolved[0].Target, second, "SetRoots replaces the set")
+	assert.Contains(t, c.Resolved[0].Target, uri.File(second).String(), "SetRoots replaces the set")
 
 	// clearing returns to the missing state
 	r.SetRoots(nil)
@@ -439,7 +476,7 @@ func TestResolver_SetRootsOwnerDirWins(t *testing.T) {
 	c := r.Closure(context.Background(), uris["main.rms"])
 
 	require.Empty(t, c.Missing)
-	assert.Contains(t, c.Resolved[0].Target, mapDir, "the owner directory resolves first")
+	assert.Contains(t, c.Resolved[0].Target, uri.File(mapDir).String(), "the owner directory resolves first")
 }
 
 // TestResolver_SetRootsEscapeBlocked checks that a root-relative
@@ -494,7 +531,9 @@ func TestResolver_Drop(t *testing.T) {
 	c = r.Closure(context.Background(), uris["main.rms"])
 	require.Equal(t, "aaaa", c.Xs[0].File.Decls[0].Name, "an unchanged fingerprint keeps the cache")
 
-	r.Drop([]string{libPath, filepath.Join(dir, "unknown.xs")})
+	// cache keys are FsPath-normalized (the Windows drive letter comes
+	// back lowercase), so Drop paths go through the same URI conversion
+	r.Drop([]string{uri.File(libPath).FsPath(), uri.File(filepath.Join(dir, "unknown.xs")).FsPath()})
 
 	c = r.Closure(context.Background(), uris["main.rms"])
 	require.Equal(t, "bbbb", c.Xs[0].File.Decls[0].Name, "Drop forces the disk re-read")

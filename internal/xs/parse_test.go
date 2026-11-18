@@ -249,7 +249,7 @@ func TestXsParse_Prelude(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, 884, externs)
+	assert.Equal(t, 1172, externs)
 
 	// a known extern is navigable
 	name, found := file.SymbolAt(common.Pos{Line: 7, Column: 19})
@@ -281,6 +281,37 @@ func TestXsParse_ConstLocalDecl(t *testing.T) {
 	require.Len(t, first.Exprs, 1)
 	assert.Equal(t, "=", first.Exprs[0].Value)
 	assert.Equal(t, "cGenghisKhan", first.Exprs[0].Children[0].Value)
+}
+
+// TestXsParse_ReturnParensFlag records whether a return value starts
+// with an opening parenthesis: the game's XS parser rejects a bare
+// return value (Error 0324/0141), so analysis needs the distinction
+// from the AST.
+func TestXsParse_ReturnParensFlag(t *testing.T) {
+	t.Parallel()
+
+	src := `int parenthesized() {
+	return (34.0);
+}
+int bare() {
+	return 34.0;
+}
+void empty() {
+	return;
+}
+int vectorVal() {
+	return (1, 2, 3);
+}
+`
+
+	file, diags := XsParse(src, "returns.xs")
+	require.Empty(t, diags, "all four shapes must parse cleanly: %v", messages(diags))
+
+	require.Len(t, file.Decls, 4)
+	assert.True(t, file.Decls[0].Body[0].Parens, "return (34.0); — parens recorded")
+	assert.False(t, file.Decls[1].Body[0].Parens, "return 34.0; — bare value")
+	assert.False(t, file.Decls[2].Body[0].Parens, "return; — no value")
+	assert.True(t, file.Decls[3].Body[0].Parens, "return (1, 2, 3); — vector literal")
 }
 
 // TestXsParse_ForTwoSections covers the real-world XS for shape:

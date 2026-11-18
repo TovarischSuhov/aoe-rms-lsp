@@ -21,4 +21,9 @@ type Candidate struct {
 	// Sort is the SortText basis: a context-group digit followed by
 	// Label, giving a deterministic ordering of candidate groups.
 	Sort string
+	// Include is the include argument of the file providing the symbol
+	// (auto-include candidates: symbols from available-but-not-included
+	// files); accepting such a candidate must also insert the include
+	// line. Empty for in-scope and kb candidates.
+	Include string
 }

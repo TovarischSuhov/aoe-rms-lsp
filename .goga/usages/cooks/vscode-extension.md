@@ -119,6 +119,33 @@ The state→label mapping lives in `src/statusbar.ts` as a pure function
 without a vscode import, unit-tested by `node --test` outside the
 extension host (the src/install.ts pattern).
 
+## Steam game detection (src/gamedetect.ts)
+
+`detectGameIncludeRoots(realSteamEnv())` runs at activation, before the
+client starts: standard Steam roots per platform plus
+`libraryfolders.vdf` libraries → the first `<lib>/steamapps/common/AoE2DE`
+holding the resource folders (layout facts and the `resources/_common`
+spelling warning live in the aoe2-game-paths cook). The result is written
+to `aoe2lsp.includeRoots` (Global) only when the user has not set it at
+any level (`config.inspect()` — any explicit value, including `[]`,
+wins); a not-found game stays silent and failures only log to the output
+channel — detection never blocks activation. Pure Node module, no vscode
+import: filesystem goes through the `SteamEnv` seam, unit-tested by
+`test/gamedetect.test.ts` against real tmpdir fixtures (the
+src/install.ts pattern).
+
+## File rename support
+
+`workspace/willRenameFiles` needs no client-side code in VS Code: the
+editor implements the protocol (client capability
+`workspace.fileOperations.willRename` is built in) — renaming a .rms/.xs
+in the explorer fires the request against the server's
+`Workspace.FileOperations.WillRename` capability and applies the
+returned WorkspaceEdit over the `#include` directives, including files
+that are not open. Other clients must support the request themselves
+(e.g. nvim built-in LSP does not send willRenameFiles — no extension
+shim exists; renames there stay manual).
+
 ## Settings pass-through
 
 VS Code answers the server's `workspace/configuration` pull from
