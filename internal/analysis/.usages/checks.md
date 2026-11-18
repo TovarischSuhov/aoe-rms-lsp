@@ -42,7 +42,9 @@ diags := analyzer.AnalyzeXs(xsFile, externals)
 | bad-argument-value | error | значение аргумента вне диапазона (percent 0..100) |
 | deprecated-effect-percent | warning | effect_percent устарел в пользу операторов (из kb nuances.json; будущие deprecated-имена получают свои коды из тех же данных) |
 | typo-alias | warning | имя — известная опечатка; сообщение называет правильное написание (данные kb nuances.json) |
-| probably-ignored | hint | атрибут — задокументированный no-op в этой позиции, игра его игнорирует (данные kb nuances.json) |
+| probably-ignored | hint | атрибут — задокументированный no-op в этой позиции, игра его игнорирует (данные kb nuances.json; in-game верифицированные пары: set_scale_by_size/groups на create_object — правильная альтернатива set_scaling_to_map_size; вложенный create_terrain на create_terrain) |
+| misplaced-attribute | hint | create_*-атрибут (terrain_type / base_terrain — данные noop_statements) записан как самостоятельная команда: движок молча игнорирует (in-game верифицировано 2026-11-18); замещает unknown-command для unknown-имён |
+| create-land-positional | hint | create_land с позиционным аргументом: с ним ленд не создаётся вовсе (in-game 2026-11-18); конфигурация — в блок (land_position, base_size…); create_elevation N валиден |
 | legacy-… | hint | #-директива устарела механически, но работает (код и текст из kb nuances.json) |
 | undefined-symbol | error | ident вне объявлений и kb |
 | bad-arity | error | неверное число аргументов вызова |

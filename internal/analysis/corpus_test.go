@@ -89,7 +89,7 @@ func xsShaped(file xs.XsFile) bool {
 func assertAnalysisAcceptance(t *testing.T, scriptShaped bool, diags []common.Diagnostic) {
 	t.Helper()
 
-	unused, unusedFunctions, emptySections := 0, 0, 0
+	unused, unusedFunctions, emptySections, misplaced, positional, ignored := 0, 0, 0, 0, 0, 0
 	for _, d := range diags {
 		switch d.Code {
 		case CodeDuplicateDeclaration:
@@ -107,12 +107,18 @@ func assertAnalysisAcceptance(t *testing.T, scriptShaped bool, diags []common.Di
 			}
 		case CodeEmptySection:
 			emptySections++
+		case CodeMisplacedAttribute:
+			misplaced++
+		case CodeCreateLandPositional:
+			positional++
+		case CodeProbablyIgnored:
+			ignored++
 		}
 	}
 
-	if unused > 0 || emptySections > 0 {
-		t.Logf("findings: unused-declaration %d (%d function-level), empty-section %d",
-			unused, unusedFunctions, emptySections)
+	if unused > 0 || emptySections > 0 || misplaced > 0 || positional > 0 || ignored > 0 {
+		t.Logf("findings: unused %d (%d fn-level), empty %d, misplaced %d, land-positional %d, probably-ignored %d",
+			unused, unusedFunctions, emptySections, misplaced, positional, ignored)
 	}
 }
 

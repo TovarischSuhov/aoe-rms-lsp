@@ -51,6 +51,14 @@ const (
 	// CodeEmptySection marks a section header with no statements before
 	// the next header.
 	CodeEmptySection = "empty-section"
+	// CodeMisplacedAttribute marks a create_* attribute written as a
+	// standalone statement (terrain_type / base_terrain in curated data):
+	// the engine silently ignores it.
+	CodeMisplacedAttribute = "misplaced-attribute"
+	// CodeCreateLandPositional marks create_land with positional
+	// arguments: with one, the land is not created at all (in-game
+	// verified).
+	CodeCreateLandPositional = "create-land-positional"
 	// CodeUnusedDeclaration marks a declaration with no references:
 	// locals never mentioned again and top-level functions unreachable
 	// from the file's engine entry points (rules and events).
@@ -203,6 +211,49 @@ func (a *Analyzer) walkStmts(stmts []rms.Statement, diags []common.Diagnostic) [
 			// positional args of the block statement itself.
 			diags = a.checkBlockStmt(stmt, diags)
 		}
+
+		diags = a.checkStatementNuances(stmt, diags)
+	}
+
+	return diags
+}
+
+// checkStatementNuances runs the curated statement-level nuances on
+// every statement (commands and structural blocks alike):
+//
+//   - terrain_type / base_terrain written as standalone commands are
+//     attributes of create_* blocks, not commands; the engine silently
+//     ignores them (in-game verified 2026-11-18, REDv1/v2 pattern)
+//   - create_land with positional arguments breaks land creation — the
+//     map generates without the land (in-game verified 2026-11-18).
+//     Only create_land: create_elevation legitimately takes a number
+//     (guide:293).
+func (a *Analyzer) checkStatementNuances(stmt *rms.Statement, diags []common.Diagnostic) []common.Diagnostic {
+	if stmt.Name == "" {
+		return diags
+	}
+
+	if a.store.NoopStatement(stmt.Name) {
+		// unknown names were already replaced by the misplaced hint in
+		// checkCommand; a kb-known command (base_terrain parses as one)
+		// still needs the nuance on top
+		if _, known := a.store.Command(stmt.Name); known {
+			diags = append(diags, common.Diagnostic{
+				Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
+				Severity: common.SeverityHint,
+				Message:  fmt.Sprintf("%q is an attribute of create_* blocks, not a standalone command; the game ignores it — move it inside a create_terrain block", stmt.Name),
+				Code:     CodeMisplacedAttribute,
+			})
+		}
+	}
+
+	if stmt.Name == "create_land" && len(stmt.Args) > 0 {
+		diags = append(diags, common.Diagnostic{
+			Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
+			Severity: common.SeverityHint,
+			Message:  "create_land does not take positional arguments; with one, the land is not created at all — move the configuration into the braces (land_position, base_size, …)",
+			Code:     CodeCreateLandPositional,
+		})
 	}
 
 	return diags
@@ -296,6 +347,20 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 				Message:  fmt.Sprintf("unknown command %q; did you mean %q?", stmt.Name, right),
 				Code:     CodeTypoAlias,
 			})
+		}
+
+		// a known no-op statement (terrain_type, base_terrain — curated
+		// in-game data): replaces the unknown-command error with the
+		// precise misplaced-attribute hint (the nuance ladder)
+		if a.store.NoopStatement(stmt.Name) {
+			diags = append(diags, common.Diagnostic{
+				Range:    common.Range{Start: stmt.Range.Start, End: stmt.Range.Start},
+				Severity: common.SeverityHint,
+				Message:  fmt.Sprintf("%q is an attribute of create_* blocks, not a standalone command; the game ignores it — move it inside a create_terrain block", stmt.Name),
+				Code:     CodeMisplacedAttribute,
+			})
+
+			return diags
 		}
 
 		diags = append(diags, common.Diagnostic{

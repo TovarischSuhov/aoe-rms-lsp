@@ -44,7 +44,6 @@ func TestAnalyzeRms_Checks(t *testing.T) {
 		{
 			name: "valid commands and attributes are clean",
 			src: `<LAND_GENERATION>
-base_terrain GRASS
 create_land {
 	land_percent 20
 }`,
@@ -76,9 +75,9 @@ create_land {
 		{
 			name: "too many arguments",
 			src: `<LAND_GENERATION>
-base_terrain GRASS JUNK
+create_land 1 2 3
 `,
-			want: []string{CodeBadArgument},
+			want: []string{CodeCreateLandPositional, CodeBadArgument},
 		},
 		{
 			name: "effect_percent is deprecated",
@@ -140,7 +139,8 @@ land_percent rand_float(10, 20)
 			name: "directives are not commands",
 			src: `#const START_GOLD 800
 <LAND_GENERATION>
-base_terrain GRASS
+create_land {
+}
 `,
 			want: []string{},
 		},
@@ -617,7 +617,8 @@ func TestAnalyzeRms_Sections(t *testing.T) {
 			src: `<PLAYER_SETUP>
 random_placement
 <LAND_GENERATION>
-base_terrain GRASS
+create_land {
+}
 <ELEVATION_GENERATION>
 <CLIFF_GENERATION>
 <OBJECTS_GENERATION>
@@ -632,7 +633,8 @@ base_terrain GRASS
 			src: `<PLAYER_SETUP>
 random_placement
 <LAND_GENERATION>
-base_terrain GRASS
+create_land {
+}
 <OBJECTS_GENERATION>
 `,
 			want: []string{CodeEmptySection},
@@ -642,11 +644,13 @@ base_terrain GRASS
 			src: `<PLAYER_SETUP>
 random_placement
 <LAND_GENERATION>
-base_terrain GRASS
+create_land {
+}
 <ELEVATION_GENERATION>
 <CLIFF_GENERATION>
 <TERRAIN_GENERATION>
-base_terrain GRASS
+create_terrain DIRT {
+}
 `,
 			want: []string{CodeEmptySection, CodeEmptySection},
 		},
@@ -655,10 +659,12 @@ base_terrain GRASS
 			src: `<PLAYER_SETUP>
 random_placement
 <LAND_GENERATION>
-base_terrain GRASS
+create_land {
+}
 <ELEVATION_GENERATION>
 <TERRAIN_GENERATION>
-base_terrain GRASS
+create_terrain DIRT {
+}
 <CLIFF_GENERATION>
 <OBJECTS_GENERATION>
 `,
@@ -831,4 +837,119 @@ int _stringLast = 0;
 	a := newAnalyzer(t)
 
 	assert.Equal(t, []string{}, codes(a.AnalyzeXs(file, nil)))
+}
+
+// TestAnalyzeRms_StatementNuances pins the in-game verified statement
+// nuances (2026-11-18): bare terrain_type/base_terrain statements and
+// positional create_land args are flagged, attribute-position usages
+// and create_elevation N stay quiet, noop pairs fire probably-ignored.
+func TestAnalyzeRms_StatementNuances(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "bare terrain_type statement is misplaced",
+			src: `<TERRAIN_GENERATION>
+start_random
+	percent_chance 100
+		terrain_type WATER
+end_random
+`,
+			want: []string{CodeMisplacedAttribute},
+		},
+		{
+			name: "bare base_terrain statement is misplaced",
+			src: `<TERRAIN_GENERATION>
+start_random
+	percent_chance 100
+		base_terrain WATER
+end_random
+`,
+			want: []string{CodeMisplacedAttribute},
+		},
+		{
+			name: "terrain_type as an attribute stays quiet",
+			src: `<LAND_GENERATION>
+create_land {
+	terrain_type GRASS
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "positional create_land is flagged",
+			src: `<LAND_GENERATION>
+create_land 2 {
+}
+`,
+			want: []string{CodeCreateLandPositional, CodeBadArgument},
+		},
+		{
+			name: "create_land without args is quiet",
+			src: `<LAND_GENERATION>
+create_land {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "create_elevation keeps its positional number",
+			src: `<ELEVATION_GENERATION>
+create_elevation 3 {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "set_scale_by_size on create_object is probably ignored",
+			src: `<OBJECTS_GENERATION>
+create_object HOUSE {
+	set_scale_by_size
+}
+`,
+			want: []string{CodeProbablyIgnored},
+		},
+		{
+			name: "set_scale_by_groups on create_object is probably ignored",
+			src: `<OBJECTS_GENERATION>
+create_object HOUSE {
+	set_scale_by_groups
+}
+`,
+			want: []string{CodeProbablyIgnored},
+		},
+		{
+			name: "nested create_terrain is probably ignored",
+			src: `<TERRAIN_GENERATION>
+create_terrain DIRT {
+	base_terrain GRASS
+	create_terrain WATER
+}
+`,
+			want: []string{CodeProbablyIgnored},
+		},
+		{
+			name: "set_scale_by_size on create_terrain stays quiet",
+			src: `<TERRAIN_GENERATION>
+create_terrain DIRT {
+	set_scale_by_size
+}
+`,
+			want: []string{},
+		},
+	}
+
+	a := newAnalyzer(t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			file, _ := rms.Parse(tt.src, "test.rms")
+
+			assert.Equal(t, tt.want, codes(a.AnalyzeRms(file)))
+		})
+	}
 }
