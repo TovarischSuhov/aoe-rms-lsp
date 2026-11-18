@@ -398,6 +398,16 @@ func TestAnalyze_DuplicateIncludeDiagnostic(t *testing.T) {
 			doc:  "#include \"a.rms\"\n#include \"b.rms\"\n",
 			want: []string{},
 		},
+		{
+			name: "transitive duplicate: dependency already includes the target",
+			doc:  "#include \"a.rms\"\n#include \"lands.rms\"\n",
+			want: []string{"2 duplicate-include@1: duplicate include: lands.rms is already included by a.rms"},
+		},
+		{
+			name: "transitive duplicate: order does not matter, effects apply twice",
+			doc:  "#include \"lands.rms\"\n#include \"a.rms\"\n",
+			want: []string{"2 duplicate-include@0: duplicate include: lands.rms is already included by a.rms"},
+		},
 	}
 
 	for _, tc := range cases {

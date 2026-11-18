@@ -205,9 +205,14 @@ Annotations: |
       2. Пересчитать диагностики (общая функция с DidChange):
          вычислить `Closure` для uri; записи `MissingInclude` с Owner==uri →
          Diagnostic (code="missing-include", range директивы); из
-         Resolved-записей замыкания директивы Owner==uri, чей target уже
-         включён более ранней директивой документа → Diagnostic
-         (code="duplicate-include", warning, range директивы); RMS:
+         Resolved-записей замыкания директивы Owner==uri: повтор внутри
+         документа (target уже включён более ранней директивой документа)
+         ИЛИ транзитивный дубль (target также включается каким-то файлом
+         зависимости — движок без include-guard применяет эффекты
+         дважды при любом порядке; повтор, целиком принадлежащий
+         зависимостям, остаётся без правки в корне и молчит) → Diagnostic
+         (code="duplicate-include", warning, range директивы, сообщение
+         называет включившего для транзитивного случая); RMS:
          синтаксис + `Analyzer`; inline `XsBlock`: пропустить код через
          `XsParse` и передать в `Analyzer` с внешними декларациями
          замыкания (пустыми для inline-блока); .xs: `Analyzer` с внешними
