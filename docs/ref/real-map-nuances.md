@@ -27,13 +27,38 @@
 
 ## 1. Директивы
 
-### `#include_drs <файл> <id>` — ❓ легаси, терпится движком DE
+### `#include_drs <файл> <id>` — ✅ работает в DE («легаси no-op» опровергнуто 23.10.2026)
 
 78 использований в 45 из 100 карт — включая **официальные карты DE**
 (`real_world_*`, порты `es@*` из репо
 [Naramsim/AoE2-random-map-scripts](https://github.com/Naramsim/AoE2-random-map-scripts)).
-DRS-архивов в DE нет — директива фактически no-op, но официальный контент
-её массово содержит (наследие AoC/HD).
+
+Первичная редакция этого раздела («DRS-архивов в DE нет — директива
+фактически no-op») опровергнута первушкой (карта пользователя, слот #98):
+
+- в установке DE цели лежат **развёрнутыми файлами** в
+  `resources/_common/drs/gamedata_x2/` (307 файлов: `random_map.def`,
+  `std_resources.inc`, ~300 `*.inc`) — движок резолвит `#include_drs` по
+  имени из этого каталога;
+- это **основная форма подключения в DE**: в официальном корпусе
+  (`.corpus-official`) `#include_drs` используется 2649×, bare `#include`
+  — ни разу (гайд относит `#include` к «Non-Functional Syntax»);
+- `#include_drs` резолвит и **относительные пути** рядом с картой —
+  официальная Oasis.rms подключает `includes/scaling.inc`,
+  `includes/preliminaries.inc` и т.д.;
+- содержимое подключений значимо: `std_resources.inc` — целые
+  `create_object`-блоки (ратуша, жители, скаут, реликвии), спецресурсы
+  Gold Rush / Crater Lake.
+
+Числовой id (54000/54101) — адресация DRS-архива AoC/HD; в DE файлы
+развёрнуты, id предположительно игнорируется (поиск по имени) — проверяется
+шагом 2 карты
+[nuance-98-include-drs.rms](nuance-maps/nuance-98-include-drs.rms).
+
+LSP: директива трактуется как полноценный include (замыкание, навигация,
+`MissingInclude` — PR #149); авторезолв из игрового каталога — game-detect
+`includeRoots` (issues #82/#123). Механика резолюции описана в
+[знании](/knowledge/architecture/include-drs-resolution.md).
 
 - Пример: [`real_world_madagascar.rms`](https://github.com/Naramsim/AoE2-random-map-scripts/blob/018d0bfc05d2b5851fdd06ef27e503c026a168b5/The%20forgotten/real_world_madagascar.rms)
 - Пример: [`KHR_WSVG_Chaos Pit.rms`](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Chaos%20Pit.rms)
