@@ -16,6 +16,8 @@ verified:
     at: 2026-09-22T07:12:06Z
   - by: claude-code/claude-sonnet-4-6
     at: 2026-10-16T00:00:00Z
+  - by: claude-code/glm-5.3
+    at: 2026-11-18T12:45:00Z
 ---
 
 # Проверка изменений
@@ -41,6 +43,17 @@ timeout 300 systemd-run --user --scope -p MemoryMax=1500M -p MemorySwapMax=0 \
 ```
 
 Race-прогон — в CI (`go test -race ./...`), не локально.
+
+### Windows-машины
+
+`systemd-run`/cgroups недоступны — локально `timeout 300 go test ./... -count=1`
+без капа (решение 2026-11-18); race и memory-cap остаются в CI. `make test`
+на Windows не работает, остальные цели Makefile — работают.
+
+Рабочая копия обязана быть LF: с `core.autocrlf=true` gofumpt рапортует
+ложные «not properly formatted», а golden-тесты (kb) падают на CRLF.
+Лечение: `git config core.autocrlf input` в репозитории +
+перечекаут (`git rm -r --cached . && git reset --hard`).
 
 ## Corpus gate
 
