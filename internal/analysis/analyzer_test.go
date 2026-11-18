@@ -601,6 +601,93 @@ event onTick {
 	}
 }
 
+// TestAnalyzeRms_Sections checks the structural section lints: the
+// required-section warning fires only on map-shaped files (four or
+// more headers — thinner files are include fragments) and the
+// empty-section hint fires on headers without statements.
+func TestAnalyzeRms_Sections(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "map-shaped without terrain fires missing-section",
+			src: `<PLAYER_SETUP>
+random_placement
+<LAND_GENERATION>
+base_terrain GRASS
+<ELEVATION_GENERATION>
+<CLIFF_GENERATION>
+<OBJECTS_GENERATION>
+`,
+			want: []string{
+				CodeMissingSection,
+				CodeEmptySection, CodeEmptySection, CodeEmptySection,
+			},
+		},
+		{
+			name: "fragment with three headers escapes missing-section",
+			src: `<PLAYER_SETUP>
+random_placement
+<LAND_GENERATION>
+base_terrain GRASS
+<OBJECTS_GENERATION>
+`,
+			want: []string{CodeEmptySection},
+		},
+		{
+			name: "terrain present means no missing-section",
+			src: `<PLAYER_SETUP>
+random_placement
+<LAND_GENERATION>
+base_terrain GRASS
+<ELEVATION_GENERATION>
+<CLIFF_GENERATION>
+<TERRAIN_GENERATION>
+base_terrain GRASS
+`,
+			want: []string{CodeEmptySection, CodeEmptySection},
+		},
+		{
+			name: "empty section in the middle",
+			src: `<PLAYER_SETUP>
+random_placement
+<LAND_GENERATION>
+base_terrain GRASS
+<ELEVATION_GENERATION>
+<TERRAIN_GENERATION>
+base_terrain GRASS
+<CLIFF_GENERATION>
+<OBJECTS_GENERATION>
+`,
+			want: []string{
+				CodeEmptySection,
+				CodeEmptySection, CodeEmptySection,
+			},
+		},
+		{
+			name: "bare headers only are empty sections, not missing",
+			src: `<LAND_GENERATION>
+<ELEVATION_GENERATION>
+`,
+			want: []string{CodeEmptySection, CodeEmptySection},
+		},
+	}
+
+	a := newAnalyzer(t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			file, _ := rms.Parse(tt.src, "test.rms")
+
+			assert.Equal(t, tt.want, codes(a.AnalyzeRms(file)))
+		})
+	}
+}
+
 // TestAnalyzeXs_Invariants checks sorting, severity and AST immutability.
 func TestAnalyzeXs_Invariants(t *testing.T) {
 	t.Parallel()
