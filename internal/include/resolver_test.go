@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -390,7 +391,10 @@ func TestResolver_TwoSpellingsOwnTargetURI(t *testing.T) {
 	})
 
 	plain := uri.File(filepath.Join(dir, "sub", "main.rms")).String()
-	dotted := "file://" + filepath.ToSlash(dir) + "/sub/../sub/main.rms"
+	// a dot-segment spelling of the same document; building it by hand
+	// (file:// + path) puts the drive letter in the host position on
+	// Windows, so it is spliced into the canonical spelling instead
+	dotted := strings.Replace(plain, "/sub/main.rms", "/sub/../sub/main.rms", 1)
 	require.NotEqual(t, plain, dotted)
 	require.Equal(t, canonicalPath(plain), canonicalPath(dotted), "same cache key")
 
@@ -434,14 +438,16 @@ func TestResolver_SetRootsFallback(t *testing.T) {
 	c = r.Closure(context.Background(), uris["main.rms"])
 	require.Empty(t, c.Missing)
 	require.Len(t, c.Rms, 2)
-	assert.Contains(t, c.Resolved[0].Target, first, "the first root wins")
+	// Target is a URI string; the raw path never appears in it on
+	// Windows (drive percent-encoding, forward slashes)
+	assert.Contains(t, c.Resolved[0].Target, uri.File(first).String(), "the first root wins")
 
 	// replacement: only the second root stays
 	r.SetRoots([]string{second})
 
 	c = r.Closure(context.Background(), uris["main.rms"])
 	require.Empty(t, c.Missing)
-	assert.Contains(t, c.Resolved[0].Target, second, "SetRoots replaces the set")
+	assert.Contains(t, c.Resolved[0].Target, uri.File(second).String(), "SetRoots replaces the set")
 
 	// clearing returns to the missing state
 	r.SetRoots(nil)
@@ -470,7 +476,7 @@ func TestResolver_SetRootsOwnerDirWins(t *testing.T) {
 	c := r.Closure(context.Background(), uris["main.rms"])
 
 	require.Empty(t, c.Missing)
-	assert.Contains(t, c.Resolved[0].Target, mapDir, "the owner directory resolves first")
+	assert.Contains(t, c.Resolved[0].Target, uri.File(mapDir).String(), "the owner directory resolves first")
 }
 
 // TestResolver_SetRootsEscapeBlocked checks that a root-relative
@@ -525,7 +531,9 @@ func TestResolver_Drop(t *testing.T) {
 	c = r.Closure(context.Background(), uris["main.rms"])
 	require.Equal(t, "aaaa", c.Xs[0].File.Decls[0].Name, "an unchanged fingerprint keeps the cache")
 
-	r.Drop([]string{libPath, filepath.Join(dir, "unknown.xs")})
+	// cache keys are FsPath-normalized (the Windows drive letter comes
+	// back lowercase), so Drop paths go through the same URI conversion
+	r.Drop([]string{uri.File(libPath).FsPath(), uri.File(filepath.Join(dir, "unknown.xs")).FsPath()})
 
 	c = r.Closure(context.Background(), uris["main.rms"])
 	require.Equal(t, "bbbb", c.Xs[0].File.Decls[0].Name, "Drop forces the disk re-read")
