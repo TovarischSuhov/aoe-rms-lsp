@@ -1137,6 +1137,8 @@ func (s *Server) CodeAction(
 			out = appendAction(out, s.renameAction(params, diag))
 		case analysis.CodeDeprecatedEffectPercent:
 			out = appendAction(out, s.replaceEffectPercentAction(params, diag))
+		case analysis.CodeMissingSection:
+			out = appendAction(out, s.insertSectionAction(params, diag))
 		case codeMissingInclude:
 			out = appendAction(out, s.createIncludeAction(params, diag))
 		}
@@ -1215,6 +1217,47 @@ func (s *Server) replaceWordAction(
 		Diagnostics: []protocol.Diagnostic{*diag},
 		Edit: &protocol.WorkspaceEdit{Changes: map[uri.URI][]protocol.TextEdit{
 			params.TextDocument.URI: {{Range: s.toProtocolRange(text, word), NewText: newText}},
+		}},
+	}
+}
+
+// insertSectionAction builds the missing-section fix: a zero-width
+// insert of the section skeleton before the first section header (the
+// diagnostic range start — the analyzer points it there). The terrain
+// skeleton carries a base_terrain line so the fixed map generates
+// something valid right away.
+func (s *Server) insertSectionAction(
+	params *protocol.CodeActionParams,
+	diag *protocol.Diagnostic,
+) *protocol.CodeAction {
+	message := messageText(diag.Message)
+	name, ok := strings.CutPrefix(message, "missing required section <")
+	if !ok {
+		return nil
+	}
+	end := strings.Index(name, ">")
+	if end <= 0 {
+		return nil
+	}
+	name = name[:end]
+
+	skeleton := "<" + name + ">\n"
+	if name == "TERRAIN_GENERATION" {
+		skeleton += "base_terrain GRASS\n"
+	}
+	skeleton += "\n"
+
+	kind := protocol.CodeActionKindQuickFix
+
+	return &protocol.CodeAction{
+		Title:       "Insert <" + name + "> section",
+		Kind:        &kind,
+		Diagnostics: []protocol.Diagnostic{*diag},
+		Edit: &protocol.WorkspaceEdit{Changes: map[uri.URI][]protocol.TextEdit{
+			params.TextDocument.URI: {{
+				Range:   protocol.Range{Start: diag.Range.Start, End: diag.Range.Start},
+				NewText: skeleton,
+			}},
 		}},
 	}
 }
