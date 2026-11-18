@@ -280,10 +280,29 @@ void f() {
 		{
 			name: "return type mismatch",
 			src: `int f() {
-	return 1.5;
+	return (1.5);
 }
 `,
 			want: []string{CodeBadType},
+		},
+		{
+			name: "bare return value is rejected by the game",
+			src: `float f() {
+	return 1.5;
+}
+`,
+			want: []string{CodeReturnParens},
+		},
+		{
+			name: "parenthesized return value is clean",
+			src: `float f() {
+	return (1.5);
+}
+void g() {
+	return;
+}
+`,
+			want: []string{},
 		},
 		{
 			name: "untyped locals stay silent",
@@ -824,7 +843,7 @@ func TestAnalyzeXs_ConstQualifierCompatible(t *testing.T) {
 	// returned and assigned freely (xslibs: 490 false bad-type before)
 	src := `extern const int cOk = 0;
 int status() {
-	return cOk;
+	return (cOk);
 }
 void main() {
 	int last = status();

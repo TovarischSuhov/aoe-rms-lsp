@@ -59,6 +59,11 @@ const (
 	// arguments: with one, the land is not created at all (in-game
 	// verified).
 	CodeCreateLandPositional = "create-land-positional"
+	// CodeReturnParens marks a return value not enclosed in parentheses:
+	// the game's XS parser rejects the file (Error 0324/0141, in-game
+	// verified; ugc-guide xs/programmer.md: "the return value must always
+	// be inside parantheses").
+	CodeReturnParens = "return-parens"
 	// CodeUnusedDeclaration marks a declaration with no references:
 	// locals never mentioned again and top-level functions unreachable
 	// from the file's engine entry points (rules and events).
@@ -861,8 +866,19 @@ func (a *Analyzer) walkStmtsXs(stmts []xs.Stmt, declared map[string]bool, env *T
 			env.declareLocals(stmt.Exprs)
 		}
 
-		if stmt.Kind == xs.StmtReturn && len(stmt.Exprs) > 0 && knownXsType(fnType) {
-			diags = a.checkReturnType(stmt.Exprs[0], env, fnType, diags)
+		if stmt.Kind == xs.StmtReturn && len(stmt.Exprs) > 0 {
+			if !stmt.Parens {
+				diags = append(diags, common.Diagnostic{
+					Range:    stmt.Exprs[0].Range,
+					Severity: common.SeverityError,
+					Message:  "return value must be enclosed in parentheses: return (value); the game rejects a bare return value",
+					Code:     CodeReturnParens,
+				})
+			}
+
+			if knownXsType(fnType) {
+				diags = a.checkReturnType(stmt.Exprs[0], env, fnType, diags)
+			}
 		}
 
 		for j := range stmt.Exprs {

@@ -763,10 +763,15 @@ func (p *xparser) parseCase() Stmt {
 	return stmt
 }
 
-// parseReturn parses return with an optional value.
+// parseReturn parses return with an optional value. The value's opening
+// parenthesis is remembered on the statement: the game's XS parser
+// rejects a bare return value (analysis reports it as return-parens).
 func (p *xparser) parseReturn() Stmt {
 	kw := p.next() // return
-	stmt := Stmt{Kind: StmtReturn, Range: common.Range{Start: kw.at.Start, End: kw.at.End}}
+	stmt := Stmt{
+		Kind: StmtReturn, Parens: p.atOp("("),
+		Range: common.Range{Start: kw.at.Start, End: kw.at.End},
+	}
 
 	if !p.atOp(";") {
 		if value, ok := p.parseExpr(); ok {
