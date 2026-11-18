@@ -48,4 +48,28 @@ model — дизайн-решение слота**; corpus acceptance.
 
 ## Result
 
-(заполняется по завершении)
+- Код `unused-declaration` (**hint**) в internal/analysis:
+  - **Entry-point model**: rules/events — engine-roots; в
+    script-shaped файлах (≥1 rule/event) топ-левел функции,
+    недостижимые из roots транзитивно по графу вызовов (рекурсия без
+    входа — тоже мертва), получают hint на `Decl.Range`; файл без
+    rules/events — библиотека (корпус: `013__vectorStringDict.xs`, 18
+    экспортируемых функций) — топ-левел не трогается; top-level
+    переменные не помечаются вовсе (side-effect инициализация,
+    static-семантика, prelude-глобалы `local int cAge* = …`)
+  - **Локали** в телах function/rule/event: имя без единого упоминания
+    в теле → hint на `Expr.Range`; декларатор сам себе использованием
+    не считается; инициализатор с вызовом молчит (side effect);
+    top-level `local`-глобалы прелюдии защищены ограничением проверки
+    исполняемыми телами
+- Приёмка: corpus — duplicate 0/100 (как было), unused **0 находок**
+  (гейт `TestCorpus_NoDuplicateDecls` расширен: функция-level hint в
+  библиотечном файле валит прогон, остальное — счётчики в лог)
+- Тесты: `TestAnalyzeXs_UnusedDecls` — 9 кейсов (unused локаль,
+  call-инициализатор, use во вложенном скоупе, script-shape
+  reachability, транзитивность, мёртвая рекурсия, library-skip,
+  rules/events, top-level переменные); фикстуры существующих тестов
+  дополнены использованиями (честные true-positive срабатывания)
+- Проверки: 15/15 пакетов ok, lint 0, fmt чисто, corpus harness
+  100/100 ok panic 0
+- Дока кода — `checks.md`; severityOverrides — общий механизм
