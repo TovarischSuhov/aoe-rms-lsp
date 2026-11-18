@@ -34,4 +34,23 @@ Statement с Args → код.
 
 ## Result
 
-(заполняется по завершении)
+- **#99 + #104 (данные)**: nuances.json — 3 noop-пары
+  (create_object×set_scale_by_size/groups; create_terrain×create_terrain —
+  вложенная форма в AST это Attribute) → probably-ignored hint через
+  готовую лестницу
+- **#108 (код)**: kb — `noop_statements` (новое поле nuances.json,
+  Store.NoopStatement); misplaced-attribute hint для bare
+  terrain_type/base_terrain: unknown-имена — замещает unknown-command
+  (checkCommand), kb-известные (base_terrain парсится как команда) —
+  сверху через checkStatementNuances
+- **#105 (код)**: create-land-positional hint для create_land с
+  позиционными аргументами (только create_land; create_elevation N
+  валиден); сопровождает честный bad-argument от арности
+- Corpus-гейт: duplicate/missing — 0 (гейты); находки-счётчики:
+  misplaced 112, probably-ignored 52, land-positional 0 (позиционной
+  формы в текущем пине корпуса нет — 8× из среза 09.09.2026)
+- Тесты: TestAnalyzeRms_StatementNuances — 10 кейсов; baselines
+  FixturesRegression обновлены (misplaced в 4 парсерных фикстурах);
+  фикстуры Checks/Sections переведены с base_terrain-филлера на
+  create_land
+- Проверки: 15/15 ok, lint 0; checks.md дополнен тремя кодами

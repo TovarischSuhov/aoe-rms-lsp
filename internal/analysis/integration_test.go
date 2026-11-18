@@ -38,15 +38,17 @@ func TestAnalyzeXs_PreludeNoFalsePositives(t *testing.T) {
 func TestAnalyzeRms_FixturesRegression(t *testing.T) {
 	t.Parallel()
 
-	// baseline observed before the value checks landed
+	// baseline observed before the value checks landed; misplaced-
+	// attribute entries come from bare base_terrain/terrain_type
+	// statements in the parser fixtures (statement-level nuance)
 	want := map[string][]string{
-		"broken.rms":       {CodeUnknownCommand},
+		"broken.rms":       {CodeMisplacedAttribute, CodeUnknownCommand},
 		"random.rms":       {CodeUnknownAttribute},
 		"conditionals.rms": {},
-		"expressions.rms":  {},
-		"includes.rms":     {},
+		"expressions.rms":  {CodeMisplacedAttribute},
+		"includes.rms":     {CodeMisplacedAttribute},
 		"positional.rms":   {},
-		"sections.rms":     {},
+		"sections.rms":     {CodeMisplacedAttribute},
 	}
 
 	files, err := filepath.Glob("../rms/testdata/*.rms")

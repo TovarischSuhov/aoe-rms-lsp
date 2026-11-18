@@ -31,6 +31,7 @@ type Store struct {
 	commandsBySect   map[string][]Command
 	attrByKey        map[string]CommandArg
 	noopAttrByKey    map[string]bool
+	noopStmtByName   map[string]bool
 	aliasByName      map[string]string
 	deprecatedByName map[string]marker
 	legacyByName     map[string]marker
@@ -108,6 +109,7 @@ func newStore() *Store {
 		commandsBySect:   make(map[string][]Command),
 		attrByKey:        make(map[string]CommandArg),
 		noopAttrByKey:    make(map[string]bool),
+		noopStmtByName:   make(map[string]bool),
 		aliasByName:      make(map[string]string),
 		deprecatedByName: make(map[string]marker),
 		legacyByName:     make(map[string]marker),
@@ -172,6 +174,13 @@ func (s *Store) Attribute(command string, attr string) (CommandArg, bool) {
 // the command: the game most likely ignores it in this position.
 func (s *Store) NoopAttribute(command string, attr string) bool {
 	return s.noopAttrByKey[attrKey(command, attr)]
+}
+
+// NoopStatement reports whether the name is a known no-op when written
+// as a standalone statement: an attribute of create_* blocks the game
+// silently ignores outside its owner block (in-game verified names).
+func (s *Store) NoopStatement(name string) bool {
+	return s.noopStmtByName[name]
 }
 
 // Alias returns the correct spelling for a known typo alias;
@@ -395,6 +404,18 @@ func (s *Store) indexNuances(raw []byte) error {
 		s.noopAttrByKey[key] = true
 	}
 
+	for _, name := range wire.NoopStatements {
+		if name == "" {
+			return fmt.Errorf("empty noop statement name")
+		}
+
+		if s.noopStmtByName[name] {
+			return fmt.Errorf("duplicate noop statement %q", name)
+		}
+
+		s.noopStmtByName[name] = true
+	}
+
 	for _, wa := range wire.Aliases {
 		if wa.Wrong == "" || wa.Right == "" {
 			return fmt.Errorf("empty alias name")
@@ -531,6 +552,7 @@ type argWire struct {
 // nuancesWire is the JSON shape of nuances.json.
 type nuancesWire struct {
 	NoopAttributes []noopAttrWire `json:"noop_attributes"`
+	NoopStatements []string       `json:"noop_statements"`
 	Aliases        []aliasWire    `json:"aliases"`
 	Deprecated     []markerWire   `json:"deprecated"`
 	Legacy         []markerWire   `json:"legacy"`
