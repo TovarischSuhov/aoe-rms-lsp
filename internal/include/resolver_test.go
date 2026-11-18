@@ -309,6 +309,37 @@ func readFile(t *testing.T, uriArg string) string {
 	return string(raw)
 }
 
+// TestWithinRoot checks the workspace bound on the unit level: targets
+// inside the root pass, parent-directory escapes fail on the native
+// path separator (on Windows filepath.Rel yields `..\`-prefixed
+// relatives), absolute paths elsewhere fail.
+func TestWithinRoot(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join(t.TempDir(), "workspace")
+	cases := []struct {
+		name    string
+		rootDir string
+		target  string
+		want    bool
+	}{
+		{"empty root disables the bound", "", filepath.Join(root, "inc.rms"), true},
+		{"target inside root", root, filepath.Join(root, "inc.rms"), true},
+		{"target is the root itself", root, root, true},
+		{"target in a subdirectory", root, filepath.Join(root, "sub", "inc.rms"), true},
+		{"direct parent escape", root, filepath.Join(root, "..", "outside.rms"), false},
+		{"nested parent escape", root, filepath.Join(root, "maps", "..", "..", "outside.rms"), false},
+		{"absolute path outside root", root, filepath.Join(t.TempDir(), "other.rms"), false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, withinRoot(tc.rootDir, tc.target))
+		})
+	}
+}
+
 // TestResolver_EscapeBeyondRootMissing checks the workspace bound: a
 // #include escaping the root document's directory becomes MissingInclude
 // even when the target exists on disk.
