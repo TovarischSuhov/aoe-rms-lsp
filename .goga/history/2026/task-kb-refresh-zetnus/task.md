@@ -31,4 +31,10 @@
 
 ## Result
 
-(заполняется по завершении)
+- Свежий экспорт гайда уложен в `docs/ref/zetnus-rms-guide.txt`
+  (gitignored, не вендорится); регенерация: 3 desc в
+  `rms-commands.json` (`ai_info_map_type`, `max_/min_number_of_cliffs`)
+- Проверки: тесты kb/hints/complete/server ok, lint 0 issues,
+  corpus gate 100/100 ok panic 0
+- Чеклист #132 закрыт полностью: UGC Guide — PR #189, Zetnus — здесь;
+  issue закрывается этим PR
