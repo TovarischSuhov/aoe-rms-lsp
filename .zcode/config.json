@@ -1,0 +1,8 @@
+{
+  "plugins": {
+    "enabledPlugins": {
+      "zcode-guide@zcode-plugins-official": false,
+      "plugin-creator@zcode-plugins-official": false
+    }
+  }
+}
