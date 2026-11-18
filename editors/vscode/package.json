@@ -106,7 +106,7 @@
             "type": "string"
           },
           "default": [],
-          "markdownDescription": "Extra absolute directories searched (in order, after the including file's directory) when resolving `#include` / `#includeXS`. Useful game folders under the AoE2 DE install: `resources_common/random-map-scripts` (stock maps shipped as loose files) and `resources_common/xs` (`Constants.xs`, `Effects.xs`, `x256tech.xs`, `ailib/Geometry.xs` for `#includeXS`)."
+          "markdownDescription": "Extra absolute directories searched (in order, after the including file's directory) when resolving `#include` / `#includeXS`. Useful game folders under the AoE2 DE install: `resources/_common/random-map-scripts` (stock maps shipped as loose files) and `resources/_common/xs` (`Constants.xs`, `Effects.xs`, `x256tech.xs`, `ailib/Geometry.xs` for `#includeXS`). Left unset, a Steam install of the game is detected automatically (an explicit setting always wins)."
         }
       }
     }

@@ -190,8 +190,8 @@ see its section below):
     },
     // extra #include search dirs, e.g. the game's resource folders:
     "includeRoots": [
-      "/abs/path/to/AoE2DE/resources_common/random-map-scripts",
-      "/abs/path/to/AoE2DE/resources_common/xs"
+      "/abs/path/to/AoE2DE/resources/_common/random-map-scripts",
+      "/abs/path/to/AoE2DE/resources/_common/xs"
     ]
   }
 }
@@ -231,6 +231,13 @@ system `tar` — into a per-version cache. Set `aoe2lsp.download.mode:
 "off"` to disable all network access; `aoe2lsp.serverPath` remains the
 manual override for a self-built binary.
 
+A Steam installation of AoE2 DE is detected automatically (standard Steam
+paths plus `libraryfolders.vdf`): when `aoe2lsp.includeRoots` has not been
+set, the game's `resources/_common/random-map-scripts` and
+`resources/_common/xs` are filled in on activation. An explicit
+`aoe2lsp.includeRoots` setting always wins; no Steam install — no
+settings change, no message.
+
 ### Neovim (nvim-lspconfig)
 
 Register the server manually (custom server, not shipped with lspconfig) —
@@ -251,8 +258,8 @@ if not configs.aoe2 then
       settings = {
         aoe2lsp = {
           includeRoots = {
-            '/path/to/AoE2DE/resources_common/random-map-scripts',
-            '/path/to/AoE2DE/resources_common/xs',
+            '/path/to/AoE2DE/resources/_common/random-map-scripts',
+            '/path/to/AoE2DE/resources/_common/xs',
           },
         },
       },

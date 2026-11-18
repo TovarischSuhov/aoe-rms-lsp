@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, ErrorAction, CloseAction, State } from "vscode-languageclient/node";
+import { detectGameIncludeRoots, realSteamEnv } from "./gamedetect.ts";
 import { resolveServer, wireEnv, type DownloadMode, type ServerResolution } from "./install.ts";
 import { statusView, type ServerPhase } from "./statusbar.ts";
 
@@ -67,6 +68,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		resolution = { command: "aoe2-lsp", origin: "path" };
 	}
 	output.appendLine(`server: ${resolution.command} (origin: ${resolution.origin})`);
+
+	// Steam auto-detect (issue #123): fill includeRoots from the detected
+	// game install before the client starts, so the first session already
+	// resolves game includes. An explicit user setting at any level wins —
+	// a not-found game stays silent, and failures never block activation:
+	// includeRoots is a convenience, not a dependency.
+	try {
+		const detected = await detectGameIncludeRoots(realSteamEnv());
+		const inspected = config.inspect<string[]>("includeRoots");
+		const explicit =
+			inspected?.globalValue ?? inspected?.workspaceValue ?? inspected?.workspaceFolderValue;
+		if (detected.length > 0 && explicit === undefined) {
+			await config.update("includeRoots", detected, vscode.ConfigurationTarget.Global);
+			output.appendLine(`includeRoots auto-detected: ${detected.join(", ")}`);
+		} else {
+			output.appendLine(
+				detected.length > 0
+					? "includeRoots kept: an explicit setting wins over auto-detection"
+					: "no AoE2 DE Steam install found, includeRoots untouched",
+			);
+		}
+	} catch (err) {
+		output.appendLine(`includeRoots auto-detection skipped: ${err instanceof Error ? err.message : String(err)}`);
+	}
 
 	// The server is an external binary over stdio; the resolved command is
 	// client-side and never reaches the server itself.
