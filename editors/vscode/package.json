@@ -75,6 +75,65 @@
         "category": "AoE2 LSP"
       }
     ],
+    "walkthroughs": [
+      {
+        "id": "aoe2lsp.gettingStarted",
+        "title": "Get Started with AoE2 RMS/XS Language Server",
+        "description": "From the self-installing server to a map running in the game.",
+        "steps": [
+          {
+            "id": "install",
+            "title": "The server installs itself",
+            "description": "Activation resolves the binary automatically — an explicit aoe2lsp.serverPath wins. Click the status-bar item to watch the resolution.",
+            "media": {
+              "markdown": "walkthroughs/install.md"
+            },
+            "completionEvents": [
+              "onCommand:aoe2lsp.showOutput"
+            ]
+          },
+          {
+            "id": "open-map",
+            "title": "Open a map script",
+            "description": "Include paths resolve out of the box — the Steam install is detected and the game's resource folders are added automatically.",
+            "media": {
+              "markdown": "walkthroughs/open-map.md"
+            },
+            "completionEvents": [
+              "onLanguage:aoe2rms",
+              "onLanguage:aoe2xs"
+            ]
+          },
+          {
+            "id": "diagnostics",
+            "title": "Read the diagnostics",
+            "description": "Unknown names with did-you-mean, argument checks, XS types and in-game verified nuances — each with a suppressible code.",
+            "media": {
+              "markdown": "walkthroughs/diagnostics.md"
+            }
+          },
+          {
+            "id": "editing",
+            "title": "Use completion, hover and signature help",
+            "description": "The game's vocabulary, snippets, cross-file rename — and willRenameFiles updating includes when a file moves.",
+            "media": {
+              "markdown": "walkthroughs/editing.md"
+            }
+          },
+          {
+            "id": "deploy",
+            "title": "Deploy the map to the game",
+            "description": "Copy the map and its include dependencies into a local mod's random-map-scripts folder with one command.",
+            "media": {
+              "markdown": "walkthroughs/deploy.md"
+            },
+            "completionEvents": [
+              "onCommand:aoe2lsp.deployMap"
+            ]
+          }
+        ]
+      }
+    ],
     "configuration": {
       "title": "AoE2 LSP",
       "properties": {

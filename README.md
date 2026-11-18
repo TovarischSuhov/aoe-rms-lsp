@@ -204,7 +204,11 @@ lspconfig `settings` table.
 ### VS Code (bundled extension)
 
 The extension in `editors/vscode/` registers the `aoe2rms`/`aoe2xs` languages
-(brackets, comments), launches the binary and forwards the settings. Install
+(brackets, comments), launches the binary and forwards the settings. A
+welcome walkthrough ("Get Started with AoE2 RMS/XS Language Server",
+Help → Welcome / the command palette) walks the real UX: the
+self-installing server → opening a map → diagnostics → completion and
+cross-file rename → deploying the map to the game. Install
 it from [Open VSX](https://open-vsx.org/extension/tovarischsuhov/aoe2-lsp),
 or grab the `.vsix` attached to each GitHub Release:
 

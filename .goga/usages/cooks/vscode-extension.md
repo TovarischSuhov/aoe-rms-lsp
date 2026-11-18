@@ -134,6 +134,21 @@ import: filesystem goes through the `SteamEnv` seam, unit-tested by
 `test/gamedetect.test.ts` against real tmpdir fixtures (the
 src/install.ts pattern).
 
+## Welcome walkthrough (walkthroughs/)
+
+`contributes.walkthroughs` declares one walkthrough
+(`aoe2lsp.gettingStarted`, "Get Started with AoE2 RMS/XS Language
+Server") whose steps mirror the real UX in order: self-installing
+server (completes on `onCommand:aoe2lsp.showOutput`), opening a map
+(`onLanguage:aoe2rms`/`aoe2xs`), diagnostics, completion/hover/rename,
+deploy (`onCommand:aoe2lsp.deployMap`). Steps without a completion
+event are checked off manually. Step bodies are markdown files under
+`walkthroughs/` — they ship in the vsix by default (keep the directory
+out of `.vscodeignore`). Rules: step content must match shipped
+behavior — update a step in the same change that changes the behavior
+it describes (precedent: deploy.md appeared with the deploy command);
+no screenshots — markdown media only, images would rot.
+
 ## Map deployment (src/deploy.ts)
 
 The `aoe2lsp.deployMap` command ("Deploy map to game") copies the active
