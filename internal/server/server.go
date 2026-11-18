@@ -2155,12 +2155,16 @@ func missingDiags(uriArg string, closure include.Closure) []common.Diagnostic {
 }
 
 // duplicateDiags warns on the document's include directives that connect
-// a file already included by an earlier directive of the same document.
-// The engine has no include guard — every repeated directive re-applies
-// the file's effects — so only the first directive of each target stays
-// clean. The first pass finds each target's earliest directive because
-// Resolved lists all #include directives before the #includeXS ones,
-// not in source order.
+// a file already included elsewhere in the closure. Two cases: a repeat
+// within the document itself (the earliest directive of each target
+// stays clean — Resolved lists all #include directives before the
+// #includeXS ones, so the first pass compares positions, not list
+// order), and the transitive case — the target is also pulled in by a
+// dependency file, so its effects apply twice however the directives are
+// ordered (the engine has no include guard). Diagnostics attach to the
+// analyzed document's own directives only: a repeat owned entirely by
+// dependency files (nothing in the root to remove) has no actionable
+// edit here and stays silent.
 func duplicateDiags(uriArg string, closure include.Closure) []common.Diagnostic {
 	first := make(map[string]common.Pos)
 
@@ -2174,17 +2178,42 @@ func duplicateDiags(uriArg string, closure include.Closure) []common.Diagnostic 
 		}
 	}
 
+	// One dependency-file owner per target — the name goes into the
+	// transitive message; the first hit is as good as any.
+	foreign := make(map[string]string)
+
+	for _, inc := range closure.Resolved {
+		if inc.Owner == uriArg {
+			continue
+		}
+
+		if _, ok := foreign[inc.Target]; !ok {
+			foreign[inc.Target] = inc.Owner
+		}
+	}
+
 	var out []common.Diagnostic
 
 	for _, inc := range closure.Resolved {
-		if inc.Owner != uriArg || inc.Inc.Range.Start == first[inc.Target] {
+		if inc.Owner != uriArg {
+			continue
+		}
+
+		var message string
+
+		if inc.Inc.Range.Start != first[inc.Target] {
+			message = "duplicate include: " + inc.Inc.Path + " is already included"
+		} else if other, ok := foreign[inc.Target]; ok {
+			name := filepath.Base(uri.URI(other).FsPath())
+			message = "duplicate include: " + inc.Inc.Path + " is already included by " + name
+		} else {
 			continue
 		}
 
 		out = append(out, common.Diagnostic{
 			Range:    inc.Inc.Range,
 			Severity: common.SeverityWarning,
-			Message:  "duplicate include: " + inc.Inc.Path + " is already included",
+			Message:  message,
 			Code:     "duplicate-include",
 		})
 	}
