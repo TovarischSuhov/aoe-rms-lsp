@@ -972,3 +972,39 @@ create_terrain DIRT {
 		})
 	}
 }
+
+// TestAnalyzeXs_RenamedSymbol pins the changelog rename diagnostic: a
+// call or identifier of a name the data marks renamed warns with the
+// replacement spelled out instead of staying silent (the game rejects
+// the old name) — and the stub keeps undefined-symbol suppressed.
+func TestAnalyzeXs_RenamedSymbol(t *testing.T) {
+	t.Parallel()
+
+	a := newAnalyzer(t)
+
+	file, _ := xs.XsParse(`void main() {
+	xsGetLocalPlayerId();
+	int id = xsGetLocalPlayerId();
+}
+`, "renamed.xs")
+
+	assert.Equal(t, []string{CodeRenamedSymbol, CodeRenamedSymbol}, codes(a.AnalyzeXs(file, nil)))
+}
+
+// TestAnalyzeXs_RenamedStubNoUndefined pins that the rename stub (a name
+// the guide no longer carries) is a knowledge-base name: no
+// undefined-symbol on top of the rename warning.
+func TestAnalyzeXs_RenamedStubNoUndefined(t *testing.T) {
+	t.Parallel()
+
+	a := newAnalyzer(t)
+
+	file, _ := xs.XsParse(`void main() {
+	int id = xsGetLocalPlayerId();
+}
+`, "stub.xs")
+
+	for _, code := range codes(a.AnalyzeXs(file, nil)) {
+		assert.NotEqual(t, CodeUndefinedSymbol, code)
+	}
+}

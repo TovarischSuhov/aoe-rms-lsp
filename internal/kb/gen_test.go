@@ -212,3 +212,123 @@ func replaceGenFile(t *testing.T, root string, rel string, content string) {
 
 	require.NoError(t, os.WriteFile(filepath.Join(root, rel), []byte(content), 0o644))
 }
+
+// TestGenKB_RenamesAndStubs pins the changelog-as-source rules: a rename
+// pair stubs the old name (renamed_to, changelog category, since from
+// the rename update) when even the guide lacks it, the new name keeps
+// its guide record and gains the rename update as since_update, and a
+// non-signature span (AI-DSL syntax) never becomes a stub.
+func TestGenKB_RenamesAndStubs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	writeGenFile(t, dir, "ugc-guide/xs/functions/functions.json", `{
+  "ui": [
+    {"name": "xsUnsyncGetLocalPlayerId", "return_type": "int", "params": [], "desc": "New name"}
+  ]
+}`)
+
+	writeGenFile(t, dir, "ugc-guide/xs/constants/constants.json", `{
+  "terrain": [{"name": "TERRAIN_GRASS", "value": 0, "desc": "grass"}]
+}`)
+
+	writeGenFile(t, dir, "zetnus-rms-guide.txt", "Syntax Skeleton\n\n<PLAYER_SETUP>\n\ncreate_elevation N\n")
+
+	writeGenFile(t, dir, changelogFile, `## Update 9
+### XS: переименовано
+- `+"`xsGetLocalPlayerId`"+` → `+"`xsUnsyncGetLocalPlayerId`"+`
+- Both names read the same value.
+
+### XS: добавлено
+- `+"`int ord(string character)`"+`
+- `+"`use (include \"script.xs\")`"+` — AI DSL, not a function
+`)
+
+	out := t.TempDir()
+	require.NoError(t, GenKB(dir, out, nil))
+
+	raw, err := os.ReadFile(filepath.Join(out, "xs-functions.json"))
+	require.NoError(t, err)
+
+	var fns []functionJSON
+	require.NoError(t, json.Unmarshal(raw, &fns))
+
+	byName := make(map[string]functionJSON, len(fns))
+	for _, fn := range fns {
+		byName[fn.Name] = fn
+	}
+
+	old := byName["xsGetLocalPlayerId"]
+	assert.Equal(t, "xsUnsyncGetLocalPlayerId", old.RenamedTo, "the rename pair marks the old name")
+	assert.Equal(t, stubCategory, old.Category)
+	assert.Equal(t, "9", old.SinceUpdate)
+	assert.Empty(t, old.Desc, "a rename stub carries no desc")
+
+	newName := byName["xsUnsyncGetLocalPlayerId"]
+	assert.Equal(t, "", newName.RenamedTo, "the guide record of the new name is not a stub")
+	assert.Equal(t, "New name", newName.Desc, "guide-wins: the guide record survives untouched")
+	assert.Equal(t, "9", newName.SinceUpdate, "the rename update dates the new name")
+
+	ord := byName["ord"]
+	assert.Equal(t, stubCategory, ord.Category)
+	assert.Equal(t, "int", ord.ReturnType)
+	require.Len(t, ord.Params, 1)
+	assert.Equal(t, "character", ord.Params[0].Name)
+	assert.Equal(t, "string", ord.Params[0].Type)
+	assert.True(t, ord.Params[0].Required)
+	assert.Equal(t, "9", ord.SinceUpdate)
+
+	assert.NotContains(t, byName, "use", "AI-DSL syntax is not a function")
+	assert.NotContains(t, byName, "include")
+}
+
+// TestGenKB_RenameMarksGuideRecord pins the guide-wins merge on the old
+// name: when the guide still carries the renamed function, the record
+// keeps its desc and gains renamed_to and the rename update as since.
+func TestGenKB_RenameMarksGuideRecord(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	writeGenFile(t, dir, "ugc-guide/xs/functions/functions.json", `{
+  "ui": [
+    {"name": "xsGetOldThing", "return_type": "int", "params": [], "desc": "Old name"}
+  ]
+}`)
+
+	writeGenFile(t, dir, "ugc-guide/xs/constants/constants.json", `{
+  "terrain": [{"name": "TERRAIN_GRASS", "value": 0, "desc": "grass"}]
+}`)
+
+	writeGenFile(t, dir, "zetnus-rms-guide.txt", "Syntax Skeleton\n\n<PLAYER_SETUP>\n\ncreate_elevation N\n")
+
+	writeGenFile(t, dir, changelogFile, `## Update 9
+### XS: переименовано
+- `+"`xsGetOldThing`"+` → `+"`xsGetNewThing`"+`
+`)
+
+	out := t.TempDir()
+	require.NoError(t, GenKB(dir, out, nil))
+
+	raw, err := os.ReadFile(filepath.Join(out, "xs-functions.json"))
+	require.NoError(t, err)
+
+	var fns []functionJSON
+	require.NoError(t, json.Unmarshal(raw, &fns))
+
+	byName := make(map[string]functionJSON, len(fns))
+	for _, fn := range fns {
+		byName[fn.Name] = fn
+	}
+
+	old := byName["xsGetOldThing"]
+	assert.Equal(t, "Old name", old.Desc, "guide-wins: the guide desc survives")
+	assert.Equal(t, "xsGetNewThing", old.RenamedTo)
+	assert.Equal(t, "9", old.SinceUpdate)
+
+	assert.NotContains(t, byName, "changelog stub for the old name")
+
+	assert.Equal(t, "9", byName["xsGetNewThing"].SinceUpdate, "the new name is stubbed from the rename pair")
+	assert.Equal(t, stubCategory, byName["xsGetNewThing"].Category)
+}

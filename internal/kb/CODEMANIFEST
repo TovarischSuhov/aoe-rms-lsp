@@ -117,6 +117,12 @@ Annotations: |
 
       `name`: имя команды; `code`: код диагностики; `message`: текст
       предупреждения
+    "RenamedTo(name: string) -> to: string, ok: bool": |
+      Новое имя для переименованного патчем имени (пары из changelog-дока,
+      секция «переименовано»): игра отвергает старое имя; ok=false если
+      имя неизвестно или не переименовано.
+
+      `name`: старое имя (функция/константа/команда); `to`: новое имя
     "Legacy(name: string) -> code: string, message: string, found: bool": |
       Legacy-метка #-директивы (`name` с #): code — стабильный публичный
       код, message — текст verbatim, те же поля, что у deprecated-меток.
@@ -136,6 +142,10 @@ Annotations: |
       Описание.
     "SinceUpdate -> string": |
       Апдейт добавления ("" если неизвестен).
+    "RenamedTo -> string": |
+      Новое имя, если патч переименовал функцию ("" — не переименована);
+      источник — changelog-док (секция «переименовано»), для имён вне
+      гайда — заготовка category=changelog с пустым desc.
 
 "Param()":
   location: model.go
@@ -293,7 +303,13 @@ Annotations: |
     Algorithm:
     1. Прочитать из `refDir` источники по `kbdata`: функции и константы —
        адаптацией JSON ugc-guide; команды — `ExtractRmsCommands`(гайд, `log`)
-    2. Пополнить SinceUpdate по changelog из `refDir`
+    2. Пополнить SinceUpdate по changelog из `refDir`; применить факты
+       changelog об именах: заготовки функций из сигнатур секций
+       «XS: добавлено», отсутствующих в гайде (category=changelog, пустой
+       desc, сигнатура парсится; не-сигнатурные спаны — не заготовки);
+       RenamedTo по парам секций «переименовано» (старое имя получает
+       since_update из ренейма при пустом; новое имя датируется ренеймом;
+       guide-wins: запись гайда не замещается заготовкой)
     3. Наложить опциональный overlay attribute-descs.json из `refDir`
        (fill-when-empty по `kbdata`): файл отсутствует → WARN и пустой
        overlay, битый JSON — ошибка сборки

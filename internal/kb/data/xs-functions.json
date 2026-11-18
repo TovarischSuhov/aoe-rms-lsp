@@ -5150,7 +5150,7 @@
       }
     ],
     "desc": "Gets the time remaining for this timer in the specified unit. Note: If a playerId other than `-1` is used, this can possibly return different values for different players and will cause a desync! Use with caution!",
-    "since_update": ""
+    "since_update": "185872"
   },
   {
     "name": "xsSendChat",
@@ -5185,7 +5185,7 @@
     "return_type": "int",
     "params": [],
     "desc": "Gets the ID of the local player. The local player is the ID of the _current_ player, and it is different for every player. Do not use this for anything other than chat/UI things, as it will cause a desync!",
-    "since_update": ""
+    "since_update": "185872"
   },
   {
     "name": "xsGetPlayerColorTag",
@@ -5498,5 +5498,42 @@
     ],
     "desc": "Returns the normalised vector in the direction of the given vector.",
     "since_update": ""
+  },
+  {
+    "name": "xsGetLocalPlayerId",
+    "category": "changelog",
+    "return_type": "int",
+    "params": null,
+    "desc": "",
+    "since_update": "177723",
+    "renamed_to": "xsUnsyncGetLocalPlayerId"
+  },
+  {
+    "name": "xsGetTimerTimeRemaining",
+    "category": "changelog",
+    "return_type": "float",
+    "params": [
+      {
+        "name": "timerId",
+        "type": "int",
+        "required": true,
+        "desc": ""
+      },
+      {
+        "name": "timeUnit",
+        "type": "int",
+        "required": true,
+        "desc": ""
+      },
+      {
+        "name": "playerId",
+        "type": "int",
+        "required": false,
+        "desc": ""
+      }
+    ],
+    "desc": "",
+    "since_update": "177723",
+    "renamed_to": "xsUnsyncGetTimerTimeRemaining"
   }
 ]

@@ -152,7 +152,7 @@ func (a *Analyzer) tokenCommand(
 	*lastKnown = cmd.Name
 
 	nameType := TokenKnown
-	if stmt.Name == "effect_percent" {
+	if a.dataDeprecates(stmt.Name) {
 		nameType = TokenDeprecated
 	}
 
@@ -169,9 +169,9 @@ func (a *Analyzer) tokenCommand(
 			attrType = TokenUnknown
 		}
 
-		// the deprecated command name carries its deprecation wherever
-		// it appears as a statement/attribute name
-		if attr.Name == "effect_percent" {
+		// the deprecated or renamed name carries its marker wherever it
+		// appears as a statement/attribute name
+		if a.dataDeprecates(attr.Name) {
 			attrType = TokenDeprecated
 		}
 
@@ -291,14 +291,38 @@ func (a *Analyzer) xsNameType(name string, declared map[string]bool) string {
 	}
 
 	if _, ok := a.store.Function(name); ok {
-		return TokenKnown
+		return a.xsDeprecation(name)
 	}
 
 	if _, ok := a.store.Constant(name); ok {
-		return TokenKnown
+		return a.xsDeprecation(name)
 	}
 
 	return TokenUnknown
+}
+
+// dataDeprecates reports whether the data marks the name as deprecated
+// (nuances.json deprecated) or renamed (changelog pairs) — both surface
+// as the deprecated token class.
+func (a *Analyzer) dataDeprecates(name string) bool {
+	if _, _, ok := a.store.Deprecated(name); ok {
+		return true
+	}
+
+	_, renamed := a.store.RenamedTo(name)
+
+	return renamed
+}
+
+// xsDeprecation classifies a known XS name: deprecated when the data
+// marks it renamed (deprecated constants/functions carry no separate
+// data today), known otherwise.
+func (a *Analyzer) xsDeprecation(name string) string {
+	if _, renamed := a.store.RenamedTo(name); renamed {
+		return TokenDeprecated
+	}
+
+	return TokenKnown
 }
 
 // nameRangeOf returns the statement's name span: the name is the

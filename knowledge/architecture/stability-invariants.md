@@ -554,7 +554,8 @@ verified:
 ## Диагностика
 
 - **Коды правил стабильны между релизами** (`unknown-command`,
-  `undefined-symbol`, `bad-arity`, `unknown-directive`, …) — на них
+  `undefined-symbol`, `bad-arity`, `unknown-directive`,
+  `renamed-symbol`, …) — на них
   опираются тесты и пользовательские `severityOverrides` в настройках.
   Код — это контракт. Единого реестра кодов нет: код живёт либо именованной
   константой ячейки (`analysis` — `CodeUnknownCommand`…`CodeBadArity`,

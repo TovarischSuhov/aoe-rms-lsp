@@ -1260,6 +1260,8 @@ func (s *Server) CodeAction(
 			out = appendAction(out, s.addIncludeAction(ctx, params, diag))
 		case analysis.CodeDeprecatedEffectPercent:
 			out = appendAction(out, s.replaceEffectPercentAction(params, diag))
+		case analysis.CodeRenamedSymbol:
+			out = appendAction(out, s.renameToAction(params, diag))
 		case analysis.CodeMissingSection:
 			out = appendAction(out, s.insertSectionAction(params, diag))
 		case codeMissingInclude:
@@ -1302,6 +1304,34 @@ func (s *Server) replaceEffectPercentAction(
 	diag *protocol.Diagnostic,
 ) *protocol.CodeAction {
 	return s.replaceWordAction(params, diag, "Replace with effect_amount", "effect_amount")
+}
+
+// renameToAction builds the renamed-symbol fix: the old name under the
+// diagnostic becomes its knowledge-base replacement. nil when the word
+// carries no rename (the diagnostic came from elsewhere).
+func (s *Server) renameToAction(
+	params *protocol.CodeActionParams,
+	diag *protocol.Diagnostic,
+) *protocol.CodeAction {
+	text, name, _ := s.openDocument(params.TextDocument.URI)
+	pos := s.fromProtocolPos(text, diag.Range.Start)
+
+	word := name
+
+	for _, r := range s.occurrenceRanges(text, name, pos) {
+		if r.Contains(pos) {
+			word = text[r.Start.Offset:r.End.Offset]
+
+			break
+		}
+	}
+
+	to, ok := s.store.RenamedTo(word)
+	if !ok {
+		return nil
+	}
+
+	return s.replaceWordAction(params, diag, "Rename to '"+to+"'", to)
 }
 
 // replaceWordAction builds a quickfix replacing the word at the

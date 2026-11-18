@@ -16,6 +16,29 @@ import (
 // callNameRe extracts the callee identifier from a backticked signature.
 var callNameRe = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)\s*\(`)
 
+// renameRe parses one "### …: переименовано" line: `- `old` → `new`…`.
+var renameRe = regexp.MustCompile("^-[ \t]*`([^`]+)`[ \t]*→[ \t]*`([^`]+)`")
+
+// sigRe parses a changelog function signature: `<ret> <name>(<params>)`.
+var sigRe = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^()]*)\)$`)
+
+// paramRe parses one signature parameter: `<type> <name>[ = <default>]`.
+var paramRe = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*=\s*([^,)]*))?$`)
+
+// stubCategory marks records synthesized from the changelog alone: the
+// guide does not carry the name yet (upstream lag). When the guide
+// catches up, its record replaces the stub and since_update survives.
+const stubCategory = "changelog"
+
+// renameP is one changelog rename pair: the game rejects `from` and
+// resolves `to`.
+type renameP struct {
+	lang string // "XS" or "RMS" — the heading the pair came from
+	from string
+	to   string
+	id   string // the update that renamed the pair
+}
+
 // funcSource is the JSON shape of docs/ref/ugc-guide/xs/functions/functions.json.
 type funcSource struct {
 	Name       string `json:"name"`
@@ -44,6 +67,7 @@ type functionJSON struct {
 	Params      []paramJSON `json:"params"`
 	Desc        string      `json:"desc"`
 	SinceUpdate string      `json:"since_update"`
+	RenamedTo   string      `json:"renamed_to,omitempty"`
 }
 
 // paramJSON is one function parameter in xs-functions.json.
@@ -61,6 +85,7 @@ type constantJSON struct {
 	Value       string `json:"value"`
 	Desc        string `json:"desc"`
 	SinceUpdate string `json:"since_update"`
+	RenamedTo   string `json:"renamed_to,omitempty"`
 }
 
 // commandJSON mirrors the rms-commands.json schema from the kbdata annotation.
@@ -72,6 +97,7 @@ type commandJSON struct {
 	Desc         string    `json:"desc"`
 	GameVersions string    `json:"game_versions"`
 	SinceUpdate  string    `json:"since_update"`
+	RenamedTo    string    `json:"renamed_to,omitempty"`
 }
 
 // argJSON is one command argument or attribute in rms-commands.json.
@@ -148,6 +174,7 @@ func GenKB(refDir, dataDir string, log *slog.Logger) error {
 		}
 
 		applyOverlay(commands, overlay)
+		applyCommandRenames(commands, updates)
 
 		cov := descCoverage(commands)
 
@@ -186,6 +213,7 @@ func GenKB(refDir, dataDir string, log *slog.Logger) error {
 				Desc:         cmd.Desc,
 				GameVersions: cmd.GameVersions,
 				SinceUpdate:  cmd.SinceUpdate,
+				RenamedTo:    cmd.RenamedTo,
 			})
 		}
 
@@ -382,7 +410,128 @@ func genFunctions(path string, updates []update) ([]functionJSON, error) {
 		}
 	}
 
-	return out, nil
+	return applyFunctionChangelog(out, updates), nil
+}
+
+// applyFunctionChangelog enriches the guide-derived function list with
+// the changelog's existence facts and rename pairs:
+//
+//   - every signature in an additive XS section names a function the
+//     game has; a name the guide does not carry yet (upstream lag) gets
+//     a stub record — empty desc, parsed signature, since_update from
+//     the section. When the guide catches up, its record replaces the
+//     stub (guide-wins) and since_update survives;
+//   - each "### XS: переименовано" pair marks the old name (a record is
+//     synthesized when even the stub list lacks it) with renamed_to —
+//     the game rejects the old name — and makes sure the new name
+//     exists.
+//
+// Appended records keep changelog order (deterministic); mutation of
+// existing records is by name index, never by pointer, so the append
+// growth cannot dangle.
+func applyFunctionChangelog(out []functionJSON, updates []update) []functionJSON {
+	pos := make(map[string]int, len(out))
+	for i := range out {
+		pos[out[i].Name] = i
+	}
+
+	add := func(fn functionJSON) {
+		if _, dup := pos[fn.Name]; dup {
+			return
+		}
+
+		out = append(out, fn)
+		pos[fn.Name] = len(out) - 1
+	}
+
+	// existence stubs from the additive sections
+	for _, u := range updates {
+		inAdded := false
+
+		for _, line := range u.lines {
+			if strings.HasPrefix(line, "### ") {
+				inAdded = strings.HasPrefix(line, "### XS: добавлено")
+
+				continue
+			}
+
+			if !inAdded {
+				continue
+			}
+
+			for _, span := range backtickRe.FindAllStringSubmatch(line, -1) {
+				name, fn, ok := changelogFunction(span[1])
+				if !ok {
+					continue
+				}
+
+				fn.Name = name
+				fn.SinceUpdate = u.id
+				fn.Category = stubCategory
+				add(fn)
+			}
+		}
+	}
+
+	// rename pairs
+	for _, r := range parseRenames(updates) {
+		if r.lang != "XS" {
+			continue
+		}
+
+		if i, ok := pos[r.from]; ok {
+			out[i].RenamedTo = r.to
+			if out[i].SinceUpdate == "" {
+				out[i].SinceUpdate = r.id
+			}
+		} else {
+			add(functionJSON{Name: r.from, Category: stubCategory, SinceUpdate: r.id, RenamedTo: r.to})
+		}
+
+		// The new name appeared with the rename even when the guide
+		// already carries it without a since marker.
+		if i, ok := pos[r.to]; ok {
+			if out[i].SinceUpdate == "" {
+				out[i].SinceUpdate = r.id
+			}
+		} else {
+			add(functionJSON{Name: r.to, Category: stubCategory, SinceUpdate: r.id})
+		}
+	}
+
+	return out
+}
+
+// changelogFunction parses one backticked changelog span into a function
+// stub: a full signature (`int hex(string str, int defaultValue)`) gives
+// the return type and parameters (defaults mark optional). Bare name
+// spans and non-signature spans (prose examples, AI-DSL syntax like
+// `use (include "script.xs")`) stay out — only the full signature
+// proves a function. ok=false when the span is not a signature.
+func changelogFunction(sig string) (string, functionJSON, bool) {
+	m := sigRe.FindStringSubmatch(strings.TrimSpace(sig))
+	if m == nil {
+		return "", functionJSON{}, false
+	}
+
+	fn := functionJSON{ReturnType: m[1]}
+
+	if list := strings.TrimSpace(m[3]); list != "" {
+		for _, p := range strings.Split(list, ",") {
+			pm := paramRe.FindStringSubmatch(p)
+			if pm == nil {
+				return "", functionJSON{}, false
+			}
+
+			fn.Params = append(fn.Params, paramJSON{
+				Name:     pm[2],
+				Type:     pm[1],
+				Required: pm[3] == "",
+			})
+		}
+	}
+
+	return m[2], fn, true
 }
 
 // genConstants adapts the guide's constants.json into the flat
@@ -415,7 +564,53 @@ func genConstants(path string, updates []update) ([]constantJSON, error) {
 		}
 	}
 
-	return out, nil
+	return applyConstantRenames(out, updates), nil
+}
+
+// applyCommandRenames marks guide commands an "### RMS: переименовано"
+// pair covers, in place (no command stubs — the guide extraction owns
+// the command set).
+func applyCommandRenames(commands []Command, updates []update) {
+	for _, r := range parseRenames(updates) {
+		if r.lang != "RMS" {
+			continue
+		}
+
+		for i := range commands {
+			if commands[i].Name == r.from {
+				commands[i].RenamedTo = r.to
+
+				if commands[i].SinceUpdate == "" {
+					commands[i].SinceUpdate = r.id
+				}
+			}
+		}
+	}
+}
+
+// applyConstantRenames marks guide constants a changelog rename pair
+// covers. There are no constant stubs: the additive sections mention
+// constants in prose without extractable name/value structure, so the
+// additive scan only annotates names the guide already knows
+// (sinceByConstant).
+func applyConstantRenames(out []constantJSON, updates []update) []constantJSON {
+	for _, r := range parseRenames(updates) {
+		if r.lang != "XS" {
+			continue
+		}
+
+		for i := range out {
+			if out[i].Name == r.from {
+				out[i].RenamedTo = r.to
+
+				if out[i].SinceUpdate == "" {
+					out[i].SinceUpdate = r.id
+				}
+			}
+		}
+	}
+
+	return out
 }
 
 // rawValue renders the source value (number or string) as a string.
@@ -463,6 +658,40 @@ func parseUpdates(changelog string) []update {
 	}
 
 	return updates
+}
+
+// parseRenames collects the "### …: переименовано" pairs across updates
+// (newest first, in file order): the game rejects `from` and resolves
+// `to`. The heading names the language (XS/RMS) the pairs belong to.
+func parseRenames(updates []update) []renameP {
+	var out []renameP
+
+	for _, u := range updates {
+		lang := ""
+
+		for _, line := range u.lines {
+			if strings.HasPrefix(line, "### ") {
+				lang = ""
+
+				head, tail, found := strings.Cut(strings.TrimPrefix(line, "### "), ":")
+				if found && tail == " переименовано" {
+					lang = strings.TrimSpace(head)
+				}
+
+				continue
+			}
+
+			if lang == "" {
+				continue
+			}
+
+			if m := renameRe.FindStringSubmatch(line); m != nil {
+				out = append(out, renameP{lang: lang, from: m[1], to: m[2], id: u.id})
+			}
+		}
+	}
+
+	return out
 }
 
 // sinceByFunction maps function names to the update that added them;

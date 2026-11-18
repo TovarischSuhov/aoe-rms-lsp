@@ -15,6 +15,10 @@ type Function struct {
 	// SinceUpdate is the DE update id that introduced the function
 	// ("" when unknown — treat as always existed).
 	SinceUpdate string
+	// RenamedTo is the new name when a patch renamed the function
+	// ("" when not renamed). The old name stays in the data so lookups
+	// can redirect; the game rejects the old name.
+	RenamedTo string
 }
 
 // Param is a single parameter of an XS function. Required=false means the
@@ -43,6 +47,9 @@ type Constant struct {
 	// SinceUpdate is the DE update id that introduced the constant
 	// ("" when unknown — treat as always existed).
 	SinceUpdate string
+	// RenamedTo is the new name when a patch renamed the constant
+	// ("" when not renamed).
+	RenamedTo string
 }
 
 // Command is a single RMS command from the knowledge base.
@@ -64,6 +71,9 @@ type Command struct {
 	// SinceUpdate is the DE update id that introduced the command
 	// ("" when unknown — treat as always existed).
 	SinceUpdate string
+	// RenamedTo is the new name when a patch renamed the command
+	// ("" when not renamed).
+	RenamedTo string
 }
 
 // CommandArg is the specification of one positional argument or attribute

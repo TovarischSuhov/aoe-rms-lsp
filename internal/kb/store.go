@@ -162,6 +162,26 @@ func (s *Store) Commands(section string) []Command {
 	return s.commandsBySect[section]
 }
 
+// RenamedTo returns the new name for a renamed function, constant or
+// command: the changelog's rename pairs keep the old name in the data
+// (the game rejects it) with a pointer to the replacement. ok=false when
+// the name is unknown or not renamed.
+func (s *Store) RenamedTo(name string) (to string, ok bool) {
+	if fn, found := s.functionByName[name]; found && fn.RenamedTo != "" {
+		return fn.RenamedTo, true
+	}
+
+	if c, found := s.constantByName[name]; found && c.RenamedTo != "" {
+		return c.RenamedTo, true
+	}
+
+	if cmd, found := s.commandByName[name]; found && cmd.RenamedTo != "" {
+		return cmd.RenamedTo, true
+	}
+
+	return "", false
+}
+
 // Attribute returns the specification of one attribute of a command;
 // found=false when the command or the attribute is unknown.
 func (s *Store) Attribute(command string, attr string) (CommandArg, bool) {
@@ -251,6 +271,7 @@ func (s *Store) indexFunctions(raw []byte) error {
 			Params:      make([]Param, 0, len(wf.Params)),
 			Desc:        wf.Desc,
 			SinceUpdate: wf.SinceUpdate,
+			RenamedTo:   wf.RenamedTo,
 		}
 
 		for _, wp := range wf.Params {
@@ -335,6 +356,7 @@ func (s *Store) indexCommands(raw []byte) error {
 			Desc:         wcmd.Desc,
 			GameVersions: wcmd.GameVersions,
 			SinceUpdate:  wcmd.SinceUpdate,
+			RenamedTo:    wcmd.RenamedTo,
 		}
 
 		for _, wa := range wcmd.Args {
@@ -510,6 +532,7 @@ type functionWire struct {
 	Params      []paramWire `json:"params"`
 	Desc        string      `json:"desc"`
 	SinceUpdate string      `json:"since_update"`
+	RenamedTo   string      `json:"renamed_to,omitempty"`
 }
 
 // paramWire is the JSON shape of one function parameter.
@@ -527,6 +550,7 @@ type constantWire struct {
 	Value       string `json:"value"`
 	Desc        string `json:"desc"`
 	SinceUpdate string `json:"since_update"`
+	RenamedTo   string `json:"renamed_to,omitempty"`
 }
 
 // commandWire is the JSON shape of one rms-commands.json record.
@@ -538,6 +562,7 @@ type commandWire struct {
 	Desc         string    `json:"desc"`
 	GameVersions string    `json:"game_versions"`
 	SinceUpdate  string    `json:"since_update"`
+	RenamedTo    string    `json:"renamed_to,omitempty"`
 }
 
 // argWire is the JSON shape of one command argument or attribute.
