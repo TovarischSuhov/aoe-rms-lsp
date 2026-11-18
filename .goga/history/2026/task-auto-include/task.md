@@ -51,4 +51,30 @@ stat-fingerprint — readdir дёшев, parse кэширован). `AvailableEn
 
 ## Result
 
-(заполняется по завершении)
+**Слот 1 — internal/include + internal/complete (#116):**
+- `Resolver.Available(ctx, uri)` — скан директории документа + roots на
+  `*.xs` (dedupe по canonical path), исключая документ и членов
+  замыкания; `AvailableEntry{URI, Path, Decls}` — путь
+  релативизован от документа (`..`-эскейп → абсолют); декларации через
+  существующий `load()` (editor-state приоритетен, диск кэширован);
+  namedDecls — function/variable/extern
+- `Candidate.Include` (путь источника) + `AvailableFile{Path, Decls}` в
+  `Completer.XsAt` (4-й параметр); Sort-группа available — «1» (между
+  source «0» и kb-функциями «2»; kb-константы «3») — пины сдвинуты
+  планово; in-scope имена выигрывают у available; rules/events не
+  адресуемы
+
+**Слот 2 — internal/server (#116 + #117):**
+- completion .xs → `#include`, inline-XS в .rms → `#includeXS` —
+  AdditionalTextEdits, zero-width вставка в начало документа
+- `addIncludeAction` на `undefined-symbol`: имя из message
+  (`undefinedSymbolName`), available-скан — **ровно один** владелец →
+  «Add include 'path'»; 0/≥2 — тишина (двух-владельцевый тест)
+
+**Проверки:** 15/15 пакетов ok, lint 0, corpus harness 100/100 ok
+panic 0. **Тесты:** TestResolver_Available (6 кейсов: относительные
+пути, замыкание-исключение, roots, декларации, editor-state,
+non-file URI), TestXsAt_AvailableFiles, TestToCompletionItems_AutoInclude,
+TestServerCodeAction_AddIncludeFix (single/two-owners)
+**Находка:** `codeActionAt`-диагностика с Start>End падает в
+rangesOverlap — тестовые диагностики несут корректный End

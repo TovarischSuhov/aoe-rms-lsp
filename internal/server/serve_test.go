@@ -541,7 +541,7 @@ func TestServe_CompletionAllXsFunctions(t *testing.T) {
 
 	sort, hasSort := sample.SortText.Get()
 	require.True(t, hasSort)
-	assert.Equal(t, "1xsGetGoal", sort, "kb functions sort into group 1")
+	assert.Equal(t, "2xsGetGoal", sort, "kb functions sort into group 2")
 }
 
 func TestServe_CompletionRmsScopedToSection(t *testing.T) {
@@ -1036,7 +1036,7 @@ func TestToCompletionItems_Render(t *testing.T) {
 			Label: "set_circular_base", Kind: complete.KindAttribute,
 			Detail: "", Sort: "0set_circular_base",
 		},
-	})
+	}, "#include")
 
 	require.Len(t, items, 2)
 
@@ -1058,7 +1058,7 @@ func TestToCompletionItems_Render(t *testing.T) {
 }
 
 func TestToCompletionItems_EmptyNilSafe(t *testing.T) {
-	items := toCompletionItems(nil)
+	items := toCompletionItems(nil, "#include")
 
 	require.NotNil(t, items)
 	require.Empty(t, items)
