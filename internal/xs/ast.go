@@ -827,6 +827,10 @@ type Stmt struct {
 	Exprs []Expr
 	// Body is the nested statements.
 	Body []Stmt
+	// Parens reports whether a return value starts with an opening
+	// parenthesis (`return (x);`). Only meaningful for Kind=StmtReturn
+	// with a value: the game's XS parser rejects a bare return value.
+	Parens bool
 	// Range is the span of the statement.
 	Range common.Range
 }

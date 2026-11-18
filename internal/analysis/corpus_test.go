@@ -96,6 +96,8 @@ func assertAnalysisAcceptance(t *testing.T, scriptShaped bool, diags []common.Di
 			t.Errorf("duplicate-declaration fired: %s (line %d)", d.Message, d.Range.Start.Line)
 		case CodeMissingSection:
 			t.Errorf("missing-section fired: %s (line %d)", d.Message, d.Range.Start.Line)
+		case CodeReturnParens:
+			t.Errorf("return-parens fired: %s (line %d)", d.Message, d.Range.Start.Line)
 		case CodeUnusedDeclaration:
 			unused++
 			if isFunctionFlag(d.Message) {
