@@ -41,6 +41,9 @@ const (
 	CodeUndefinedSymbol = "undefined-symbol"
 	// CodeBadArity marks a call with a wrong number of arguments.
 	CodeBadArity = "bad-arity"
+	// CodeDuplicateDeclaration marks a name declared twice in the same
+	// scope: repeated top-level declarations and same-block locals.
+	CodeDuplicateDeclaration = "duplicate-declaration"
 )
 
 // xsBuiltins are language-level identifiers no knowledge base covers.
@@ -272,6 +275,7 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 // behavior. The result is sorted by position.
 func (a *Analyzer) AnalyzeXs(file xs.XsFile, externals []xs.Decl) []common.Diagnostic {
 	declared := map[string]bool{}
+	diags := checkDuplicateDecls(file)
 
 	for i := range file.Decls {
 		decl := &file.Decls[i]
@@ -288,8 +292,6 @@ func (a *Analyzer) AnalyzeXs(file xs.XsFile, externals []xs.Decl) []common.Diagn
 
 	env := NewTypeEnv(file)
 	seedExternals(env, declared, externals)
-
-	var diags []common.Diagnostic
 
 	for i := range file.Decls {
 		decl := &file.Decls[i]
@@ -338,6 +340,120 @@ func collectLocals(stmts []xs.Stmt, declared map[string]bool) {
 
 		collectLocals(stmt.Body, declared)
 	}
+}
+
+// checkDuplicateDecls reports same-scope redeclarations: repeated
+// top-level declarations and locals declared twice in one block.
+// Nested scopes shadow legally (C-like semantics) and stay silent —
+// the check is deliberately conservative against false positives.
+func checkDuplicateDecls(file xs.XsFile) []common.Diagnostic {
+	var diags []common.Diagnostic
+
+	top := map[string]bool{}
+	for i := range file.Decls {
+		decl := &file.Decls[i]
+
+		// include is a file path, not a symbol; unnamed rules cannot
+		// collide
+		if decl.Kind == xs.DeclInclude || decl.Name == "" {
+			continue
+		}
+
+		if top[decl.Name] {
+			diags = append(diags, common.Diagnostic{
+				Range:    decl.Range,
+				Severity: common.SeverityWarning,
+				Message: fmt.Sprintf("duplicate declaration of %q; the earlier declaration stays in effect",
+					decl.Name),
+				Code: CodeDuplicateDeclaration,
+			})
+		}
+		top[decl.Name] = true
+
+		diags = dupBlock(decl.Body, diags)
+	}
+
+	return diags
+}
+
+// dupBlock walks one block scope: repeated declarators are duplicates,
+// each nested construct opens its own scope.
+func dupBlock(stmts []xs.Stmt, diags []common.Diagnostic) []common.Diagnostic {
+	return dupWalk(stmts, map[string]bool{}, diags)
+}
+
+// dupWalk checks the statements of one scope; scope maps names already
+// declared at this level.
+func dupWalk(stmts []xs.Stmt, scope map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
+	for i := range stmts {
+		stmt := &stmts[i]
+
+		switch stmt.Kind {
+		case xs.StmtDecl:
+			// declarations land in the current scope
+			diags = dupDeclarators(stmt.Exprs, scope, diags)
+			continue
+		case xs.StmtIf:
+			// Body[0] = then, Body[1] = else: independent scopes
+			for j := range stmt.Body {
+				diags = dupBlock(stmt.Body[j:j+1], diags)
+			}
+		case xs.StmtFor:
+			// the init section owns the loop's scope; the body nests
+			// inside it, so sibling loops may redeclare freely
+			loop := map[string]bool{}
+			diags = dupDeclarators(stmt.Exprs, loop, diags)
+			diags = dupWalk(stmt.Body, loop, diags)
+		case xs.StmtSwitch:
+			// each case body is its own scope (conservative: shared-scope
+			// case declarations stay unflagged)
+			for j := range stmt.Body {
+				if stmt.Body[j].Kind == xs.StmtCase {
+					diags = dupBlock(stmt.Body[j].Body, diags)
+				}
+			}
+		case xs.StmtCondition, xs.StmtAction:
+			// permissive rule blocks: independent scopes
+			diags = dupBlock(stmt.Body, diags)
+		default:
+			// block wrappers and bare statements: child scope for the
+			// body, loop/while/do bodies included
+			diags = dupBlock(stmt.Body, diags)
+		}
+	}
+
+	return diags
+}
+
+// dupDeclarators checks the names one declaration introduces (bare
+// declarators and assignment targets) against the current scope.
+func dupDeclarators(exprs []xs.Expr, scope map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
+	for _, e := range exprs {
+		name := ""
+		switch {
+		case e.Kind == xs.ExprIdent:
+			name = e.Value // bare declarator: int x;
+		case e.Kind == xs.ExprBinary && e.Value == "=" && len(e.Children) > 0 &&
+			e.Children[0].Kind == xs.ExprIdent:
+			name = e.Children[0].Value
+		}
+		if name == "" {
+			continue
+		}
+
+		if scope[name] {
+			diags = append(diags, common.Diagnostic{
+				Range:    e.Range,
+				Severity: common.SeverityWarning,
+				Message: fmt.Sprintf("duplicate declaration of %q; the earlier declaration stays in effect",
+					name),
+				Code: CodeDuplicateDeclaration,
+			})
+		}
+		scope[name] = true
+	}
+
+	return diags
 }
 
 // declareItems marks the names introduced by one declaration's expression

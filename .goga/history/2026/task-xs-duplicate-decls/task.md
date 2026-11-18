@@ -44,4 +44,19 @@ ranges не имеет (параметры — вне спеги слота, н�
 
 ## Result
 
-(заполняется по завершении)
+- Код `duplicate-declaration` (warning) в internal/analysis:
+  `checkDuplicateDecls` — top-level (именованные декларации; include и
+  безымянные rules скипаются) + скоуп-ход локалей с семантикой веток
+  парсера (if Body[0]/[1] независимы, for-init в скоупе цикла,
+  switch-кейсы независимы, condition/action-блоки независимы);
+  вложенные скоупы затеняют легально
+- Range: top-level — Decl.Range, локалы — Expr.Range декларатора
+- Приёмка: новый `TestCorpus_NoDuplicateDecls` — корпусный гейт
+  analysis-слотов (skip без .corpus, пригоден следующим слотам):
+  100/100 карт, ноль срабатываний
+- Тесты: TestAnalyzeXs_DuplicateDecls, 12 кейсов (dup top-level,
+  cross-kind, rules, same-block, bare declarator, затенение, if/else,
+  sibling for в обеих формах, switch, безымянные rules, include-skip)
+- Проверки: go test 15/15 пакетов ok, lint 0, fmt чисто
+- Дока кода — internal/analysis/.usages/checks.md; severityOverrides
+  работают через общий механизм без правок
