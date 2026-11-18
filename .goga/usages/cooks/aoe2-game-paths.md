@@ -50,9 +50,6 @@ should hold — non-recursive search, exact directories):
 - A not-found game stays silent: no error, no settings write. Detection
   failures never block activation (includeRoots is a convenience).
 
-<<<<<<< Updated upstream
-## MS Store / Xbox (issue #124, not implemented)
-=======
 ## User mods layout (verified on a live install, 2026-11-19)
 
 Per-user mods root: `%USERPROFILE%\Games\Age of Empires 2 DE\<account>\mods\{local,subscribed}\` — one directory per Steam account id (a
@@ -64,7 +61,6 @@ machine can hold several, including a bare `0`), each with `local` and
 moment their folder structure exists — deploy creates it on demand.
 
 ## MS Store / Xbox (issue #124 — deferred indefinitely, 2026-11-19)
->>>>>>> Stashed changes
 
 Deferred by user decision: no live MS Store/Xbox install is available to
 verify the layout, and unverified facts do not enter code or data (the

@@ -68,6 +68,13 @@
         "path": "./snippets/aoe2rms.json"
       }
     ],
+    "commands": [
+      {
+        "command": "aoe2lsp.deployMap",
+        "title": "Deploy map to game",
+        "category": "AoE2 LSP"
+      }
+    ],
     "configuration": {
       "title": "AoE2 LSP",
       "properties": {
@@ -99,6 +106,11 @@
               "none"
             ]
           }
+        },
+        "aoe2lsp.deploy.targetDir": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Absolute path of the destination folder for the **Deploy map to game** command — a mod's `resources/_common/random-map-scripts` folder (e.g. `%USERPROFILE%\\Games\\Age of Empires 2 DE\\<account>\\mods\\local\\<mod>\\resources\\_common\\random-map-scripts`). Left empty, a single local mod under `%USERPROFILE%\\Games\\Age of Empires 2 DE` is detected automatically; zero or several candidates require this setting."
         },
         "aoe2lsp.includeRoots": {
           "type": "array",
