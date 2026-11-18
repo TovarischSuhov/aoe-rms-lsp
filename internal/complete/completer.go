@@ -38,8 +38,14 @@ const (
 // constants; the label orders inside a group.
 const (
 	sortSource     = "0"
-	sortKbFunction = "1"
-	sortKbConstant = "2"
+	sortAvailable  = "1"
+	sortKbFunction = "2"
+	sortKbConstant = "3"
+
+	// KindAutoInclude marks auto-include candidates in the detail line;
+	// the kind field itself stays the symbol's nature (function or
+	// variable) so editor kind-icons keep working.
+	availableSuffix = " · auto-include"
 )
 
 // Completer computes completion candidates over parsed ASTs and the
@@ -199,14 +205,26 @@ func attrValueAt(site rms.ArgSite, pos common.Pos) bool {
 	return false
 }
 
+// AvailableFile is one available-but-not-included XS file: the symbol
+// source for auto-include candidates.
+type AvailableFile struct {
+	// Path is the include argument to insert on acceptance.
+	Path string
+	// Decls are the file's top-level named declarations.
+	Decls []xs.Decl
+}
+
 // XsAt returns the completion candidates for pos in an XS file (a
 // document or an inline block in block-local coordinates — the caller
 // translates). Source symbols — the file's visible symbols plus the
 // include-closure declarations — win over same-name kb entries (truth
 // model); same-name source symbols of different kinds are both kept.
-// Rule and event names are skipped: they are not addressable in
-// expressions. Positions inside strings and comments answer silence.
-func (c *Completer) XsAt(file xs.XsFile, pos common.Pos, external []xs.Decl) []Candidate {
+// Available files (not yet included) contribute auto-include
+// candidates marked with their path in Include; same-name symbols
+// already in scope win — the available candidate is skipped. Rule and
+// event names are skipped: they are not addressable in expressions.
+// Positions inside strings and comments answer silence.
+func (c *Completer) XsAt(file xs.XsFile, pos common.Pos, external []xs.Decl, available []AvailableFile) []Candidate {
 	syms, ok := file.VisibleAt(pos)
 	if !ok {
 		return nil
@@ -258,6 +276,36 @@ func (c *Completer) XsAt(file xs.XsFile, pos common.Pos, external []xs.Decl) []C
 		}
 
 		addSource(d.Name, kind, declSignature(d))
+	}
+
+	// auto-include candidates: symbols from available-but-not-included
+	// files; in-scope symbols win (the include already provides them)
+	for _, af := range available {
+		for _, d := range af.Decls {
+			var kind string
+
+			switch d.Kind {
+			case xs.DeclFunction, xs.DeclExtern:
+				kind = KindFunction
+			case xs.DeclVariable:
+				kind = KindVariable
+			default:
+				continue
+			}
+
+			if source[d.Name] {
+				continue
+			}
+
+			source[d.Name] = true
+			out = append(out, Candidate{
+				Label:   d.Name,
+				Kind:    kind,
+				Detail:  declSignature(d) + availableSuffix + " " + af.Path,
+				Sort:    sortAvailable + d.Name,
+				Include: af.Path,
+			})
+		}
 	}
 
 	for _, fn := range c.store.Functions() {
