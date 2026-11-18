@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, ErrorAction, CloseAction, State } from "vscode-languageclient/node";
+import * as path from "node:path";
+import { deployMap, detectDeployTarget, realDeployEnv } from "./deploy.ts";
 import { detectGameIncludeRoots, realSteamEnv } from "./gamedetect.ts";
 import { resolveServer, wireEnv, type DownloadMode, type ServerResolution } from "./install.ts";
 import { statusView, type ServerPhase } from "./statusbar.ts";
@@ -135,6 +137,47 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	renderStatus("starting");
 	status.show();
+
+	// Deploy-to-game (issue #83): copy the active .rms and its local
+	// include dependencies into the game's mod folder. The explicit
+	// aoe2lsp.deploy.targetDir wins; without it a single local mod under
+	// %USERPROFILE%\Games\Age of Empires 2 DE is used, anything else asks
+	// for the setting instead of guessing.
+	const deployMapCommand = vscode.commands.registerCommand("aoe2lsp.deployMap", async () => {
+		const editor = vscode.window.activeTextEditor;
+		if (!editor || !editor.document.uri.fsPath.toLowerCase().endsWith(".rms")) {
+			void vscode.window.showErrorMessage("aoe2-lsp: open a .rms map file to deploy it to the game.");
+			return;
+		}
+
+		const mapPath = editor.document.uri.fsPath;
+		let targetDir = config.get<string>("deploy.targetDir", "").trim();
+		if (!targetDir) {
+			const detected = await detectDeployTarget(realDeployEnv());
+			if (!detected) {
+				void vscode.window.showErrorMessage(
+					'aoe2-lsp: no local AoE2 DE mod found under %USERPROFILE%\\Games\\Age of Empires 2 DE — set the aoe2lsp.deploy.targetDir setting to the mod\'s resources/_common/random-map-scripts folder.',
+				);
+				return;
+			}
+			targetDir = detected;
+		}
+
+		try {
+			const count = await vscode.window.withProgress(
+				{ location: vscode.ProgressLocation.Window, title: `aoe2-lsp: deploying ${path.basename(mapPath)}`, cancellable: false },
+				() => deployMap(mapPath, targetDir, realDeployEnv()),
+			);
+			output.appendLine(`deploy: ${count} file(s) → ${targetDir}`);
+			void vscode.window.showInformationMessage(
+				`aoe2-lsp: deployed ${count} file(s) to the game mod folder (${path.basename(targetDir)}). The mod folder is read when a match starts.`,
+			);
+		} catch (err) {
+			output.appendLine(`deploy failed: ${err instanceof Error ? err.message : String(err)}`);
+			void vscode.window.showErrorMessage(`aoe2-lsp: deploy failed: ${err instanceof Error ? err.message : String(err)}`);
+		}
+	});
+	context.subscriptions.push(deployMapCommand);
 
 	void client.start().catch((err: unknown) => {
 		void vscode.window.showErrorMessage(

@@ -134,6 +134,25 @@ import: filesystem goes through the `SteamEnv` seam, unit-tested by
 `test/gamedetect.test.ts` against real tmpdir fixtures (the
 src/install.ts pattern).
 
+## Map deployment (src/deploy.ts)
+
+The `aoe2lsp.deployMap` command ("Deploy map to game") copies the active
+.rms and its local include dependencies into a mod's
+`resources/_common/random-map-scripts` folder. `src/deploy.ts` is a pure
+Node module over the `DeployEnv` seam (the src/gamedetect.ts pattern):
+`scanIncludes` parses the three directive forms from line starts only,
+`collectDependencies` walks the include graph resolving against each
+includer's directory — deps outside the map's directory tree (game
+roots) and missing targets are skipped, cycles terminate on the visit
+set — and `deployMap` recreates the relative structure under the target
+so include resolution survives the move (existing files are overwritten:
+the map being edited wins). Destination: `aoe2lsp.deploy.targetDir`
+explicit setting wins; otherwise `detectDeployTarget` picks the single
+local mod under `%USERPROFILE%\Games\Age of Empires 2 DE` (layout in the
+aoe2-game-paths cook) and refuses to guess with zero or several
+candidates — the error message names the setting. Unit-tested by
+`test/deploy.test.ts` against real tmpdir fixtures.
+
 ## File rename support
 
 `workspace/willRenameFiles` needs no client-side code in VS Code: the

@@ -238,6 +238,20 @@ set, the game's `resources/_common/random-map-scripts` and
 `aoe2lsp.includeRoots` setting always wins; no Steam install — no
 settings change, no message.
 
+### Deploy map to game
+
+The **Deploy map to game** command (`aoe2lsp.deployMap`) copies the
+active `.rms` file and its local `#include`/`#includeXS` dependencies
+(the map's own directory tree; game-root files are not copied) into a
+mod's `resources/_common/random-map-scripts` folder, recreating the
+relative structure so include resolution survives the move. The
+destination comes from the `aoe2lsp.deploy.targetDir` setting; left
+empty, a single local mod under
+`%USERPROFILE%\Games\Age of Empires 2 DE\<account>\mods\local\<mod>` is
+detected automatically — zero or several candidates ask for the setting
+instead of guessing. The game reads the mod folder when a match starts;
+enable the mod in the Mod Manager first.
+
 ### Neovim (nvim-lspconfig)
 
 Register the server manually (custom server, not shipped with lspconfig) —

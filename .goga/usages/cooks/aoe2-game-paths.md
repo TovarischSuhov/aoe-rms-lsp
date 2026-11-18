@@ -50,6 +50,16 @@ should hold — non-recursive search, exact directories):
 - A not-found game stays silent: no error, no settings write. Detection
   failures never block activation (includeRoots is a convenience).
 
+## User mods layout (verified on a live install, 2026-11-19)
+
+Per-user mods root: `%USERPROFILE%\Games\Age of Empires 2 DE\<account>\mods\{local,subscribed}\` — one directory per Steam account id (a
+machine can hold several, including a bare `0`), each with `local` and
+`subscribed`. Mod folders follow the game resources shape:
+`<mod>\resources\_common\...` (subscribed mods verified: `drs`,
+`info.json`, `thumbnail.jpg`); an RM mod's scripts live in
+`<mod>\resources\_common\random-map-scripts`. Local mods appear the
+moment their folder structure exists — deploy creates it on demand.
+
 ## MS Store / Xbox (issue #124, not implemented)
 
 Not covered yet: the packaged install lives under the Microsoft Store /
