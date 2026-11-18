@@ -45,6 +45,7 @@ diags := analyzer.AnalyzeXs(xsFile, externals)
 | undefined-symbol | error | ident вне объявлений и kb |
 | bad-arity | error | неверное число аргументов вызова |
 | bad-type | error | несовместимый тип аргумента/присваивания/return |
+| duplicate-declaration | warning | повтор декларации в одном скоупе: повтор top-level имени (функции/переменные/именованные rules) или локала в одном блоке; вложенные скоупы затеняют легально и молчат (приёмка — `TestCorpus_NoDuplicateDecls`) |
 
 ## Nuance ladder for unknown names
 

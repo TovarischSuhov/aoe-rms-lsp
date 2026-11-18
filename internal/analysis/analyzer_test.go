@@ -311,6 +311,154 @@ void f() {
 	}
 }
 
+// TestAnalyzeXs_DuplicateDecls checks the same-scope redeclaration
+// warning: repeated top-level names and same-block locals fire;
+// nested scopes, branches and sibling loops shadow legally and stay
+// silent.
+func TestAnalyzeXs_DuplicateDecls(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "duplicate top-level functions",
+			src: `void f() {
+}
+
+void f() {
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "top-level name reused across kinds",
+			src: `int value = 1;
+
+void value() {
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "duplicate named rules",
+			src: `rule dup inactive min-interval 10 {
+}
+
+rule dup {
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "same-block local duplicate",
+			src: `void f() {
+	int x = 1;
+	int x = 2;
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "bare declarator repeated",
+			src: `void f() {
+	int x;
+	int x;
+}
+`,
+			want: []string{CodeDuplicateDeclaration},
+		},
+		{
+			name: "nested block shadowing is legal",
+			src: `void f(int c) {
+	int x = 1;
+	if (c) {
+		int x = 2;
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "if and else branches are independent scopes",
+			src: `void f(int c) {
+	if (c) {
+		int x = 1;
+	} else {
+		int x = 2;
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "sibling three-section for loops redeclare freely",
+			src: `void f() {
+	for (int i = 0; i < 3; i++) {
+	}
+	for (int i = 0; i < 3; i++) {
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "sibling two-section for loops redeclare freely",
+			src: `void f() {
+	int total = 0;
+	for (total = 1; <= 3) {
+	}
+	for (total = 1; <= 3) {
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "switch cases are independent scopes",
+			src: `void f(int c) {
+	switch (c) {
+		case 1:
+			int x = 1;
+		case 2:
+			int x = 2;
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "unnamed rules do not collide",
+			src: `rule {
+}
+
+rule {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "include directives are skipped",
+			src: `#include "lib.xs"
+#include "lib.xs"
+`,
+			want: []string{},
+		},
+	}
+
+	a := newAnalyzer(t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			file, _ := xs.XsParse(tt.src, "test.xs")
+
+			assert.Equal(t, tt.want, codes(a.AnalyzeXs(file, nil)))
+		})
+	}
+}
+
 // TestAnalyzeXs_Invariants checks sorting, severity and AST immutability.
 func TestAnalyzeXs_Invariants(t *testing.T) {
 	t.Parallel()
