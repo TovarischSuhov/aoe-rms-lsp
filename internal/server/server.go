@@ -706,7 +706,15 @@ func (s *Server) Completion(
 	slog.DebugContext(ctx, "completion", "uri", params.TextDocument.URI,
 		"line", params.Position.Line, "col", params.Position.Character, "items", len(cands))
 
-	return &protocol.CompletionList{IsIncomplete: false, Items: toCompletionItems(cands)}, nil
+	// auto-include edits add an include directive; the kind follows the
+	// document: .xs documents include .xs files, inline-XS blocks in a
+	// .rms document connect them through #includeXS
+	directive := "#include"
+	if strings.HasSuffix(name, ".rms") {
+		directive = "#includeXS"
+	}
+
+	return &protocol.CompletionList{IsIncomplete: false, Items: toCompletionItems(cands, directive)}, nil
 }
 
 // completionRms parses the .rms document: a position inside an inline
@@ -735,6 +743,7 @@ func (s *Server) completionRms(
 			xsFile,
 			unshiftPos(pos, block.Range.Start),
 			closure.ExternalDecls(""),
+			s.availableFiles(ctx, docURI),
 		)
 	}
 
@@ -743,7 +752,8 @@ func (s *Server) completionRms(
 
 // completionXs parses the .xs document and computes the candidates with
 // the closure's external declarations (the analyzed file is excluded
-// from its own externals — the analyzeXs pattern).
+// from its own externals — the analyzeXs pattern) plus auto-include
+// candidates from available-but-not-included files.
 func (s *Server) completionXs(
 	ctx context.Context,
 	text string,
@@ -754,7 +764,29 @@ func (s *Server) completionXs(
 	file, _ := xs.XsParse(text, name)
 	closure := s.resolver.Closure(ctx, docURI)
 
-	return s.completer.XsAt(file, pos, closure.ExternalDecls(docURI))
+	return s.completer.XsAt(
+		file,
+		pos,
+		closure.ExternalDecls(docURI),
+		s.availableFiles(ctx, docURI),
+	)
+}
+
+// availableFiles maps the resolver's available-but-not-included scan to
+// the complete cell's shape.
+func (s *Server) availableFiles(ctx context.Context, docURI string) []complete.AvailableFile {
+	entries := s.resolver.Available(ctx, docURI)
+	if len(entries) == 0 {
+		return nil
+	}
+
+	out := make([]complete.AvailableFile, 0, len(entries))
+
+	for _, e := range entries {
+		out = append(out, complete.AvailableFile{Path: e.Path, Decls: e.Decls})
+	}
+
+	return out
 }
 
 // completionKinds maps the complete cell's candidate kinds to protocol
@@ -773,8 +805,10 @@ var completionKinds = map[string]protocol.CompletionItemKind{
 // toCompletionItems renders candidates per lsp-protocol (Completion
 // Items): Label, the kind-table Kind, one-line Detail, SortText; the
 // insert text equals the label and stays unset, documentation stays
-// out of completion (concise-items rule).
-func toCompletionItems(cands []complete.Candidate) []protocol.CompletionItem {
+// out of completion (concise-items rule). Auto-include candidates gain
+// AdditionalTextEdits: the include line (directive per document kind)
+// inserted at the document start on acceptance.
+func toCompletionItems(cands []complete.Candidate, directive string) []protocol.CompletionItem {
 	items := make([]protocol.CompletionItem, 0, len(cands))
 
 	for _, c := range cands {
@@ -788,10 +822,23 @@ func toCompletionItems(cands []complete.Candidate) []protocol.CompletionItem {
 			item.Detail = protocol.NewOptional(c.Detail)
 		}
 
+		if c.Include != "" {
+			item.AdditionalTextEdits = []protocol.TextEdit{includeInsertEdit(directive, c.Include)}
+		}
+
 		items = append(items, item)
 	}
 
 	return items
+}
+
+// includeInsertEdit builds the zero-width document-start insert of an
+// include directive for the given include argument.
+func includeInsertEdit(directive string, path string) protocol.TextEdit {
+	return protocol.TextEdit{
+		Range:   protocol.Range{Start: protocol.Position{Line: 0, Character: 0}, End: protocol.Position{Line: 0, Character: 0}},
+		NewText: directive + " \"" + path + "\"\n",
+	}
 }
 
 // Definition answers textDocument/definition across the document's
@@ -1135,6 +1182,7 @@ func (s *Server) CodeAction(
 		switch fmt.Sprint(diag.Code) {
 		case analysis.CodeUnknownCommand, analysis.CodeUnknownAttribute, analysis.CodeUndefinedSymbol:
 			out = appendAction(out, s.renameAction(params, diag))
+			out = appendAction(out, s.addIncludeAction(ctx, params, diag))
 		case analysis.CodeDeprecatedEffectPercent:
 			out = appendAction(out, s.replaceEffectPercentAction(params, diag))
 		case analysis.CodeMissingSection:
@@ -1219,6 +1267,78 @@ func (s *Server) replaceWordAction(
 			params.TextDocument.URI: {{Range: s.toProtocolRange(text, word), NewText: newText}},
 		}},
 	}
+}
+
+// addIncludeAction builds the auto-include fix for an undefined XS
+// symbol: when exactly one available-but-not-included file declares
+// the name, the fix inserts the include line at the document start.
+// Zero or several candidate files stay silent — a wrong guess would
+// add a broken include. Non-undefined-symbol codes and non-file
+// documents answer nil.
+func (s *Server) addIncludeAction(
+	ctx context.Context,
+	params *protocol.CodeActionParams,
+	diag *protocol.Diagnostic,
+) *protocol.CodeAction {
+	if fmt.Sprint(diag.Code) != analysis.CodeUndefinedSymbol {
+		return nil
+	}
+
+	name := undefinedSymbolName(messageText(diag.Message))
+	if name == "" {
+		return nil
+	}
+
+	docURI := string(params.TextDocument.URI)
+
+	var owners []string
+
+	for _, entry := range s.resolver.Available(ctx, docURI) {
+		for _, d := range entry.Decls {
+			if d.Name == name {
+				owners = append(owners, entry.Path)
+
+				break
+			}
+		}
+	}
+
+	if len(owners) != 1 {
+		return nil
+	}
+
+	directive := "#include"
+	if strings.HasSuffix(docURI, ".rms") {
+		directive = "#includeXS"
+	}
+
+	kind := protocol.CodeActionKindQuickFix
+
+	return &protocol.CodeAction{
+		Title:       "Add include '" + owners[0] + "'",
+		Kind:        &kind,
+		Diagnostics: []protocol.Diagnostic{*diag},
+		Edit: &protocol.WorkspaceEdit{Changes: map[uri.URI][]protocol.TextEdit{
+			params.TextDocument.URI: {includeInsertEdit(directive, owners[0])},
+		}},
+	}
+}
+
+// undefinedSymbolName extracts the symbol name from the undefined-
+// symbol message (`undefined symbol "x"…`); other message shapes
+// answer "".
+func undefinedSymbolName(message string) string {
+	rest, ok := strings.CutPrefix(message, "undefined symbol \"")
+	if !ok {
+		return ""
+	}
+
+	end := strings.Index(rest, "\"")
+	if end <= 0 {
+		return ""
+	}
+
+	return rest[:end]
 }
 
 // insertSectionAction builds the missing-section fix: a zero-width

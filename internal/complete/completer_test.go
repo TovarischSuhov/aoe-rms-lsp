@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -199,7 +200,7 @@ func TestCompleter_XsAt_Contract(t *testing.T) {
 
 	file, _ := xs.XsParse("void f() {}", "t.xs")
 
-	require.IsType(t, []Candidate{}, c.XsAt(file, common.Pos{Line: 0, Column: 6}, nil))
+	require.IsType(t, []Candidate{}, c.XsAt(file, common.Pos{Line: 0, Column: 6}, nil, nil))
 }
 
 func TestXsAt_SourceShadowsKb(t *testing.T) {
@@ -207,7 +208,7 @@ func TestXsAt_SourceShadowsKb(t *testing.T) {
 	src := "int xsGetGoal() { return 1; }"
 	file, _ := xs.XsParse(src, "t.xs")
 
-	cands := newTestCompleter(t).XsAt(file, at(src, "return", 0), nil)
+	cands := newTestCompleter(t).XsAt(file, at(src, "return", 0), nil, nil)
 
 	var got []Candidate
 
@@ -237,7 +238,7 @@ func TestXsAt_ExternalDeclsMerged(t *testing.T) {
 		{Kind: xs.DeclInclude, Name: "z.xs"},
 	}
 
-	cands := newTestCompleter(t).XsAt(file, at(src, "main", 2), external)
+	cands := newTestCompleter(t).XsAt(file, at(src, "main", 2), external, nil)
 
 	byLabel := make(map[string]Candidate)
 
@@ -253,9 +254,9 @@ func TestXsAt_ExternalDeclsMerged(t *testing.T) {
 	require.False(t, included, "include declarations are not addressable")
 
 	require.Equal(t, "int xsGetGoal(int)", byLabel["xsGetGoal"].Detail)
-	require.Equal(t, "1xsGetGoal", byLabel["xsGetGoal"].Sort)
+	require.Equal(t, "2xsGetGoal", byLabel["xsGetGoal"].Sort)
 
-	require.Equal(t, "2cColorBlue", byLabel["cColorBlue"].Sort)
+	require.Equal(t, "3cColorBlue", byLabel["cColorBlue"].Sort)
 }
 
 func TestXsAt_VisibleAtFalse_Empty(t *testing.T) {
@@ -263,7 +264,7 @@ func TestXsAt_VisibleAtFalse_Empty(t *testing.T) {
 	src := "void f() { string s = \"ab\"; }"
 	file, _ := xs.XsParse(src, "t.xs")
 
-	cands := newTestCompleter(t).XsAt(file, at(src, "ab", 0), nil)
+	cands := newTestCompleter(t).XsAt(file, at(src, "ab", 0), nil, nil)
 
 	require.Empty(t, cands, "strings answer silence")
 }
@@ -275,7 +276,7 @@ func TestXsAt_SameNameDifferentKinds_BothKept(t *testing.T) {
 
 	external := []xs.Decl{{Kind: xs.DeclFunction, Name: "foo", Type: "void"}}
 
-	cands := newTestCompleter(t).XsAt(file, at(src, "foo", 1), external)
+	cands := newTestCompleter(t).XsAt(file, at(src, "foo", 1), external, nil)
 
 	var kinds []string
 
@@ -299,7 +300,7 @@ func TestXsAt_ExternalNoReturnType_DetailWithoutRet(t *testing.T) {
 		Params: []xs.Param{{Name: "a", Type: "int"}},
 	}}
 
-	cands := newTestCompleter(t).XsAt(file, at(src, "main", 2), external)
+	cands := newTestCompleter(t).XsAt(file, at(src, "main", 2), external, nil)
 
 	byLabel := make(map[string]Candidate)
 
@@ -315,7 +316,7 @@ func TestXsAt_RuleExcludedExternIsFunction(t *testing.T) {
 	src := "rule r { condition 1 }\nextern int ex();"
 	file, _ := xs.XsParse(src, "t.xs")
 
-	cands := newTestCompleter(t).XsAt(file, at(src, "extern", 2), nil)
+	cands := newTestCompleter(t).XsAt(file, at(src, "extern", 2), nil, nil)
 
 	byLabel := make(map[string]Candidate)
 
@@ -335,7 +336,7 @@ func TestXsAt_ParamAndLocalEmptyDetail(t *testing.T) {
 	src := "void f(int p) {\n  int loc = 1;\n  loc = p;\n}\n"
 	file, _ := xs.XsParse(src, "t.xs")
 
-	cands := newTestCompleter(t).XsAt(file, at(src, "loc = p", 1), nil)
+	cands := newTestCompleter(t).XsAt(file, at(src, "loc = p", 1), nil, nil)
 
 	byLabel := make(map[string]Candidate)
 
@@ -359,7 +360,7 @@ func TestXsAt_ForInitCandidate(t *testing.T) {
 	file, _ := xs.XsParse(src, "for.xs")
 
 	// cursor on the i assignment inside the loop body
-	cands := newTestCompleter(t).XsAt(file, at(src, "i = i", 4), nil)
+	cands := newTestCompleter(t).XsAt(file, at(src, "i = i", 4), nil, nil)
 
 	var got []Candidate
 
@@ -373,4 +374,44 @@ func TestXsAt_ForInitCandidate(t *testing.T) {
 
 	require.Equal(t, KindLocal, got[0].Kind)
 	require.Equal(t, "0i", got[0].Sort, "source group sorts first")
+}
+
+// TestXsAt_AvailableFiles checks the auto-include candidates: available
+// file symbols carry the include path, sort below source symbols, and
+// same-name in-scope symbols win — the available candidate is skipped.
+func TestXsAt_AvailableFiles(t *testing.T) {
+	t.Parallel()
+	c := newTestCompleter(t)
+
+	src := `void main() {
+	int local = 1;
+	if (local > 0) {
+	}
+}
+`
+	file, _ := xs.XsParse(src, "t.xs")
+	available := []AvailableFile{
+		{Path: "lib.xs", Decls: []xs.Decl{
+			{Kind: xs.DeclFunction, Name: "exportedFn", Type: "int", Range: file.Decls[0].Range},
+			{Kind: xs.DeclVariable, Name: "local", Type: "int"},
+			{Kind: xs.DeclRule, Name: "aRule"},
+		}},
+	}
+
+	cands := c.XsAt(file, common.Pos{Line: 1, Column: 6}, nil, available)
+
+	byLabel := map[string]Candidate{}
+	for _, cand := range cands {
+		byLabel[cand.Label] = cand
+	}
+
+	fn, ok := byLabel["exportedFn"]
+	require.True(t, ok, "the available file symbol is offered")
+	assert.Equal(t, "lib.xs", fn.Include, "the include path rides the candidate")
+	assert.Equal(t, "1exportedFn", fn.Sort, "available symbols sort below source")
+	assert.Contains(t, fn.Detail, "auto-include")
+	assert.Equal(t, KindFunction, fn.Kind)
+
+	assert.NotContains(t, byLabel["local"].Sort, "1local", "in-scope names win over available")
+	assert.NotContains(t, byLabel, "aRule", "rules are not addressable")
 }
