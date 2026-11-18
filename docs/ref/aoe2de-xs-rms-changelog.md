@@ -1,6 +1,6 @@
 # AoE2 DE — XS/RMS changelog из release notes
-# Собрано: 2026-10-13, источник: ageofempires.com/news
-# Период: 2019-11 (релиз AoE2 DE) — 2026-09. Просмотрено 78 постов обновлений AoE2 DE
+# Собрано: 2026-11-18, источник: ageofempires.com/news
+# Период: 2019-11 (релиз AoE2 DE) — 2026-11. Просмотрено 79 постов обновлений AoE2 DE
 # (Update/Minor Update/Hotfix/Update Preview). Посты без XS/RMS-изменений в файл не включены.
 #
 # Регламент пополнения (весь процесс обновления kb — docs/kb-refresh.md):
@@ -12,6 +12,30 @@
 #   разделах "### Триггеры/константы", "### Modding…" и любых с "добавлено"
 # - после пополнения: go run ./cmd/kbgen -diff (отчёт «что нового») →
 #   go run ./cmd/kbgen (перегенерация данных)
+
+## Update 188329 — 2026-10-27
+https://www.ageofempires.com/news/age-of-empires-ii-definitive-edition-update-188329/
+
+### XS: добавлено
+Синхронизируемый net-data: максимум 256 байт данных на игрока на push, до 4 push в секунду; write-функции возвращают число реально записанных байт (строки обрезаются по лимиту, остальные типы падают без усечения); данные читаются через `xsReadNet*`; рекомендуется и для single-player — включает корректное воспроизведение реплеев.
+- `void xsResetNetData()`
+- `int xsWriteNetInt(int value)`
+- `int xsWriteNetFloat(float value)`
+- `int xsWriteNetVector(vector value)`
+- `int xsWriteNetString(string value)`
+- `bool xsSendNetData(string callback)` — пушит данные всем игрокам, затем вызывает названную функцию; в мультиплеере с задержкой по латентности, в single-player с задержкой в два тика
+- `string xsReadNetString()`
+- `int xsReadNetInt()`
+- `float xsReadNetFloat()`
+- `vector xsReadNetVector()`
+- `bool xsSetWriteNetDataPosition(int position)`
+- `bool xsSetReadNetDataPosition(int position)`
+- `int xsGetWriteNetDataPosition()`
+- `int xsGetReadNetDataPosition()`
+- `bool xsUnsyncIsSandboxMode()` — true в реплеях и в кампаниях с выбранным sandbox-режимом
+
+### XS: изменено/исправлено
+- Исправлен краш `xsSetUnitProperty` при установке id юнита-хозяина гарнизона (garrisoned-in-unit).
 
 ## Update 185872 — 2026-09-22
 https://www.ageofempires.com/news/age-of-empires-ii-definitive-edition-update-185872/

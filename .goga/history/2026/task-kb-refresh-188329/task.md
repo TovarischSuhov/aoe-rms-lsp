@@ -42,5 +42,25 @@ update» + «Add missed constants» — оба патча должны войт�
 
 ## Result
 
-(заполняется по завершении: дифф-отчёт, состав регенерации, вердикт
-по issue)
+- Источники: апстрим UGC Guide переложен (functions/constants JSON +
+  prelude.xs/py, коммит апстрима «Update XS docs for the 2026 October
+  update» 2026-10-28 + «Add missed constants»); changelog — секция
+  Update 188329 (15 net-data функций + фикс xsSetUnitProperty),
+  шапка — период 2026-11, 79 постов
+- Данные: xs-functions 204→289 (+87, −2 — ренеймы 185872), константы
+  882→1170 (+288: ActionType/Annex/Attribute/ColorId/TechState/Capture
+  и пр. — TVS DLC + октябрьский патч), `since_update` 188329/185872 из
+  changelog; rms-commands не тронут (Zetnus отсутствует локально)
+- Вынужденные спутники: пины счётчиков (kb store 204→289/27→45,
+  server completion 204→289, xs prelude 884→1172 экстернов),
+  регенерация TextMate-грамматики (tmgen, 1170 констант)
+- Проверки: fmt/build/lint зелёные; тесты 14/15 пакетов ok (include —
+  красный только на Windows, фиксялся в PR #188, не этой веткой);
+  corpus gate локально: 100/100 ok, panic 0; CI-dispatch на ветке —
+  corpus-джоба
+- Issues: `Fixes #186` (188329 покрыт полностью: апстрим-документация
+  патча вошла в данные); `Refs #132` — UGC-часть 185872 вошла, слот
+  остаётся открытым до переэкспорта Zetnus-гайда (локальная копия
+  мейнтейнера; RMS-фиксы 185872 — ATTR_*/unit classes/random_map.def —
+  ждут его)
+- Отчёт диффа — в описании PR

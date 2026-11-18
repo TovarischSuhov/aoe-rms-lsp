@@ -249,7 +249,7 @@ func TestXsParse_Prelude(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, 884, externs)
+	assert.Equal(t, 1172, externs)
 
 	// a known extern is navigable
 	name, found := file.SymbolAt(common.Pos{Line: 7, Column: 19})

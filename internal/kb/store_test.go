@@ -14,7 +14,9 @@ func TestNewStore_Success(t *testing.T) {
 	store, err := NewStore()
 	require.NoError(t, err)
 
-	assert.Len(t, store.Functions(), 204)
+	// headline counters pin the embedded data shape; a kb-refresh
+	// (docs/kb-refresh.md) bumps them deliberately
+	assert.Len(t, store.Functions(), 289)
 
 	all := store.Constants("")
 	require.NotEmpty(t, all)
@@ -24,7 +26,7 @@ func TestNewStore_Success(t *testing.T) {
 		sections[c.Section] = true
 	}
 
-	assert.Len(t, sections, 27)
+	assert.Len(t, sections, 45)
 	assert.NotEmpty(t, store.Commands(""))
 }
 
