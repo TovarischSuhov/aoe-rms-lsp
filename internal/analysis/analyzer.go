@@ -44,6 +44,10 @@ const (
 	// CodeDuplicateDeclaration marks a name declared twice in the same
 	// scope: repeated top-level declarations and same-block locals.
 	CodeDuplicateDeclaration = "duplicate-declaration"
+	// CodeUnusedDeclaration marks a declaration with no references:
+	// locals never mentioned again and top-level functions unreachable
+	// from the file's engine entry points (rules and events).
+	CodeUnusedDeclaration = "unused-declaration"
 )
 
 // xsBuiltins are language-level identifiers no knowledge base covers.
@@ -276,6 +280,7 @@ func (a *Analyzer) checkCommand(stmt *rms.Statement, lastKnown *string, diags []
 func (a *Analyzer) AnalyzeXs(file xs.XsFile, externals []xs.Decl) []common.Diagnostic {
 	declared := map[string]bool{}
 	diags := checkDuplicateDecls(file)
+	diags = checkUnusedDecls(file, diags)
 
 	for i := range file.Decls {
 		decl := &file.Decls[i]
@@ -454,6 +459,219 @@ func dupDeclarators(exprs []xs.Expr, scope map[string]bool, diags []common.Diagn
 	}
 
 	return diags
+}
+
+// checkUnusedDecls reports declarations with no references. The
+// entry-point model: rules and events are called by the engine and are
+// the roots of the reachability walk; a file with none of them is a
+// library whose top-level functions are exported through include
+// closures, so its top level stays unflagged (cross-file callers are
+// invisible at file level). Top-level variables are skipped too —
+// their initializers may carry load-time side effects. Locals need no
+// entry-point reasoning: an initializer with a call keeps the hint
+// quiet for the same side-effect reason.
+func checkUnusedDecls(file xs.XsFile, diags []common.Diagnostic) []common.Diagnostic {
+	functions := map[string]*xs.Decl{}
+	scriptShaped := false
+
+	for i := range file.Decls {
+		decl := &file.Decls[i]
+		if decl.Kind == xs.DeclFunction && decl.Name != "" {
+			functions[decl.Name] = decl
+		}
+		if decl.Kind == xs.DeclRule || decl.Kind == xs.DeclEvent {
+			scriptShaped = true
+		}
+	}
+
+	if scriptShaped {
+		// walk the transitive call graph from the engine entry points;
+		// names reachable from a root are used
+		used := map[string]bool{}
+		expanded := map[string]bool{}
+
+		for i := range file.Decls {
+			decl := &file.Decls[i]
+			if decl.Kind == xs.DeclRule || decl.Kind == xs.DeclEvent {
+				expandUses(decl.Body, functions, used, expanded)
+			}
+		}
+
+		for i := range file.Decls {
+			decl := &file.Decls[i]
+			if decl.Kind != xs.DeclFunction || decl.Name == "" {
+				continue
+			}
+			if !used[decl.Name] {
+				diags = append(diags, common.Diagnostic{
+					Range:    decl.Range,
+					Severity: common.SeverityHint,
+					Message: fmt.Sprintf("function %q is never called from rules or events",
+						decl.Name),
+					Code: CodeUnusedDeclaration,
+				})
+			}
+		}
+	}
+
+	// locals inside executable bodies only: top-level `local` statements
+	// are file globals the prelude exports by the dozen, and top-level
+	// variables carry load-time side effects
+	for i := range file.Decls {
+		decl := &file.Decls[i]
+		if decl.Kind != xs.DeclFunction && decl.Kind != xs.DeclRule && decl.Kind != xs.DeclEvent {
+			continue
+		}
+
+		// name-based per enclosing declaration; the declaration itself
+		// does not count as a use, everything else does (shadowing
+		// collisions are duplicate-declaration's domain instead)
+		used := collectIdents(decl.Body, true)
+
+		diags = unusedLocals(decl.Body, used, diags)
+	}
+
+	return diags
+}
+
+// expandUses adds every name mentioned in body to used and recurses
+// into the bodies of the top-level functions it calls.
+func expandUses(body []xs.Stmt, functions map[string]*xs.Decl, used map[string]bool, expanded map[string]bool) {
+	for ident := range collectIdents(body, false) {
+		used[ident] = true
+
+		if _, isLocalFn := functions[ident]; isLocalFn && !expanded[ident] {
+			expanded[ident] = true
+			expandUses(functions[ident].Body, functions, used, expanded)
+		}
+	}
+}
+
+// collectIdents gathers every identifier mentioned in a statement tree:
+// idents, call callees and assignment targets alike. With skipDecls the
+// declared names are excluded — the declaration target of a declarator
+// does not count as a use of itself — while initializers still do.
+func collectIdents(stmts []xs.Stmt, skipDecls bool) map[string]bool {
+	used := map[string]bool{}
+
+	var walkExpr func(e xs.Expr)
+	walkExpr = func(e xs.Expr) {
+		if e.Kind == xs.ExprIdent {
+			used[e.Value] = true
+		}
+		if e.Kind == xs.ExprCall {
+			used[e.Callee] = true
+		}
+		for _, child := range e.Children {
+			walkExpr(child)
+		}
+	}
+
+	// walkDeclarator walks one declarator: a bare `int x;` has no
+	// mentions, `x = init` mentions everything except the target x
+	walkDeclarator := func(e xs.Expr) {
+		if e.Kind == xs.ExprBinary && e.Value == "=" {
+			for _, child := range e.Children[min(1, len(e.Children)-1):] {
+				walkExpr(child)
+			}
+		}
+	}
+
+	walkExprs := func(exprs []xs.Expr, inDecl bool) {
+		for j := range exprs {
+			if inDecl && skipDecls {
+				walkDeclarator(exprs[j])
+			} else {
+				walkExpr(exprs[j])
+			}
+		}
+	}
+
+	var walk func(stmts []xs.Stmt)
+	walk = func(stmts []xs.Stmt) {
+		for i := range stmts {
+			stmt := &stmts[i]
+
+			if stmt.Kind == xs.StmtFor && len(stmt.Exprs) > 0 && skipDecls {
+				// Exprs[0] is the init section (a declarator or an
+				// assignment to an outer variable, whose cond repeats it
+				// anyway), the rest reads variables normally
+				walkExprs(stmt.Exprs[:1], true)
+				walkExprs(stmt.Exprs[1:], false)
+			} else {
+				walkExprs(stmt.Exprs, stmt.Kind == xs.StmtDecl)
+			}
+
+			walk(stmt.Body)
+		}
+	}
+
+	walk(stmts)
+
+	return used
+}
+
+// unusedLocals reports locals whose name is never mentioned in decl's
+// body; an initializer with a call may carry side effects and stays
+// quiet.
+func unusedLocals(stmts []xs.Stmt, used map[string]bool, diags []common.Diagnostic) []common.Diagnostic {
+	for i := range stmts {
+		stmt := &stmts[i]
+
+		if stmt.Kind == xs.StmtDecl || stmt.Kind == xs.StmtFor {
+			for _, e := range stmt.Exprs {
+				name := declaratorName(e)
+				if name == "" || used[name] {
+					continue
+				}
+				if initializerHasCall(e) {
+					continue
+				}
+
+				diags = append(diags, common.Diagnostic{
+					Range:    e.Range,
+					Severity: common.SeverityHint,
+					Message:  fmt.Sprintf("local %q is declared but never used", name),
+					Code:     CodeUnusedDeclaration,
+				})
+			}
+		}
+
+		diags = unusedLocals(stmt.Body, used, diags)
+	}
+
+	return diags
+}
+
+// declaratorName returns the declared name of one declarator
+// expression: a bare ident or an assignment target.
+func declaratorName(e xs.Expr) string {
+	switch {
+	case e.Kind == xs.ExprIdent:
+		return e.Value
+	case e.Kind == xs.ExprBinary && e.Value == "=" && len(e.Children) > 0 &&
+		e.Children[0].Kind == xs.ExprIdent:
+		return e.Children[0].Value
+	}
+
+	return ""
+}
+
+// initializerHasCall reports whether the declarator's initializer
+// subtree contains a call (a side effect the deletion hint must not
+// suggest removing).
+func initializerHasCall(e xs.Expr) bool {
+	if e.Kind == xs.ExprCall {
+		return true
+	}
+
+	for _, child := range e.Children {
+		if initializerHasCall(child) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // declareItems marks the names introduced by one declaration's expression

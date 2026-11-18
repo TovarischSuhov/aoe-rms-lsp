@@ -204,6 +204,9 @@ func TestAnalyzeXs_Checks(t *testing.T) {
 void tick(int step) {
 	int local = step + counter;
 	int seed = xsGetMapSeed();
+	local = local + 1;
+	if (seed > 0) {
+	}
 }
 `,
 			want: []string{},
@@ -230,6 +233,8 @@ void tick(int step) {
 	vector v = vector(0, 0, 0);
 	v.x = pos.x;
 	bool done = true;
+	if (done) {
+	}
 }
 `,
 			want: []string{},
@@ -356,6 +361,7 @@ rule dup {
 			src: `void f() {
 	int x = 1;
 	int x = 2;
+	x = 3;
 }
 `,
 			want: []string{CodeDuplicateDeclaration},
@@ -365,6 +371,7 @@ rule dup {
 			src: `void f() {
 	int x;
 	int x;
+	x = 1;
 }
 `,
 			want: []string{CodeDuplicateDeclaration},
@@ -375,6 +382,7 @@ rule dup {
 	int x = 1;
 	if (c) {
 		int x = 2;
+		c = x;
 	}
 }
 `,
@@ -385,8 +393,12 @@ rule dup {
 			src: `void f(int c) {
 	if (c) {
 		int x = 1;
+		if (x > 0) {
+		}
 	} else {
 		int x = 2;
+		if (x > 1) {
+		}
 	}
 }
 `,
@@ -421,8 +433,12 @@ rule dup {
 	switch (c) {
 		case 1:
 			int x = 1;
+			if (x > 0) {
+			}
 		case 2:
 			int x = 2;
+			if (x > 1) {
+			}
 	}
 }
 `,
@@ -442,6 +458,132 @@ rule {
 			name: "include directives are skipped",
 			src: `#include "lib.xs"
 #include "lib.xs"
+`,
+			want: []string{},
+		},
+	}
+
+	a := newAnalyzer(t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			file, _ := xs.XsParse(tt.src, "test.xs")
+
+			assert.Equal(t, tt.want, codes(a.AnalyzeXs(file, nil)))
+		})
+	}
+}
+
+// TestAnalyzeXs_UnusedDecls checks the entry-point model: rules and
+// events are engine-called roots, functions unreachable from them in a
+// script-shaped file are flagged, library files (no rules) keep their
+// top level quiet, and unused locals fire unless their initializer
+// carries a call.
+func TestAnalyzeXs_UnusedDecls(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "unused local",
+			src: `void f() {
+	int stale = 1;
+}
+`,
+			want: []string{CodeUnusedDeclaration},
+		},
+		{
+			name: "call initializer keeps the local quiet",
+			src: `void f() {
+	int seed = xsGetMapSeed();
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "local used in a nested scope is used",
+			src: `void f(int c) {
+	int x = 1;
+	if (c) {
+		x = 2;
+	}
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "unused function in a script-shaped file",
+			src: `rule checker inactive {
+	condition {
+		xsGetMapSeed();
+	}
+}
+
+void orphan() {
+}
+`,
+			want: []string{CodeUnusedDeclaration},
+		},
+		{
+			name: "function called transitively from a rule is used",
+			src: `rule checker inactive {
+	condition {
+		entry();
+	}
+}
+
+void entry() {
+	helper();
+}
+
+void helper() {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "recursion without entry is unused",
+			src: `rule checker inactive {
+	condition {
+		xsGetMapSeed();
+	}
+}
+
+void loop() {
+	loop();
+}
+`,
+			want: []string{CodeUnusedDeclaration},
+		},
+		{
+			name: "library file keeps its top level quiet",
+			src: `void exported(vector key) {
+}
+
+void alsoExported() {
+	exported(vector(0, 0, 0));
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "rules and events are never flagged",
+			src: `rule quiet inactive {
+	condition {
+	}
+}
+
+event onTick {
+}
+`,
+			want: []string{},
+		},
+		{
+			name: "top-level variables stay quiet",
+			src: `int forgotten = 5;
 `,
 			want: []string{},
 		},
@@ -544,7 +686,7 @@ func TestAnalyzeXs_ForLoopVarNoUndefined(t *testing.T) {
 	t.Parallel()
 	// the review repro: the loop variable used in init/cond/step/body
 	// must not fire undefined-symbol (previously 4 false errors)
-	src := "void main() { for (int i = 0; i < 10; i++) { int j = i + 1; } }"
+	src := "void main() { for (int i = 0; i < 10; i++) { int j = i + 1; if (j > 0) { } } }"
 
 	file, _ := xs.XsParse(src, "for.xs")
 	a := newAnalyzer(t)

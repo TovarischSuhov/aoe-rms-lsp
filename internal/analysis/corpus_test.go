@@ -7,16 +7,20 @@ import (
 	"aoe2-lsp/internal/xs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-// TestCorpus_NoDuplicateDecls runs the duplicate-declaration check over
-// the real corpus sample (make corpus): a community-written script
+// TestCorpus_NoDuplicateDecls runs the same-scope redeclaration check
+// over the real corpus sample (make corpus): a community-written script
 // tripping the warning is a false positive to fix, not a map to shame.
-// The gate reruns for every analysis slot over its own code; it skips
-// when the corpus has not been fetched.
+// Unused declarations are counted, not gated: true leftovers in wild
+// scripts are findings, while top-level function flags in library-shaped
+// files (no rules or events) would be false positives — the include
+// closure calls them — and fail the gate. The test skips when the corpus
+// has not been fetched.
 func TestCorpus_NoDuplicateDecls(t *testing.T) {
 	t.Parallel()
 
@@ -45,7 +49,7 @@ func TestCorpus_NoDuplicateDecls(t *testing.T) {
 
 			for _, block := range file.XsBlocks {
 				xsFile, _ := xs.XsParse(block.Code, "inline:"+filepath.Base(path))
-				assertNoDuplicateDecls(t, a.AnalyzeXs(xsFile, nil))
+				assertAnalysisAcceptance(t, xsFile, a.AnalyzeXs(xsFile, nil))
 			}
 		})
 	}
@@ -59,18 +63,48 @@ func TestCorpus_NoDuplicateDecls(t *testing.T) {
 			require.NoError(t, err)
 
 			xsFile, _ := xs.XsParse(string(raw), path)
-			assertNoDuplicateDecls(t, a.AnalyzeXs(xsFile, nil))
+			assertAnalysisAcceptance(t, xsFile, a.AnalyzeXs(xsFile, nil))
 		})
 	}
 }
 
-// assertNoDuplicateDecls fails the corpus subtest when the check fires.
-func assertNoDuplicateDecls(t *testing.T, diags []common.Diagnostic) {
+// assertAnalysisAcceptance gates duplicate-declaration at zero, keeps
+// top-level function hints out of library-shaped files and counts the
+// rest of the unused findings for the slot's PR report.
+func assertAnalysisAcceptance(t *testing.T, file xs.XsFile, diags []common.Diagnostic) {
 	t.Helper()
 
-	for _, d := range diags {
-		if d.Code == CodeDuplicateDeclaration {
-			t.Errorf("duplicate-declaration fired: %s (line %d)", d.Message, d.Range.Start.Line)
+	scriptShaped := false
+	for i := range file.Decls {
+		if file.Decls[i].Kind == xs.DeclRule || file.Decls[i].Kind == xs.DeclEvent {
+			scriptShaped = true
 		}
 	}
+
+	unused, unusedFunctions := 0, 0
+	for _, d := range diags {
+		switch d.Code {
+		case CodeDuplicateDeclaration:
+			t.Errorf("duplicate-declaration fired: %s (line %d)", d.Message, d.Range.Start.Line)
+		case CodeUnusedDeclaration:
+			unused++
+			if isFunctionFlag(d.Message) {
+				unusedFunctions++
+				if !scriptShaped {
+					t.Errorf("unused function in a library-shaped file: %s (line %d)",
+						d.Message, d.Range.Start.Line)
+				}
+			}
+		}
+	}
+
+	if unused > 0 {
+		t.Logf("unused-declaration findings: %d (%d function-level)", unused, unusedFunctions)
+	}
+}
+
+// isFunctionFlag reports whether the unused-declaration message is about
+// a top-level function rather than a local.
+func isFunctionFlag(message string) bool {
+	return strings.HasPrefix(message, "function ")
 }

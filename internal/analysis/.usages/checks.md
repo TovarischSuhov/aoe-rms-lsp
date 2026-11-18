@@ -46,6 +46,7 @@ diags := analyzer.AnalyzeXs(xsFile, externals)
 | bad-arity | error | неверное число аргументов вызова |
 | bad-type | error | несовместимый тип аргумента/присваивания/return |
 | duplicate-declaration | warning | повтор декларации в одном скоупе: повтор top-level имени (функции/переменные/именованные rules) или локала в одном блоке; вложенные скоупы затеняют легально и молчат (приёмка — `TestCorpus_NoDuplicateDecls`) |
+| unused-declaration | hint | нет ссылок: локаль без упоминаний (инициализатор с вызовом молчит — side effect) или топ-левел функция, недостижимая из rules/events. Entry-point model: rules/events — engine-roots; файл без них — библиотека, её топ-левел не помечается (cross-file вызовы невидимы); top-level переменные не помечаются вовсе |
 
 ## Nuance ladder for unknown names
 
