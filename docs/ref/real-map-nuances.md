@@ -116,6 +116,12 @@ elevation/terrain: значит на `create_object` они, скорее все
 | `create_terrain` | `number` | 1× / 1 | не найден | [KHR_WSVG_Atacama](https://github.com/HSZemi/rms/blob/c422ed5e4eda735bd5ef705bd409ecb446c1502d/STANDARD_MAPS_WITH_USER_PATCH_FEATURES/KOTH_REGICIDE/WSVG%20Single%20Maps%20v2/KHR_WSVG_Atacama.rms) |
 | `create_terrain` | `create_terrain` (вложенный!) | 2× / 1 | — | [Crater_Lake](https://github.com/Naramsim/AoE2-random-map-scripts) |
 
+Вложенный `create_terrain` (brace-less, внутри attribute-блока
+внешнего) **подтверждён no-op в игре** (2026-11-18, DE): контрольная
+карта — внешний `create_terrain DIRT { … create_terrain WATER }`
+отработал (пятна DIRT есть), вложенный WATER — воды нет; рекурсии в
+attribute-блоки движок не входит.
+
 Паттерн очевиден: авторы копируют атрибуты между `create_land` /
 `create_terrain` / `create_elevation` / `create_object` — движок глотает.
 
