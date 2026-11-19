@@ -220,6 +220,211 @@ func TestResolver_DefinitionIncludeDirective(t *testing.T) {
 	assert.Equal(t, common.Range{}, target.Range)
 }
 
+// TestResolver_DefinitionIncludeThroughRoot pins the issue #210 main
+// case: the map lives outside the configured include root and the
+// directive resolves only through it. The click must jump exactly when
+// the closure diagnostics report the directive Resolved — through the
+// same resolution the diagnostics used — carrying the closure's own
+// Target URI and the file-start zero range.
+func TestResolver_DefinitionIncludeThroughRoot(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mapDir := t.TempDir()
+
+	writeTree(t, root, map[string]string{
+		"lib/xs/foo.xs": "void foo() { }\n",
+	})
+
+	const mainSrc = "#include lib/xs/foo.xs\n"
+	mapURIs := writeTree(t, mapDir, map[string]string{
+		"main.rms": mainSrc,
+	})
+
+	r := NewResolver(fakeSource{})
+	r.SetRoots([]string{root})
+
+	// parity precondition: diagnostics already accept the directive, so
+	// a silent found=false here is the defect, never a fixture slip
+	c := r.Closure(context.Background(), mapURIs["main.rms"])
+	require.Empty(t, c.Missing)
+	require.Len(t, c.Resolved, 1)
+
+	target, found := r.Definition(context.Background(), mapURIs["main.rms"], linePos(mainSrc, 0, "lib/xs", 0))
+
+	require.True(t, found, "a directive the closure reports Resolved must jump")
+	assert.Equal(t, c.Resolved[0].Target, target.URI, "the jump lands on the closure's own Resolved target")
+	assert.Equal(t, common.Range{}, target.Range)
+}
+
+// TestResolver_DefinitionRootRelativeCoveredByRoot pins scenario B of
+// the issue #210 fix: a ../-target that exists next to the owner but is
+// only *accepted* through a configured root's bound jumps exactly like
+// the closure's Resolved entry. The owner directory stats this file
+// fine, so the pre-fix owner-dir-only withinRoot check silently ate the
+// click while diagnostics reported the directive Resolved.
+func TestResolver_DefinitionRootRelativeCoveredByRoot(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	const econSrc = "#include ../shared/x.xs\n"
+	uris := writeTree(t, root, map[string]string{
+		"map/parts/econ.rms": econSrc,
+		"map/shared/x.xs":    "void xsPart() { }\n",
+	})
+
+	r := NewResolver(fakeSource{})
+	r.SetRoots([]string{root})
+
+	// parity precondition: the owner-dir candidate exists but only the
+	// root's bound accepts it, so diagnostics report Resolved and the
+	// click must answer the same way
+	c := r.Closure(context.Background(), uris["map/parts/econ.rms"])
+	require.Empty(t, c.Missing)
+	require.Len(t, c.Resolved, 1)
+
+	target, found := r.Definition(context.Background(), uris["map/parts/econ.rms"], linePos(econSrc, 0, "../shared", 0))
+
+	require.True(t, found, "a root-covered ../-target the closure reports Resolved must jump")
+	assert.Equal(t, c.Resolved[0].Target, target.URI, "the jump lands on the closure's own Resolved target")
+	assert.Equal(t, uris["map/shared/x.xs"], target.URI, "... which is the root's map/shared/x.xs copy")
+	assert.Equal(t, common.Range{}, target.Range)
+}
+
+// TestResolver_DefinitionOwnerDirBeatsRoot pins scenario C: when the
+// target exists both next to the includer and in a configured root, the
+// click lands on the owner-directory copy — resolveTarget's first
+// accepted candidate (owner dir, then roots in SetRoots order), not a
+// re-implemented or reordered priority (R3.1).
+func TestResolver_DefinitionOwnerDirBeatsRoot(t *testing.T) {
+	t.Parallel()
+
+	mapDir := t.TempDir()
+	root := t.TempDir()
+
+	const mainSrc = "#include \"shared.rms\"\n"
+	uris := writeTree(t, mapDir, map[string]string{
+		"main.rms":   mainSrc,
+		"shared.rms": "base_terrain GRASS\n",
+	})
+	writeTree(t, root, map[string]string{"shared.rms": "base_terrain DIRT\n"})
+
+	r := NewResolver(fakeSource{})
+	r.SetRoots([]string{root})
+
+	// parity precondition: the closure itself picked the owner-directory
+	// copy, so the click must not disagree with the diagnostics
+	c := r.Closure(context.Background(), uris["main.rms"])
+	require.Empty(t, c.Missing)
+	require.Len(t, c.Resolved, 1)
+	require.Equal(t, uris["shared.rms"], c.Resolved[0].Target, "the owner-directory copy resolves first")
+
+	target, found := r.Definition(context.Background(), uris["main.rms"], linePos(mainSrc, 0, "shared.rms", 0))
+
+	require.True(t, found, "the owner-directory copy resolves, so the click must jump")
+	assert.Equal(t, uris["shared.rms"], target.URI, "the owner-directory copy beats the root copy")
+	assert.Equal(t, common.Range{}, target.Range)
+}
+
+// TestResolver_DefinitionMissingParity pins scenario D: a target written
+// nowhere stays found=false on the click while the same resolver's
+// closure reports exactly one MissingInclude for that directive — a
+// click answers exactly when diagnostics resolve (R2.1, R2.2), never
+// "always jump".
+func TestResolver_DefinitionMissingParity(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	const mainSrc = "#include missing.rms\n"
+	uris := writeTree(t, dir, map[string]string{
+		"main.rms": mainSrc,
+	})
+
+	r := NewResolver(fakeSource{})
+
+	target, found := r.Definition(context.Background(), uris["main.rms"], linePos(mainSrc, 0, "missing.rms", 0))
+	assert.False(t, found, "a target that exists nowhere must not jump")
+	assert.Equal(t, Target{}, target, "a miss returns the zero target")
+
+	c := r.Closure(context.Background(), uris["main.rms"])
+	require.Len(t, c.Missing, 1, "the same resolver misses exactly this directive")
+	assert.Equal(t, "missing.rms", c.Missing[0].Path)
+	assert.Equal(t, uris["main.rms"], c.Missing[0].Owner)
+}
+
+// TestResolver_DefinitionRootEscapeBlocked pins scenario E (R4.1, the
+// definition-side mirror of TestResolver_SetRootsEscapeBlocked): the
+// root-relative candidate exists on disk but escapes the owner directory
+// and every configured root, so the click stays found=false. escape.rms
+// sits exactly at the root-relative candidate path, making the bound —
+// not a missing file — the thing that rejects it.
+func TestResolver_DefinitionRootEscapeBlocked(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	root := filepath.Join(base, "root")
+
+	const mainSrc = "#include \"../escape.rms\"\n"
+	uris := writeTree(t, root, map[string]string{
+		"map/main.rms": mainSrc,
+	})
+	writeTree(t, base, map[string]string{"escape.rms": "base_terrain GRASS\n"})
+
+	r := NewResolver(fakeSource{})
+	r.SetRoots([]string{root})
+
+	// parity precondition: the diagnostics side misses the same
+	// directive — asserted first, so found=false below is parity, not a
+	// fixture slip (mirror of SetRootsEscapeBlocked)
+	c := r.Closure(context.Background(), uris["map/main.rms"])
+	require.Len(t, c.Missing, 1, "a target escaping every root stays missing")
+
+	target, found := r.Definition(context.Background(), uris["map/main.rms"], linePos(mainSrc, 0, "../escape", 0))
+
+	assert.False(t, found, "a target escaping every root must not jump")
+	assert.Equal(t, Target{}, target)
+}
+
+// TestResolver_DefinitionIncludeXSThroughRoot pins the merged-list
+// contract (R1.3): #includeXS rides the same Includes + XsIncludes
+// directive list through resolveTarget, so a root-resolved XS library
+// jumps exactly like a plain #include — dropping XsIncludes from the
+// definition hit-test would strand clicks on paths the diagnostics call
+// Resolved.
+func TestResolver_DefinitionIncludeXSThroughRoot(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mapDir := t.TempDir()
+
+	rootURIs := writeTree(t, root, map[string]string{
+		"lib/xs/foo.xs": "void foo() { }\n",
+	})
+
+	const mainSrc = "#includeXS lib/xs/foo.xs\n"
+	mapURIs := writeTree(t, mapDir, map[string]string{
+		"main.rms": mainSrc,
+	})
+
+	r := NewResolver(fakeSource{})
+	r.SetRoots([]string{root})
+
+	// parity precondition: diagnostics resolve the XS directive through
+	// the root, so the click must answer the same way
+	c := r.Closure(context.Background(), mapURIs["main.rms"])
+	require.Empty(t, c.Missing)
+	require.Len(t, c.Resolved, 1)
+
+	target, found := r.Definition(context.Background(), mapURIs["main.rms"], linePos(mainSrc, 0, "lib/xs", 0))
+
+	require.True(t, found, "an #includeXS the closure reports Resolved must jump like a plain #include")
+	assert.Equal(t, c.Resolved[0].Target, target.URI, "the jump lands on the closure's own Resolved target")
+	assert.Equal(t, rootURIs["lib/xs/foo.xs"], target.URI, "... which is the root's lib/xs/foo.xs copy")
+	assert.Equal(t, common.Range{}, target.Range)
+}
+
 // TestResolver_DefinitionExternalDecl checks scenario 2: an inline XS name
 // resolves to the declaring file's name range.
 func TestResolver_DefinitionExternalDecl(t *testing.T) {
