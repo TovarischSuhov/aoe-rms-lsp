@@ -1,7 +1,7 @@
 ---
 type: Invariant
 title: Инварианты стабильности
-description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, пересортировка merged-списков semantic tokens на месте склейки, мемоизация парсов editor-документов по canonical path с валидацией полным сравнением текста, данные без сети.
+description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, пересортировка merged-списков semantic tokens на месте склейки, мемоизация парсов editor-документов по canonical path с валидацией полным сравнением текста, паника в request-хендлере не рвёт сессию (defer recoverRequest), serve логирует conn.Err(), данные без сети.
 sources:
   - resource: README.md
   - resource: docs/plans/build-lsp-rms-xs.md
@@ -24,7 +24,7 @@ sources:
   - resource: internal/rms/ast.go
   - resource: internal/include/resolver.go
 generated:
-  by: implement-mini fix #211
+  by: implement-mini fix #213
   at: 2026-11-20
 verified:
   - by: claude-code/claude-haiku-4-5
@@ -42,6 +42,8 @@ verified:
   - by: process:go-test-server-internal
     at: 2026-11-19
   - by: process:go-test-include
+    at: 2026-11-20
+  - by: process:go-test-server
     at: 2026-11-20
 ---
 
@@ -629,6 +631,18 @@ verified:
   навигации или повторный парс на каждое нажатие (#211). Пины: восемь
   тестов `internal/include/memo_test.go` (`TestResolver_EditorMemo*`),
   включая white-box Drop/SetRoots и конкурентный прогон.
+- **Паника в request-хендлере не рвёт сессию.** Каждый request-хендлер
+  несёт `defer recoverRequest`: клиенту уходит −32603 `*jsonrpc2.Error`
+  с именем метода и значением паники, ERROR-лог «request panic
+  recovered»; `recoverNotification` (logged degraded success) несут
+  пять notification-хендлеров — DidChangeWatchedFiles,
+  DidChangeConfiguration, DidOpen, DidChange, DidClose, — Initialized
+  и Exit пока без recover: известный пробел (будущий issue). `serve`
+  логирует `conn.Err() != nil` («connection failed»); чистый shutdown
+  (EOF/ErrClosed — `conn.Err()` возвращает nil) лога не создаёт (#213).
+  Основания: `internal/server/server.go`
+  (recoverRequest/recoverNotification), `internal/server/serve.go`,
+  тесты `internal/server/recover_test.go`, `internal/server/serve_test.go`.
 
 ## Данные и окружение
 

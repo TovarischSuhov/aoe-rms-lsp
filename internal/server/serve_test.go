@@ -5,10 +5,12 @@ import (
 	"aoe2-lsp/internal/complete"
 	"aoe2-lsp/internal/hints"
 	"aoe2-lsp/internal/kb"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -1334,4 +1336,98 @@ func (c *recordingClient) RegisterCapability(
 	c.mu.Unlock()
 
 	return nil
+}
+
+// newServeLogCapture redirects the default slog logger into a buffer for the
+// duration of the test, restoring the previous logger via t.Cleanup. The
+// default logger is process-global, so tests using it must not run in
+// parallel.
+func newServeLogCapture(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(old) })
+
+	return &buf
+}
+
+// startServeOverPipe mounts serve on a fresh os.Pipe pair (no stdio swap) and
+// returns the log capture, the channel carrying serve's result, and the
+// client-side write end. The remaining transport halves close with the test,
+// after serve has returned.
+func startServeOverPipe(t *testing.T) (*bytes.Buffer, <-chan error, io.WriteCloser) {
+	t.Helper()
+
+	logBuf := newServeLogCapture(t)
+
+	reqR, reqW, err := os.Pipe()
+	require.NoError(t, err)
+
+	respR, respW, err := os.Pipe()
+	require.NoError(t, err)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- serve(context.Background(), duplexPipe{ReadCloser: reqR, Writer: respW}, "test")
+	}()
+
+	t.Cleanup(func() {
+		_ = reqR.Close()
+		_ = respR.Close()
+		_ = respW.Close()
+	})
+
+	return logBuf, done, reqW
+}
+
+// TestServe_CleanShutdownNotLogged covers spec S4: when the editor closes the
+// transport, serve sees a clean EOF, returns nil within the timeout and no
+// connection failure is logged.
+func TestServe_CleanShutdownNotLogged(t *testing.T) {
+	logBuf, done, reqW := startServeOverPipe(t)
+
+	// The editor closes its write half: a clean end of stream.
+	require.NoError(t, reqW.Close())
+
+	select {
+	case err := <-done:
+		require.NoError(t, err, "clean EOF shutdown must return nil")
+	case <-time.After(testTimeout):
+		t.Fatalf("serve did not return within %s", testTimeout)
+	}
+
+	assert.NotContains(t, logBuf.String(), "connection failed",
+		"clean shutdown (EOF) must not be logged as a connection failure")
+}
+
+// TestServe_ConnectionFailureLogged covers spec S5: a broken frame (invalid
+// Content-Length header) ends the connection with a non-EOF error, and serve
+// logs the failure before returning.
+func TestServe_ConnectionFailureLogged(t *testing.T) {
+	logBuf, done, reqW := startServeOverPipe(t)
+
+	// A broken frame: the header declares a non-numeric Content-Length. The
+	// framer rejects it with ErrInvalidHeader — a non-EOF read error, so
+	// conn.Err() is non-nil and the failure is a real one (spec S5), unlike
+	// the clean EOF of TestServe_CleanShutdownNotLogged.
+	_, err := io.WriteString(reqW, "Content-Length: garbage\r\n\r\n")
+	require.NoError(t, err)
+	require.NoError(t, reqW.Close())
+
+	select {
+	case err := <-done:
+		require.NoError(t, err, "a client-side frame failure must not change serve's nil return")
+	case <-time.After(testTimeout):
+		t.Fatalf("serve did not return within %s", testTimeout)
+	}
+
+	out := logBuf.String()
+	assert.Contains(t, out, "connection failed",
+		"a real connection failure must be logged")
+	assert.Contains(t, out, "level=ERROR",
+		"the connection failure must be logged at ERROR level")
+	assert.Contains(t, out, "err=",
+		"the log must carry the connection failure cause")
 }

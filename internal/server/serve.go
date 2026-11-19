@@ -49,6 +49,10 @@ func serve(ctx context.Context, rwc io.ReadWriteCloser, version string) error {
 	case <-srv.exit:
 	}
 
+	if err := conn.Err(); err != nil {
+		slog.ErrorContext(ctx, "connection failed", "err", err)
+	}
+
 	if err := conn.Close(); err != nil {
 		return fmt.Errorf("close connection: %w", err)
 	}
