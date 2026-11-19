@@ -1320,7 +1320,7 @@ func (s *Server) renameToAction(
 
 	for _, r := range s.occurrenceRanges(text, name, pos) {
 		if r.Contains(pos) {
-			word = text[r.Start.Offset:r.End.Offset]
+			word = siteText(text, name, r)
 
 			break
 		}

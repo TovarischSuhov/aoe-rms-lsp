@@ -373,3 +373,138 @@ func TestServerCodeAction_RenamedSymbolFix(t *testing.T) {
 	require.Len(t, edits, 1)
 	require.Equal(t, "xsUnsyncGetLocalPlayerId", edits[0].NewText)
 }
+
+// rawOffset returns the raw byte offset of needle on the given line of
+// the source (the rawPos style of internal/rms): diagnostics carry
+// Line/Column, while the raw offset carries every CR a CRLF file adds —
+// the divergence a raw-byte word slice stumbles over (issue #205).
+func rawOffset(src string, line int, needle string) int {
+	rawLines := strings.Split(src, "\n")
+	offset := strings.Index(rawLines[line], needle)
+
+	for i := 0; i < line; i++ {
+		offset += len(rawLines[i]) + 1
+	}
+
+	return offset
+}
+
+// TestServerCodeAction_RenamedSymbolCRLFParity pins the EOL invariance
+// of the renamed-symbol quickfix (issue #205): a .rms document answers
+// with the same fix as its LF twin — the word under the diagnostic is
+// extracted against the CRLF-normalized text its offsets were counted
+// on — an off-word diagnostic start stays silent, and the raw-bytes .xs
+// branch keeps answering on real CR bytes.
+func TestServerCodeAction_RenamedSymbolCRLFParity(t *testing.T) {
+	t.Parallel()
+
+	const (
+		id = "xsGetLocalPlayerId"
+		to = "xsUnsyncGetLocalPlayerId"
+		// The call lines are tab-indented: the identifier starts one
+		// column past the tab, the call's '(' follows the identifier.
+		idStart  = uint32(len("\t"))
+		callOpen = uint32(len("\t" + id))
+	)
+
+	renamedDiag := func(line uint32, startCol uint32) protocol.Diagnostic {
+		return protocol.Diagnostic{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: line, Character: startCol},
+				End:   protocol.Position{Line: line, Character: startCol + uint32(len(id))},
+			},
+			Code:    protocol.String(analysis.CodeRenamedSymbol),
+			Message: protocol.String(`"` + id + `" was renamed to "` + to + `" — the game rejects the old name`),
+		}
+	}
+
+	t.Run("rms inline-xs crlf parity", func(t *testing.T) {
+		t.Parallel()
+
+		s := newNavigationServer(t)
+
+		lfSrc := "<PLAYER_SETUP>\n#includeXS\n" +
+			"void main() {\n\txsGetLocalPlayerId();\n}\n" +
+			"</PLAYER_SETUP>\n"
+		crlfSrc := strings.ReplaceAll(lfSrc, "\n", "\r\n")
+
+		// Fixture sanity (the TestRmsWordAt_CRLFParity probe style):
+		// only a diagnostic below line 0 can expose the divergence, and
+		// the LF source is the normalized form its parser offsets count.
+		diag := renamedDiag(3, idStart)
+
+		require.Greater(t, int(diag.Range.Start.Line), 0,
+			"fixture sanity: only a diagnostic below line 0 can expose the raw-vs-normalized offset divergence")
+		require.Greater(t, rawOffset(crlfSrc, 3, id), rawOffset(lfSrc, 3, id),
+			"fixture sanity: the raw CRLF offset diverges from the normalized offset")
+
+		const uri = "file:///t.rms"
+
+		s.docs.Put(uri, lfSrc, 1)
+		lfActions := codeActionAt(t, s, uri, diag)
+
+		s.docs.Put(uri, crlfSrc, 2)
+		crlfActions := codeActionAt(t, s, uri, diag)
+
+		require.Len(t, lfActions, 1, "LF twin baseline: the rename quickfix is offered")
+		require.Len(t, crlfActions, 1, "a CRLF map keeps the rename quickfix alive (issue #205)")
+
+		lfAction := lfActions[0].(*protocol.CodeAction)
+		crlfAction := crlfActions[0].(*protocol.CodeAction)
+
+		require.Equal(t, "Rename to '"+to+"'", crlfAction.Title)
+		require.Equal(t, lfAction, crlfAction, "the CRLF map answers the identical quickfix of its LF twin")
+
+		edits := crlfAction.Edit.Changes[uri]
+		require.Len(t, edits, 1)
+		require.Equal(t, to, edits[0].NewText)
+	})
+
+	t.Run("off-word diagnostic stays silent", func(t *testing.T) {
+		t.Parallel()
+
+		s := newNavigationServer(t)
+
+		src := "<PLAYER_SETUP>\n#includeXS\n" +
+			"void main() {\n\txsGetLocalPlayerId();\n}\n" +
+			"</PLAYER_SETUP>\n"
+		s.docs.Put("file:///t.rms", strings.ReplaceAll(src, "\n", "\r\n"), 1)
+
+		// The diagnostic start sits on the call's '(' — no word range
+		// contains it and the URI fallback carries no rename, so the
+		// server stays silent rather than guessing a word.
+		actions := codeActionAt(t, s, "file:///t.rms", renamedDiag(3, callOpen))
+
+		require.Empty(t, actions, "an off-word diagnostic start offers no rename action")
+	})
+
+	t.Run("xs crlf parity", func(t *testing.T) {
+		t.Parallel()
+
+		s := newNavigationServer(t)
+
+		lfSrc := "void main() {\n\txsGetLocalPlayerId();\n}\n"
+		crlfSrc := strings.ReplaceAll(lfSrc, "\n", "\r\n")
+
+		const uri = "file:///t.xs"
+
+		s.docs.Put(uri, lfSrc, 1)
+		lfActions := codeActionAt(t, s, uri, renamedDiag(1, idStart))
+
+		s.docs.Put(uri, crlfSrc, 2)
+		crlfActions := codeActionAt(t, s, uri, renamedDiag(1, idStart))
+
+		require.Len(t, crlfActions, 1, "a CRLF .xs file keeps the rename quickfix alive")
+
+		lfAction := lfActions[0].(*protocol.CodeAction)
+		crlfAction := crlfActions[0].(*protocol.CodeAction)
+
+		require.Equal(t, "Rename to '"+to+"'", crlfAction.Title)
+		require.Equal(t, lfAction, crlfAction,
+			"the raw-bytes .xs branch answers the identical quickfix of its LF twin — no normalization may leak in")
+
+		edits := crlfAction.Edit.Changes[uri]
+		require.Len(t, edits, 1)
+		require.Equal(t, to, edits[0].NewText)
+	})
+}

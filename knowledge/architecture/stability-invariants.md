@@ -24,8 +24,8 @@ sources:
   - resource: internal/rms/ast.go
   - resource: internal/include/resolver.go
 generated:
-  by: claude-code implement-mini fix #204
-  at: 2026-11-19T15:26:00Z
+  by: implement-mini fix #205
+  at: 2026-11-19
 verified:
   - by: claude-code/claude-haiku-4-5
     at: 2026-10-19T00:00:00Z
@@ -39,6 +39,8 @@ verified:
     at: 2026-10-24T12:59:33Z
   - by: process:go-test-rms-include
     at: 2026-11-19T15:26:00Z
+  - by: process:go-test-server-internal
+    at: 2026-11-19
 ---
 
 # Инварианты стабильности
@@ -75,12 +77,16 @@ verified:
   на CRLF-файлах молча сдвинут; имя под позицией берётся из записанного
   имени word-индекса (`rms.RmsFile.WordAt` — точный ключ `References`,
   секционные слова записаны в lowercase) или из `siteText`, который
-  нормализует текст перед срезом. Пины: `TestRmsWordAt`,
+  нормализует текст перед срезом. Тот же класс — второй исправленный
+  экземпляр (#205): серверный renamed-symbol quickfix (`renameToAction`,
+  `internal/server/server.go`) теперь извлекает слово через `siteText`,
+  а не сырым срезом по офсетам. Пины: `TestRmsWordAt`,
   `TestRmsWordAt_CRLFParity`, `TestResolver_ReferencesCRLFEditorState`,
   `TestResolver_ReferencesCRLFOnDisk`,
   `TestResolver_ReferencesSectionNameCase`,
   `TestResolver_ReferencesInlineXsCRLFParity`,
-  `TestResolver_DefinitionCRLFParity`.
+  `TestResolver_DefinitionCRLFParity`,
+  `TestServerCodeAction_RenamedSymbolCRLFParity`.
 - **Каждый потреблённый токен — в AST или под диагностикой (#96).**
   RMS-парсер не теряет байты молча: токен, потреблённый на сбойном пути,
   либо представлен в recovery-форме AST, либо покрыт позиционированной
