@@ -1,0 +1,7 @@
+// c56-lead do/while closer layout
+void A() {
+do x(); while(c);
+do{x();}while(c);
+do{do y(); while(b);}while(c);
+do if(d){y();} while(e);
+}

@@ -2405,9 +2405,11 @@ func (p *xsPrinter) stmtIf(s xs.Stmt, level int, prefix string) {
 }
 
 // stmtDo prints a do/while: the body under the do line, the condition on
-// the closer line. A do the parser took without its while's parentheses —
-// or without the while at all — prints as its own bytes: the closer line
-// would have to synthesize a "while ()" the parser cannot reparse.
+// the closer line. A brace-less body starts that line with the bare
+// "while"; a block shares its "}" with it. A do the parser took without
+// its while's parentheses — or without the while at all — prints as its
+// own bytes: the closer line would have to synthesize a "while ()" the
+// parser cannot reparse.
 func (p *xsPrinter) stmtDo(s xs.Stmt, level int) {
 	if len(s.Exprs) == 0 {
 		p.stmtVerbatim(s, level)
@@ -2432,7 +2434,12 @@ func (p *xsPrinter) stmtDo(s xs.Stmt, level int) {
 		closer = "}"
 	}
 
-	p.line(level, closer+" while ("+cond+");")
+	closing := "while (" + cond + ");"
+	if closer != "" {
+		closing = closer + " " + closing
+	}
+
+	p.line(level, closing)
 }
 
 // stmtFor prints a for loop, rebuilding the header's three sections.
