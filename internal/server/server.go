@@ -22,6 +22,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 
@@ -338,7 +339,9 @@ func NewServer(
 func (s *Server) Initialize(
 	ctx context.Context,
 	params *protocol.InitializeParams,
-) (*protocol.InitializeResult, error) {
+) (_ *protocol.InitializeResult, err error) {
+	defer recoverRequest(ctx, "Initialize", &err)
+
 	full := protocol.TextDocumentSyncKindFull
 
 	caps := protocol.ServerCapabilities{
@@ -489,9 +492,11 @@ func (s *Server) DidClose(
 // recoverNotification turns a notification-handler panic into a logged,
 // degraded success: the editor session survives without the dropped
 // notification, the panic lands in stderr (ERROR) where the corpus
-// harness and operators find it. Request handlers stay unwrapped — the
-// jsonrpc2 layer already answers those with an error response the caller
-// sees.
+// harness and operators find it. Request handlers carry defer
+// recoverRequest instead: the jsonrpc2 dispatch recover answers one
+// InternalError response but then fails the connection (c.fail closes
+// the stream, dispatch.go:112-114) — without a handler-level recover a
+// single panic would end the whole session.
 func recoverNotification(ctx context.Context, method string, err *error) {
 	if r := recover(); r != nil {
 		slog.ErrorContext(ctx, "notification panic recovered",
@@ -501,12 +506,26 @@ func recoverNotification(ctx context.Context, method string, err *error) {
 	}
 }
 
+// recoverRequest stops a request-handler panic at the handler and turns
+// it into the *jsonrpc2.Error the client sees (see recoverNotification
+// for what the library's own recover would do to the session).
+func recoverRequest(ctx context.Context, method string, err *error) {
+	if r := recover(); r != nil {
+		slog.ErrorContext(ctx, "request panic recovered",
+			"method", method, "panic", r)
+
+		*err = jsonrpc2.Errorf(jsonrpc2.InternalError, "%s panicked: %v", method, r)
+	}
+}
+
 // Hover answers with the kb entry under the cursor: the RMS command owning
 // the position or the XS symbol. nil, nil when there is nothing to show.
 func (s *Server) Hover(
 	ctx context.Context,
 	params *protocol.HoverParams,
-) (*protocol.Hover, error) {
+) (_ *protocol.Hover, err error) {
+	defer recoverRequest(ctx, "Hover", &err)
+
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
 		return nil, nil
@@ -607,7 +626,9 @@ func (s *Server) hoverXs(text string, name string, pos common.Pos) string {
 func (s *Server) SignatureHelp(
 	ctx context.Context,
 	params *protocol.SignatureHelpParams,
-) (*protocol.SignatureHelp, error) {
+) (_ *protocol.SignatureHelp, err error) {
+	defer recoverRequest(ctx, "SignatureHelp", &err)
+
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
 		return nil, nil
@@ -723,7 +744,9 @@ func toSignatureHelp(hint hints.Hint) *protocol.SignatureHelp {
 func (s *Server) Completion(
 	ctx context.Context,
 	params *protocol.CompletionParams,
-) (protocol.CompletionResult, error) {
+) (_ protocol.CompletionResult, err error) {
+	defer recoverRequest(ctx, "Completion", &err)
+
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
 		return &protocol.CompletionList{Items: []protocol.CompletionItem{}}, nil
@@ -886,7 +909,9 @@ func includeInsertEdit(directive string, path string) protocol.TextEdit {
 func (s *Server) Definition(
 	ctx context.Context,
 	params *protocol.DefinitionParams,
-) (protocol.DefinitionResult, error) {
+) (_ protocol.DefinitionResult, err error) {
+	defer recoverRequest(ctx, "Definition", &err)
+
 	text, _, _ := s.openDocument(params.TextDocument.URI)
 
 	target, found := s.resolver.Definition(
@@ -914,7 +939,9 @@ func (s *Server) Definition(
 func (s *Server) References(
 	ctx context.Context,
 	params *protocol.ReferenceParams,
-) ([]protocol.Location, error) {
+) (_ []protocol.Location, err error) {
+	defer recoverRequest(ctx, "References", &err)
+
 	docURI := string(params.TextDocument.URI)
 	text, _, _ := s.openDocument(params.TextDocument.URI)
 	pos := s.fromProtocolPos(text, params.Position)
@@ -978,7 +1005,9 @@ var validNewName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 func (s *Server) PrepareRename(
 	ctx context.Context,
 	params *protocol.PrepareRenameParams,
-) (protocol.PrepareRenameResult, error) {
+) (_ protocol.PrepareRenameResult, err error) {
+	defer recoverRequest(ctx, "PrepareRename", &err)
+
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
 		return nil, nil
@@ -1031,7 +1060,9 @@ func (s *Server) PrepareRename(
 func (s *Server) Rename(
 	ctx context.Context,
 	params *protocol.RenameParams,
-) (*protocol.WorkspaceEdit, error) {
+) (_ *protocol.WorkspaceEdit, err error) {
+	defer recoverRequest(ctx, "Rename", &err)
+
 	if !validNewName.MatchString(params.NewName) {
 		return nil, fmt.Errorf("invalid new name %q: must match [A-Za-z_][A-Za-z0-9_]*", params.NewName)
 	}
@@ -1074,7 +1105,9 @@ func (s *Server) Rename(
 func (s *Server) WillRenameFiles(
 	ctx context.Context,
 	params *protocol.RenameFilesParams,
-) (*protocol.WorkspaceEdit, error) {
+) (_ *protocol.WorkspaceEdit, err error) {
+	defer recoverRequest(ctx, "WillRenameFiles", &err)
+
 	changes := make(map[uri.URI][]protocol.TextEdit)
 
 	for _, f := range params.Files {
@@ -1154,7 +1187,9 @@ func siteText(text string, name string, rr common.Range) string {
 func (s *Server) DocumentHighlight(
 	ctx context.Context,
 	params *protocol.DocumentHighlightParams,
-) ([]protocol.DocumentHighlight, error) {
+) (_ []protocol.DocumentHighlight, err error) {
+	defer recoverRequest(ctx, "DocumentHighlight", &err)
+
 	docURI := params.TextDocument.URI
 	text, name, _ := s.openDocument(docURI)
 	pos := s.fromProtocolPos(text, params.Position)
@@ -1219,7 +1254,9 @@ func (s *Server) highlightRms(text string, name string, pos common.Pos) []common
 func (s *Server) FoldingRanges(
 	ctx context.Context,
 	params *protocol.FoldingRangeParams,
-) ([]protocol.FoldingRange, error) {
+) (_ []protocol.FoldingRange, err error) {
+	defer recoverRequest(ctx, "FoldingRanges", &err)
+
 	docURI := params.TextDocument.URI
 	text, name, _ := s.openDocument(docURI)
 
@@ -1271,7 +1308,9 @@ const codeMissingInclude = "missing-include"
 func (s *Server) CodeAction(
 	ctx context.Context,
 	params *protocol.CodeActionParams,
-) ([]protocol.CommandOrCodeAction, error) {
+) (_ []protocol.CommandOrCodeAction, err error) {
+	defer recoverRequest(ctx, "CodeAction", &err)
+
 	if !onlyAllowsQuickFix(params.Context.Only) {
 		return []protocol.CommandOrCodeAction{}, nil
 	}
@@ -1599,7 +1638,9 @@ func posBefore(a, b protocol.Position) bool {
 func (s *Server) DocumentSymbol(
 	ctx context.Context,
 	params *protocol.DocumentSymbolParams,
-) (protocol.DocumentSymbolResult, error) {
+) (_ protocol.DocumentSymbolResult, err error) {
+	defer recoverRequest(ctx, "DocumentSymbol", &err)
+
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
 		return protocol.DocumentSymbolSlice{}, nil
@@ -1644,7 +1685,9 @@ type workspaceCandidate struct {
 func (s *Server) Symbols(
 	ctx context.Context,
 	params *protocol.WorkspaceSymbolParams,
-) (protocol.WorkspaceSymbolResult, error) {
+) (_ protocol.WorkspaceSymbolResult, err error) {
+	defer recoverRequest(ctx, "Symbols", &err)
+
 	query := params.Query
 
 	seen := make(map[string]bool)
@@ -1782,7 +1825,9 @@ var semanticTokenTypes = []string{
 func (s *Server) SemanticTokensFull(
 	ctx context.Context,
 	params *protocol.SemanticTokensParams,
-) (*protocol.SemanticTokens, error) {
+) (_ *protocol.SemanticTokens, err error) {
+	defer recoverRequest(ctx, "SemanticTokensFull", &err)
+
 	docURI := params.TextDocument.URI
 	text, name, _ := s.openDocument(docURI)
 
@@ -1915,7 +1960,9 @@ func (s *Server) toDocumentSymbol(text string, sym common.Symbol) protocol.Docum
 func (s *Server) DocumentLink(
 	ctx context.Context,
 	params *protocol.DocumentLinkParams,
-) ([]protocol.DocumentLink, error) {
+) (_ []protocol.DocumentLink, err error) {
+	defer recoverRequest(ctx, "DocumentLink", &err)
+
 	docURI := string(params.TextDocument.URI)
 	text, name, _ := s.openDocument(params.TextDocument.URI)
 
@@ -1959,7 +2006,9 @@ func (s *Server) DocumentLink(
 func (s *Server) SelectionRange(
 	ctx context.Context,
 	params *protocol.SelectionRangeParams,
-) ([]protocol.SelectionRange, error) {
+) (_ []protocol.SelectionRange, err error) {
+	defer recoverRequest(ctx, "SelectionRange", &err)
+
 	docURI := params.TextDocument.URI
 	text, name, _ := s.openDocument(docURI)
 
@@ -2050,7 +2099,9 @@ func lineRange(text string, line uint32) common.Range {
 func (s *Server) Formatting(
 	ctx context.Context,
 	params *protocol.DocumentFormattingParams,
-) ([]protocol.TextEdit, error) {
+) (_ []protocol.TextEdit, err error) {
+	defer recoverRequest(ctx, "Formatting", &err)
+
 	text, name, _ := s.openDocument(params.TextDocument.URI) // editor state, not the FS
 
 	// TrimTrailingWhitespace and friends stay unread: the printer owns
@@ -2102,7 +2153,9 @@ func endOfDocument(text string) common.Pos {
 }
 
 // Shutdown acknowledges a clean shutdown request.
-func (s *Server) Shutdown(ctx context.Context) error {
+func (s *Server) Shutdown(ctx context.Context) (err error) {
+	defer recoverRequest(ctx, "Shutdown", &err)
+
 	return nil
 }
 
