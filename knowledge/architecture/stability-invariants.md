@@ -21,9 +21,11 @@ sources:
   - resource: internal/format/xs_test.go
   - resource: .goga/history/2026/task-format-unclosed-block/task.md
   - resource: .goga/history/2026/task-rms-operand-failure-diags/design.md
+  - resource: internal/rms/ast.go
+  - resource: internal/include/resolver.go
 generated:
-  by: claude-code/claude-opus-4-6
-  at: 2026-10-24T12:59:33Z
+  by: claude-code implement-mini fix #204
+  at: 2026-11-19T15:26:00Z
 verified:
   - by: claude-code/claude-haiku-4-5
     at: 2026-10-19T00:00:00Z
@@ -35,6 +37,8 @@ verified:
     at: 2026-10-24T12:15:53Z
   - by: claude-code/claude-opus-4-6
     at: 2026-10-24T12:59:33Z
+  - by: process:go-test-rms-include
+    at: 2026-11-19T15:26:00Z
 ---
 
 # Инварианты стабильности
@@ -65,7 +69,18 @@ verified:
   остановить, попадает в экстент токена: строчный комментарий в CRLF-файле
   обязан останавливаться и на `\r` (`internal/xs/parse.go`). Позиции
   inline-XS относительны первой строки блока `rms.XsBlock.Code`, в
-  координаты RMS-файла их переносить нельзя.
+  координаты RMS-файла их переносить нельзя. Следствие для потребителя
+  RMS-позиций (#204): каждый RMS `Pos.Offset` адресует нормализованный
+  текст — срез сырых байтов (`f.text` editor-state или дискового) по ним
+  на CRLF-файлах молча сдвинут; имя под позицией берётся из записанного
+  имени word-индекса (`rms.RmsFile.WordAt` — точный ключ `References`,
+  секционные слова записаны в lowercase) или из `siteText`, который
+  нормализует текст перед срезом. Пины: `TestRmsWordAt`,
+  `TestRmsWordAt_CRLFParity`, `TestResolver_ReferencesCRLFEditorState`,
+  `TestResolver_ReferencesCRLFOnDisk`,
+  `TestResolver_ReferencesSectionNameCase`,
+  `TestResolver_ReferencesInlineXsCRLFParity`,
+  `TestResolver_DefinitionCRLFParity`.
 - **Каждый потреблённый токен — в AST или под диагностикой (#96).**
   RMS-парсер не теряет байты молча: токен, потреблённый на сбойном пути,
   либо представлен в recovery-форме AST, либо покрыт позиционированной
