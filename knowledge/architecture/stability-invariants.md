@@ -1,7 +1,7 @@
 ---
 type: Invariant
 title: Инварианты стабильности
-description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, данные без сети.
+description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, пересортировка merged-списков semantic tokens на месте склейки, данные без сети.
 sources:
   - resource: README.md
   - resource: docs/plans/build-lsp-rms-xs.md
@@ -24,7 +24,7 @@ sources:
   - resource: internal/rms/ast.go
   - resource: internal/include/resolver.go
 generated:
-  by: implement-mini fix #205
+  by: implement-mini fix #206
   at: 2026-11-19
 verified:
   - by: claude-code/claude-haiku-4-5
@@ -606,6 +606,13 @@ verified:
   сервер.
 - Кодирование позиций договаривается с клиентом per-client (utf-8
   предпочтительно).
+- **Semantic tokens: merged-списки пересортируются по позиции на месте
+  склейки.** `encodeSemanticTokens` доверяет sorted input; `SemanticTokensFull`
+  обязан пересортировать merged-списки (RMS-токены + сдвинутые токены
+  `XsBlocks`) по `(line, column)` на месте склейки, append-порядок
+  продюсеров не позиционный (#206). Пины:
+  `TestServerSemanticTokens_InlineXsBeforeContent`, merge-site sort и
+  doc-комментарий энкодера в `internal/server/server.go`.
 
 ## Данные и окружение
 

@@ -121,6 +121,42 @@ func TestServerSemanticTokens_InlineXs(t *testing.T) {
 	require.Equal(t, expected, res.Data)
 }
 
+// TestServerSemanticTokens_InlineXsBeforeContent pins the merged-list
+// order: an inline XS block followed by RMS content must emit delta
+// quintuples in non-decreasing (line, character) order — appending the
+// block's tokens after the RMS list sends the delta encoding backwards
+// and underflows uint32.
+func TestServerSemanticTokens_InlineXsBeforeContent(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	s.docs.Put("file:///t.rms",
+		"#includeXS\nvoid h() {}\n<LAND_GENERATION>\ncreate_land {\n}\n", 1)
+
+	params := &protocol.SemanticTokensParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI("file:///t.rms")},
+	}
+
+	res, err := s.SemanticTokensFull(context.Background(), params)
+	require.NoError(t, err)
+
+	expected := []uint32{
+		1, 5, 1, 4, 0, // h on line 1 (block base): kind
+		1, 1, 15, 3, 0, // land_generation on line 2: section
+		1, 0, 11, 0, 0, // create_land on line 3: known
+	}
+
+	require.Equal(t, expected, res.Data)
+
+	// a second request over the same document must reproduce the same
+	// delta encoding bit for bit
+	again, err := s.SemanticTokensFull(context.Background(), params)
+	require.NoError(t, err)
+
+	require.Equal(t, expected, again.Data)
+}
+
 // TestServerSemanticTokens_IntegrationStdio runs the token pipeline
 // over the real stdio entrypoint: the advertised legend agrees with the
 // emitted token-type indices, and an .rms document with an unknown
