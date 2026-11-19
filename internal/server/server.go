@@ -1744,9 +1744,10 @@ var semanticTokenTypes = []string{
 // classified identifiers of one document: RMS names and values plus
 // inline XS blocks (shifted into file coordinates) for .rms, XS
 // declarations and identifiers (with the include closure's externals)
-// for .xs. Data is delta-encoded quintuples; full-document only, no
-// range requests, no deltas. Empty documents answer empty Data — not
-// nil, not an error.
+// for .xs. The merged .rms list is re-sorted by position at the merge
+// site before delta encoding. Data is delta-encoded quintuples;
+// full-document only, no range requests, no deltas. Empty documents
+// answer empty Data — not nil, not an error.
 func (s *Server) SemanticTokensFull(
 	ctx context.Context,
 	params *protocol.SemanticTokensParams,
@@ -1774,6 +1775,20 @@ func (s *Server) SemanticTokensFull(
 				toks = append(toks, tok)
 			}
 		}
+
+		// Each producer list is sorted, but the append-order merge is not;
+		// encodeSemanticTokens delta-encodes in place, so an out-of-order
+		// start underflows the uint32 line delta (#206).
+		slices.SortStableFunc(toks, func(a, b common.Token) int {
+			switch {
+			case a.Range.Start.Before(b.Range.Start):
+				return -1
+			case b.Range.Start.Before(a.Range.Start):
+				return 1
+			default:
+				return 0
+			}
+		})
 	case strings.HasSuffix(name, ".xs"):
 		xsFile, _ := xs.XsParse(text, name)
 
@@ -1790,8 +1805,8 @@ func (s *Server) SemanticTokensFull(
 
 // encodeSemanticTokens converts classified tokens into delta-encoded
 // quintuples [Δline, Δstart, length, typeIdx, modifiers] in the
-// negotiated position encoding; the input is position-sorted with no
-// overlaps (analysis guarantee).
+// negotiated position encoding; the caller passes tokens position-sorted
+// with no overlaps.
 func (s *Server) encodeSemanticTokens(text string, toks []common.Token) []uint32 {
 	data := make([]uint32, 0, len(toks)*5)
 
