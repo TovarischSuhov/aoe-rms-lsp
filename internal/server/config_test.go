@@ -52,6 +52,119 @@ func TestServerDidChangeConfiguration_SeverityOverride(t *testing.T) {
 		"an invalid override name keeps the analyzer severity")
 }
 
+// TestServerDidChangeConfiguration_WrappedOverrides pins the envelope
+// half of the overrides fix (#212): a standard `{"aoe2lsp": …}` envelope
+// pushed over didChangeConfiguration applies the severityOverrides found
+// *inside* the envelope — not the empty state a raw parse would store.
+func TestServerDidChangeConfiguration_WrappedOverrides(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	err := s.DidChangeConfiguration(context.Background(), &protocol.DidChangeConfigurationParams{
+		Settings: mustJSON(t, `{"aoe2lsp":{"diagnostics":{"severityOverrides":{
+			"unknown-command": "hint"
+		}}}}`),
+	})
+	require.NoError(t, err)
+
+	diags := s.toProtocolDiags("", []common.Diagnostic{
+		{Code: "unknown-command", Severity: common.SeverityError, Message: "m"},
+	})
+
+	require.Len(t, diags, 1)
+	require.Equal(t, protocol.DiagnosticSeverityHint, diags[0].Severity,
+		"the override inside the envelope applies")
+}
+
+// TestServerDidChangeConfiguration_WrappedEnvelope pins the envelope
+// decision table: a nested envelope unwraps repeatedly (R1.3), sibling
+// keys next to aoe2lsp are ignored (R1.2), a null/non-object envelope
+// value is not an envelope — the payload parses as is (R1.4) — and an
+// empty object, wrapped or not, stores the empty state: full
+// replacement (R2.2). recoverNotification masks a handler panic, so a
+// stored empty state read back through s.settings.Load() is itself the
+// no-panic evidence.
+func TestServerDidChangeConfiguration_WrappedEnvelope(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name               string
+		payload            string
+		wantOverridesEmpty bool
+		wantHint           bool
+	}{
+		{
+			name:     "nested envelope unwraps repeatedly",
+			payload:  `{"aoe2lsp":{"aoe2lsp":{"diagnostics":{"severityOverrides":{"unknown-command":"hint"}}}}}`,
+			wantHint: true,
+		},
+		{
+			name:     "sibling keys are ignored",
+			payload:  `{"aoe2lsp":{"diagnostics":{"severityOverrides":{"unknown-command":"hint"}}},"otherSection":{"x":1}}`,
+			wantHint: true,
+		},
+		{
+			name:               "string envelope value is not an envelope",
+			payload:            `{"aoe2lsp":"x"}`,
+			wantOverridesEmpty: true,
+		},
+		{
+			name:               "null envelope value is not an envelope",
+			payload:            `{"aoe2lsp":null}`,
+			wantOverridesEmpty: true,
+		},
+		{
+			name:               "array envelope value is not an envelope",
+			payload:            `{"aoe2lsp":[]}`,
+			wantOverridesEmpty: true,
+		},
+		{
+			name:               "empty envelope value",
+			payload:            `{"aoe2lsp":{}}`,
+			wantOverridesEmpty: true,
+		},
+		{
+			name:               "empty payload without an envelope",
+			payload:            `{}`,
+			wantOverridesEmpty: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := newNavigationServer(t)
+
+			err := s.DidChangeConfiguration(context.Background(), &protocol.DidChangeConfigurationParams{
+				Settings: mustJSON(t, tt.payload),
+			})
+			require.NoError(t, err)
+
+			if tt.wantHint {
+				diags := s.toProtocolDiags("", []common.Diagnostic{
+					{Code: "unknown-command", Severity: common.SeverityError, Message: "m"},
+				})
+
+				require.Len(t, diags, 1)
+				require.Equal(t, protocol.DiagnosticSeverityHint, diags[0].Severity,
+					"the inner content applies")
+
+				return
+			}
+
+			// As-is and empty payloads store the empty state: a nil state
+			// would mean the payload took the parse-error path (previous
+			// settings kept) instead of being parsed as is.
+			st := s.settings.Load()
+			require.True(t,
+				st != nil && len(st.severityOverrides) == 0 && len(st.includeRoots) == 0,
+				"the payload parses as is into the empty state")
+		})
+	}
+}
+
 // TestServerDidChangeConfiguration_IncludeRoots pins the wiring: pushed
 // roots reach the resolver and closures resolve through them.
 func TestServerDidChangeConfiguration_IncludeRoots(t *testing.T) {
@@ -75,6 +188,34 @@ func TestServerDidChangeConfiguration_IncludeRoots(t *testing.T) {
 
 	closure := s.resolver.Closure(context.Background(), mainURI)
 	require.Empty(t, closure.Missing, "the include resolves through the configured root")
+}
+
+// TestServerDidChangeConfiguration_WrappedIncludeRoots pins the include
+// half of the envelope fix (#212): roots pushed inside a standard
+// `{"aoe2lsp": …}` envelope reach the resolver, so closures resolve
+// through them — on the reported bug a wrapped push cleared the roots
+// and the same include went missing.
+func TestServerDidChangeConfiguration_WrappedIncludeRoots(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	dir := t.TempDir()
+	root := t.TempDir()
+	mainURI := "file://" + dir + "/main.rms"
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.rms"), []byte("#include \"shared.rms\"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "shared.rms"), []byte("base_terrain GRASS\n"), 0o644))
+
+	s.docs.Put(mainURI, "#include \"shared.rms\"\n", 1)
+
+	err := s.DidChangeConfiguration(context.Background(), &protocol.DidChangeConfigurationParams{
+		Settings: mustJSON(t, `{"aoe2lsp":{"includeRoots":[`+strconv.Quote(root)+`]}}`),
+	})
+	require.NoError(t, err)
+
+	closure := s.resolver.Closure(context.Background(), mainURI)
+	require.Empty(t, closure.Missing, "the include resolves through the root inside the envelope")
 }
 
 // TestServerInitialized_PullConfiguration pins the pull channel: with
@@ -105,6 +246,39 @@ func TestServerInitialized_PullConfiguration(t *testing.T) {
 	})
 	require.Len(t, diags, 1)
 	require.Equal(t, protocol.DiagnosticSeverityHint, diags[0].Severity, "the pulled settings apply")
+}
+
+// TestServerInitialized_PullConfiguration_Wrapped pins the pull channel
+// of the envelope fix: a client answering workspace/configuration with a
+// wrapped payload applies the inner content identically to the push
+// channel — the unwrap lives in the shared applySettings path, not in
+// either handler.
+func TestServerInitialized_PullConfiguration_Wrapped(t *testing.T) {
+	t.Parallel()
+
+	s := newNavigationServer(t)
+
+	configCap := true
+	_, err := s.Initialize(context.Background(), &protocol.InitializeParams{
+		Capabilities: protocol.ClientCapabilities{
+			Workspace: &protocol.WorkspaceClientCapabilities{Configuration: &configCap},
+		},
+	})
+	require.NoError(t, err)
+
+	rc := &recordingClient{notify: make(chan struct{}, 4)}
+	rc.configResult = []protocol.LSPAny{mustJSON(t,
+		`{"aoe2lsp":{"diagnostics":{"severityOverrides":{"unknown-command":"hint"}}}}`)}
+
+	ctx := protocol.WithClient(context.Background(), rc)
+	require.NoError(t, s.Initialized(ctx, &protocol.InitializedParams{}))
+
+	diags := s.toProtocolDiags("", []common.Diagnostic{
+		{Code: "unknown-command", Severity: common.SeverityError, Message: "m"},
+	})
+	require.Len(t, diags, 1)
+	require.Equal(t, protocol.DiagnosticSeverityHint, diags[0].Severity,
+		"the wrapped pulled settings apply like the pushed ones")
 }
 
 // TestServerInitialized_NoCapabilityNoop pins the silence: without the
