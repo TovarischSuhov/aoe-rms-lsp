@@ -88,9 +88,14 @@ type settingsJSON struct {
 
 // applySettings parses one raw settings payload (a pull item or the
 // didChangeConfiguration settings), stores the result and pushes the
-// include roots into the resolver. Unknown severity names are ignored
-// with a WARN log (an unknown code simply never matches); diagnostics
-// are republished afterwards by the caller-side handlers.
+// include roots into the resolver. A standard `{"aoe2lsp": …}` envelope
+// (neovim/lspconfig, emacs-lsp, whole-workspace vscode settings) is
+// unwrapped repeatedly before parsing; an envelope-less payload — the
+// vscode configurationSection push — is parsed as is, and an envelope
+// whose value is null or not an object is not an envelope. Unknown
+// severity names are ignored with a WARN log (an unknown code simply
+// never matches); diagnostics are republished afterwards by the
+// caller-side handlers.
 func (s *Server) applySettings(ctx context.Context, raw any) {
 	if raw == nil {
 		return
@@ -104,6 +109,8 @@ func (s *Server) applySettings(ctx context.Context, raw any) {
 
 		return
 	}
+
+	b = unwrapSection(b)
 
 	if err := json.Unmarshal(b, &parsed); err != nil {
 		slog.WarnContext(ctx, "settings parse failed", "err", err)
@@ -130,6 +137,30 @@ func (s *Server) applySettings(ctx context.Context, raw any) {
 
 	slog.DebugContext(ctx, "settings applied",
 		"overrides", len(overrides), "roots", len(state.includeRoots))
+}
+
+// unwrapSection repeatedly strips a standard `{"aoe2lsp": …}` envelope
+// from raw settings bytes, returning them unchanged as soon as the
+// payload stops being an object with an aoe2lsp object value.
+func unwrapSection(b []byte) []byte {
+	for {
+		var envelope map[string]json.RawMessage
+		if err := json.Unmarshal(b, &envelope); err != nil {
+			return b
+		}
+
+		inner, ok := envelope["aoe2lsp"]
+		if !ok {
+			return b
+		}
+
+		var section map[string]json.RawMessage
+		if err := json.Unmarshal(inner, &section); err != nil || section == nil {
+			return b
+		}
+
+		b = inner
+	}
 }
 
 // severityByName maps a settings severity name to its protocol value;
