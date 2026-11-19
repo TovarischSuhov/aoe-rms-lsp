@@ -998,7 +998,11 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range, comm
 			inBlock = false
 		}
 
+		// Blanks write to a []byte clone made at the first write; an
+		// untouched line keeps its original string. Reads stay on line:
+		// j only moves forward past already-written indexes.
 		line := out[i]
+		var buf []byte
 		inString := false
 
 		for j := 0; j < len(line); j++ {
@@ -1011,20 +1015,34 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range, comm
 				// Quotes inside a block comment are comment bytes, not
 				// string delimiters — they blank like any other char.
 				if line[j] == '*' && j+1 < len(line) && line[j+1] == '/' {
-					line = line[:j] + "  " + line[j+2:]
+					if buf == nil {
+						buf = []byte(line)
+					}
+					buf[j], buf[j+1] = ' ', ' '
 					comments = append(comments, common.Range{Start: blockStart, End: at(i, j+2)})
 					inBlock = false
 					j++
 				} else if line[j] != '\n' {
-					line = line[:j] + " " + line[j+1:]
+					if buf == nil {
+						buf = []byte(line)
+					}
+					buf[j] = ' '
 				}
 			case line[j] == '/' && j+1 < len(line) && line[j+1] == '*':
-				line = line[:j] + "  " + line[j+2:]
+				if buf == nil {
+					buf = []byte(line)
+				}
+				buf[j], buf[j+1] = ' ', ' '
 				blockStart = at(i, j)
 				inBlock = true
 				j++
 			case line[j] == '/' && j+1 < len(line) && line[j+1] == '/':
-				line = line[:j] + strings.Repeat(" ", len(line)-j)
+				if buf == nil {
+					buf = []byte(line)
+				}
+				for k := j; k < len(buf); k++ {
+					buf[k] = ' '
+				}
 				comments = append(comments, common.Range{Start: at(i, j), End: at(i, len(line))})
 				j = len(line)
 			case line[j] == '"':
@@ -1032,16 +1050,18 @@ func blankComments(lines []string, starts []int) ([]string, []common.Range, comm
 			}
 		}
 
-		out[i] = line
+		if buf != nil {
+			out[i] = string(buf)
+		}
 
 		// Boundary classification runs on the blanked line — the exact
 		// view run() classifies on — so the scan and the walk cannot
 		// disagree about regions.
-		if inRegion && xsTerminator(strings.TrimSpace(line)) {
+		if inRegion && xsTerminator(strings.TrimSpace(out[i])) {
 			inRegion = false
 		}
 
-		if !inRegion && opensXsRegion(line) {
+		if !inRegion && opensXsRegion(out[i]) {
 			inRegion = true
 
 			if inBlock {
