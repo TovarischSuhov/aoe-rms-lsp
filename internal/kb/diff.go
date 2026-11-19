@@ -242,6 +242,10 @@ func diffFunctionFields(a, b functionWire) []string {
 		fields = append(fields, "since_update")
 	}
 
+	if a.RenamedTo != b.RenamedTo {
+		fields = append(fields, "renamed_to")
+	}
+
 	return fields
 }
 
@@ -264,6 +268,10 @@ func diffConstantFields(a, b constantWire) []string {
 
 	if a.SinceUpdate != b.SinceUpdate {
 		fields = append(fields, "since_update")
+	}
+
+	if a.RenamedTo != b.RenamedTo {
+		fields = append(fields, "renamed_to")
 	}
 
 	return fields
@@ -291,6 +299,10 @@ func diffCommandFields(a, b commandWire) []string {
 
 	if a.SinceUpdate != b.SinceUpdate {
 		fields = append(fields, "since_update")
+	}
+
+	if a.RenamedTo != b.RenamedTo {
+		fields = append(fields, "renamed_to")
 	}
 
 	return fields
