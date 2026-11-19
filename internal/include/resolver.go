@@ -805,7 +805,9 @@ func closureHas(c Closure, target string) bool {
 }
 
 // nameAt resolves the name under pos: XS identifiers via SymbolAt (inline
-// blocks translated), RMS words via ReferencesAt plus the file text.
+// blocks translated), RMS words via the recorded word-index name (WordAt) —
+// RMS offsets address the CRLF-normalized text, so the raw file text is
+// never sliced with them (issue #204).
 func (r *Resolver) nameAt(f file, pos common.Pos) string {
 	if f.xs != nil {
 		name, _ := f.xs.SymbolAt(pos)
@@ -824,12 +826,9 @@ func (r *Resolver) nameAt(f file, pos common.Pos) string {
 		return name
 	}
 
-	ranges := f.rms.ReferencesAt(pos)
-	if len(ranges) == 0 {
-		return ""
-	}
+	name, _ := f.rms.WordAt(pos)
 
-	return f.text[ranges[0].Start.Offset:ranges[0].End.Offset]
+	return name
 }
 
 // symbolNameAt resolves the identifier name under pos for the closure-wide

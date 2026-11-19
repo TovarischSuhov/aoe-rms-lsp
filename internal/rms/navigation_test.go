@@ -181,6 +181,184 @@ func TestRmsReferencesAt_NumberEmpty(t *testing.T) {
 	require.Empty(t, file.ReferencesAt(common.Pos{Line: 0, Column: uint32(strings.Index(src, "12"))}))
 }
 
+// TestRmsWordAt pins the recorded-name contract of the word index
+// (issue #204, AC1/AC2): WordAt answers the name recorded at parse time
+// for the word token containing pos — the exact key References and
+// ReferencesAt answer — never a slice of the raw source. Section names
+// are recorded lowercase whatever their source spelling; const/ident
+// values keep their written case; non-word positions (numbers, gaps,
+// header punctuation) answer ("", false) — containment, never the
+// nearest word.
+func TestRmsWordAt(t *testing.T) {
+	t.Parallel()
+	src := "<LAND_GENERATION>\n" +
+		"create_terrain FOREST plains {\n" +
+		"  base_terrain GRASS\n" +
+		"}\n" +
+		"land_percent 12\n" +
+		"</LAND_GENERATION>\n"
+
+	file, _ := Parse(src, "wordat.rms")
+
+	tests := []struct {
+		name  string
+		pos   common.Pos
+		want  string
+		found bool
+	}{
+		{
+			name:  "opening section name token answers the recorded lowercase name (AC2)",
+			pos:   linePos(src, 0, "LAND_GENERATION", 0),
+			want:  "land_generation",
+			found: true,
+		},
+		{
+			name:  "mid-word position answers the same recorded name",
+			pos:   linePos(src, 0, "LAND_GENERATION", 5),
+			want:  "land_generation",
+			found: true,
+		},
+		{
+			name:  "closing section name token answers the recorded lowercase name",
+			pos:   linePos(src, 5, "LAND_GENERATION", 0),
+			want:  "land_generation",
+			found: true,
+		},
+		{
+			name:  "command name word",
+			pos:   linePos(src, 1, "create_terrain", 0),
+			want:  "create_terrain",
+			found: true,
+		},
+		{
+			name:  "const value word keeps its written case",
+			pos:   linePos(src, 1, "FOREST", 0),
+			want:  "FOREST",
+			found: true,
+		},
+		{
+			name:  "ident value word",
+			pos:   linePos(src, 1, "plains", 0),
+			want:  "plains",
+			found: true,
+		},
+		{
+			name:  "attribute name word",
+			pos:   linePos(src, 2, "base_terrain", 0),
+			want:  "base_terrain",
+			found: true,
+		},
+		{
+			name:  "number literal is not an indexed word",
+			pos:   linePos(src, 4, "12", 0),
+			found: false,
+		},
+		{
+			name:  "inter-token gap is not an indexed word",
+			pos:   linePos(src, 1, " FOREST", 0),
+			found: false,
+		},
+		{
+			name:  "angle bracket of a header is not the section word",
+			pos:   linePos(src, 0, "<", 0),
+			found: false,
+		},
+		{
+			name:  "closing slash of a closing tag is not the section word",
+			pos:   linePos(src, 5, "/", 0),
+			found: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, found := file.WordAt(tt.pos)
+
+			require.Equal(t, tt.found, found)
+			require.Equal(t, tt.want, got)
+
+			// The recorded name is the exact References key (AC4):
+			// ReferencesAt(pos) delegates to it by construction.
+			if tt.found {
+				require.Equal(t, file.References(got), file.ReferencesAt(tt.pos))
+			}
+		})
+	}
+}
+
+// rawPos builds the position of needle on the given line of the raw
+// source: Line/Column address the normalized view every AST Range uses,
+// while Offset is derived from the raw bytes — the pair an editor
+// naively reports for a CRLF file (issue #204).
+func rawPos(src string, line int, needle string) common.Pos {
+	rawLines := strings.Split(src, "\n")
+	col := strings.Index(rawLines[line], needle)
+
+	offset := col
+	for i := 0; i < line; i++ {
+		offset += len(rawLines[i]) + 1
+	}
+
+	return common.Pos{Line: uint32(line), Column: uint32(col), Offset: offset}
+}
+
+// TestRmsWordAt_CRLFParity pins the EOL invariance of WordAt (issue
+// #204, AC3): a CRLF source answers with the same recorded names at the
+// same Line/Column positions as its LF twin, even when the query carries
+// the raw-bytes Offset — containment compares Line/Column only
+// (internal/common/range.go), so an offset-based lookup must never leak
+// into the answer.
+func TestRmsWordAt_CRLFParity(t *testing.T) {
+	t.Parallel()
+	lfSrc := "<LAND_GENERATION>\n" +
+		"create_terrain FOREST\n" +
+		"</LAND_GENERATION>\n"
+	crlfSrc := strings.ReplaceAll(lfSrc, "\n", "\r\n")
+
+	lf, _ := Parse(lfSrc, "lf.rms")
+	crlf, _ := Parse(crlfSrc, "crlf.rms")
+
+	probes := []struct {
+		name   string
+		line   int
+		needle string
+		want   string
+		found  bool
+	}{
+		{"opening section name", 0, "LAND_GENERATION", "land_generation", true},
+		{"command name", 1, "create_terrain", "create_terrain", true},
+		{"const value", 1, "FOREST", "FOREST", true},
+		{"closing section name", 2, "LAND_GENERATION", "land_generation", true},
+		{"inter-token gap", 1, " ", "", false},
+	}
+
+	for _, p := range probes {
+		t.Run(p.name, func(t *testing.T) {
+			t.Parallel()
+
+			lfPos := rawPos(lfSrc, p.line, p.needle)
+			crlfPos := rawPos(crlfSrc, p.line, p.needle)
+
+			require.Equal(t, lfPos.Line, crlfPos.Line, "fixture sanity: same line")
+			require.Equal(t, lfPos.Column, crlfPos.Column, "fixture sanity: same column")
+			if p.line > 0 {
+				require.Greater(t, crlfPos.Offset, lfPos.Offset,
+					"fixture sanity: the raw CRLF offset diverges from the normalized offset")
+			}
+
+			lfName, lfFound := lf.WordAt(lfPos)
+			crlfName, crlfFound := crlf.WordAt(crlfPos)
+
+			require.Equal(t, p.found, lfFound, "LF twin baseline")
+			require.Equal(t, p.found, crlfFound, "CRLF answers found on the same Line/Column")
+			require.Equal(t, lfName, crlfName, "CRLF answers the same recorded name as the LF twin")
+			require.Equal(t, p.want, crlfName)
+		})
+	}
+}
+
 // symbolsNamed filters outline nodes by name.
 func symbolsNamed(nodes []common.Symbol, name string) []common.Symbol {
 	out := make([]common.Symbol, 0)

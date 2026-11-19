@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -537,4 +538,403 @@ func TestResolver_Drop(t *testing.T) {
 
 	c = r.Closure(context.Background(), uris["main.rms"])
 	require.Equal(t, "bbbb", c.Xs[0].File.Decls[0].Name, "Drop forces the disk re-read")
+}
+
+// eolTree rebuilds a fixture tree with every "\n" of its .rms files
+// replaced by eol. The RMS parser normalizes CRLF before counting
+// offsets (rms.Parse), so a CRLF twin of an LF fixture is the same
+// document to the word index and navigation must answer identically
+// (issue #204). The .xs files keep their bytes: XS is parsed on the raw
+// text, its offsets address the file's own bytes, and #204 varies the
+// EOL of the RMS map only. writeTree writes the literal bytes, so the
+// twins differ on disk exactly as spelled.
+func eolTree(tree map[string]string, eol string) map[string]string {
+	out := make(map[string]string, len(tree))
+
+	for name, content := range tree {
+		out[name] = content
+		if strings.HasSuffix(name, ".rms") {
+			out[name] = strings.ReplaceAll(content, "\n", eol)
+		}
+	}
+
+	return out
+}
+
+// linePos locates the cursor at needle within line of src, advanced by
+// col. Navigation containment compares Line/Column only
+// (internal/common/range.go), so the same positions address an LF
+// fixture and its CRLF twin; Offset stays zero — no query may smuggle a
+// raw-text offset into a position.
+func linePos(src string, line int, needle string, col int) common.Pos {
+	lines := strings.Split(src, "\n")
+
+	return common.Pos{Line: uint32(line), Column: uint32(strings.Index(lines[line], needle) + col)}
+}
+
+// rangeAt is the half-open span of a length-long token at (line, col),
+// carrying the offset the word index records: RMS offsets address the
+// normalized text, so the LF fixture's line starts give the exact
+// values — and the CRLF twin's answer carries the same offsets (the
+// normalized text is identical). Queries keep Offset zero; only
+// expected answer ranges need it.
+func rangeAt(src string, line int, col int, length int) common.Range {
+	lines := strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n")
+	offset := col
+	for i := range line {
+		offset += len(lines[i]) + 1
+	}
+
+	return common.Range{
+		Start: common.Pos{Line: uint32(line), Column: uint32(col), Offset: offset},
+		End:   common.Pos{Line: uint32(line), Column: uint32(col + length), Offset: offset + length},
+	}
+}
+
+// parityTree is the RMS fixture of the EOL-parity pins: main includes
+// econ.rms, spells its section header lowercase (the case aspect is
+// pinned separately) and carries a command word, a const value and a
+// numeric literal; econ.rms repeats the command word, so a query on
+// main answers across the closure.
+func parityTree() map[string]string {
+	return map[string]string{
+		"main.rms":       "#include \"parts/econ.rms\"\n<terrain_generation>\nbase_terrain GRASS\nland_percent 12\n",
+		"parts/econ.rms": "base_terrain GRASS\nbase_terrain DIRT\n",
+	}
+}
+
+// parityProbes are the cursor probes on parityTree's main.rms: the
+// on-word cases must answer, the not-on-word cases (numeric literal,
+// inter-token gap) must stay empty (issue #204, AC5).
+var parityProbes = []struct {
+	name   string
+	line   int
+	needle string
+	onWord bool
+}{
+	{"command word", 2, "base_terrain", true},
+	{"const value word", 2, "GRASS", true},
+	{"number literal is not an indexed word", 3, "12", false},
+	{"inter-token gap is not an indexed word", 2, " GRASS", false},
+}
+
+// TestResolver_ReferencesCRLFEditorState pins issue #204 scenario (a):
+// a CRLF map open in the editor (fakeSource) answers References exactly
+// like its LF twin (AC1). RMS word offsets address the normalized text,
+// so a name sliced from the raw editor bytes is garbage and silently
+// empties the answer.
+func TestResolver_ReferencesCRLFEditorState(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	lfTexts := eolTree(parityTree(), "\n")
+	uris := writeTree(t, dir, lfTexts)
+
+	open := func(texts map[string]string) fakeSource {
+		return fakeSource{uris["main.rms"]: texts["main.rms"], uris["parts/econ.rms"]: texts["parts/econ.rms"]}
+	}
+
+	// the LF twin's answers, computed before the CRLF rewrite: the
+	// baseline every CRLF case must reproduce. On-word baselines are
+	// guarded (non-empty, containing the queried occurrence), so parity
+	// cannot pass vacuously on an empty-vs-empty accident.
+	rLF := NewResolver(open(lfTexts))
+
+	baseline := make(map[string][]Target, len(parityProbes))
+	for _, tc := range parityProbes {
+		pos := linePos(lfTexts["main.rms"], tc.line, tc.needle, 0)
+		baseline[tc.name] = rLF.References(context.Background(), uris["main.rms"], pos)
+
+		if !tc.onWord {
+			require.Empty(t, baseline[tc.name], "LF baseline: a not-on-word position stays empty")
+
+			continue
+		}
+
+		require.NotEmpty(t, baseline[tc.name], "LF baseline: the cursor sits on an indexed word")
+		require.True(t,
+			slices.ContainsFunc(baseline[tc.name], func(tg Target) bool { return tg.Range.Contains(pos) }),
+			"LF baseline: the answer contains the queried occurrence")
+	}
+
+	// the CRLF twin overwrites the same paths: identical URIs make the
+	// two answer sets directly comparable
+	crlfTexts := eolTree(parityTree(), "\r\n")
+	writeTree(t, dir, crlfTexts)
+
+	for _, tc := range parityProbes {
+		t.Run("CRLF/"+tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			pos := linePos(crlfTexts["main.rms"], tc.line, tc.needle, 0)
+			refs := NewResolver(open(crlfTexts)).References(context.Background(), uris["main.rms"], pos)
+
+			if !tc.onWord {
+				assert.Empty(t, refs, "a non-word position must answer empty (AC5)")
+
+				return
+			}
+
+			assert.Equal(t, baseline[tc.name], refs,
+				"the CRLF answer must equal the LF twin's set (AC1)")
+		})
+	}
+}
+
+// TestResolver_ReferencesCRLFOnDisk pins issue #204 scenario (b): the
+// CRLF map is not open anywhere — every load goes through loadDisk's
+// raw os.ReadFile bytes — and References must still equal the LF twin's
+// set (AC1).
+func TestResolver_ReferencesCRLFOnDisk(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	lfTexts := eolTree(parityTree(), "\n")
+	uris := writeTree(t, dir, lfTexts)
+
+	// the LF twin answers from disk first; the CRLF twin then
+	// overwrites the same paths, so both runs query identical URIs
+	rLF := NewResolver(fakeSource{})
+
+	baseline := make(map[string][]Target, len(parityProbes))
+	for _, tc := range parityProbes {
+		pos := linePos(lfTexts["main.rms"], tc.line, tc.needle, 0)
+		baseline[tc.name] = rLF.References(context.Background(), uris["main.rms"], pos)
+
+		if !tc.onWord {
+			require.Empty(t, baseline[tc.name], "LF baseline: a not-on-word position stays empty")
+
+			continue
+		}
+
+		require.NotEmpty(t, baseline[tc.name], "LF baseline: the cursor sits on an indexed word")
+		require.True(t,
+			slices.ContainsFunc(baseline[tc.name], func(tg Target) bool { return tg.Range.Contains(pos) }),
+			"LF baseline: the answer contains the queried occurrence")
+	}
+
+	writeTree(t, dir, eolTree(parityTree(), "\r\n"))
+
+	for _, tc := range parityProbes {
+		t.Run("CRLF/"+tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// a fresh resolver: the stat-keyed cache never crosses
+			// instances, so the CRLF bytes are re-read from disk
+			src := eolTree(parityTree(), "\r\n")["main.rms"]
+			pos := linePos(src, tc.line, tc.needle, 0)
+			refs := NewResolver(fakeSource{}).References(context.Background(), uris["main.rms"], pos)
+
+			if !tc.onWord {
+				assert.Empty(t, refs, "a non-word position must answer empty (AC5)")
+
+				return
+			}
+
+			assert.Equal(t, baseline[tc.name], refs,
+				"the on-disk CRLF answer must equal the LF twin's set (AC1)")
+		})
+	}
+}
+
+// sectionTree is the uppercase-section fixture (issue #204, AC2): the
+// corpus spells section headers <UPPERCASE>, while the parser records
+// the section word lowercase — whatever the source spelling, References
+// on either tag token must answer the full occurrence set.
+func sectionTree() map[string]string {
+	return map[string]string{
+		"main.rms": "<TERRAIN_GENERATION>\nbase_terrain GRASS\n</TERRAIN_GENERATION>\n",
+	}
+}
+
+// TestResolver_ReferencesSectionNameCase pins issue #204 scenarios (c)
+// and (d): References queried on an uppercase section word — on an LF
+// file (c) and on a CRLF file (d), on the opening and on the closing
+// tag token — returns the two occurrences of the recorded (lowercase)
+// name. A name sliced from the raw text keeps the written uppercase
+// spelling, matches no indexed word and silently empties the answer.
+func TestResolver_ReferencesSectionNameCase(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	const sectionWord = "TERRAIN_GENERATION"
+
+	tree := sectionTree()
+	uris := writeTree(t, dir, tree)
+	mainURI := uris["main.rms"]
+
+	// the expected set: the section word's opening-tag and closing-tag
+	// occurrences, computed from the fixture text itself so the columns
+	// never drift from it
+	lines := strings.Split(tree["main.rms"], "\n")
+	want := []Target{
+		{URI: mainURI, Range: rangeAt(tree["main.rms"], 0, strings.Index(lines[0], sectionWord), len(sectionWord))},
+		{URI: mainURI, Range: rangeAt(tree["main.rms"], 2, strings.Index(lines[2], sectionWord), len(sectionWord))},
+	}
+
+	entries := []struct {
+		label string
+		line  int
+	}{
+		{"opening tag", 0},
+		{"closing tag", 2},
+	}
+
+	// both twins answer before the subtests spawn: sequential
+	// editor-state queries, then parallel assertions
+	answers := make(map[string][]Target, 2*len(entries))
+
+	for _, eol := range []struct{ label, s string }{{"LF", "\n"}, {"CRLF", "\r\n"}} {
+		texts := eolTree(tree, eol.s)
+		writeTree(t, dir, texts)
+
+		r := NewResolver(fakeSource{mainURI: texts["main.rms"]})
+
+		for _, e := range entries {
+			pos := linePos(texts["main.rms"], e.line, sectionWord, 0)
+			answers[eol.label+"/"+e.label] = r.References(context.Background(), mainURI, pos)
+		}
+	}
+
+	for _, eol := range []string{"LF", "CRLF"} {
+		for _, e := range entries {
+			t.Run(eol+"/"+e.label, func(t *testing.T) {
+				t.Parallel()
+				assert.Equal(t, want, answers[eol+"/"+e.label],
+					"the uppercase section word must answer its full occurrence set (AC2)")
+			})
+		}
+	}
+}
+
+// inlineXsTree is the scenario-(e) fixture: an inline XS block inside
+// the RMS map, navTree-shaped, in either EOL spelling.
+func inlineXsTree() map[string]string {
+	return map[string]string{
+		"main.rms":     "#includeXS parts/lib.xs\nvoid main() { sharedFn(1); }\n",
+		"parts/lib.xs": "void sharedFn(int n) { }\nvoid caller() { sharedFn(2); }\n",
+	}
+}
+
+// TestResolver_ReferencesInlineXsCRLFParity pins issue #204 scenario
+// (e): the inline XS block of a CRLF file answers exactly like its LF
+// twin's block. The block path never touches the defect — the XS parser
+// works on the block's own LF-normalized code and containment compares
+// Line/Column — so this pin guards the fix against regressing the
+// untouched XS/inline branches; it is expected green before the fix.
+func TestResolver_ReferencesInlineXsCRLFParity(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	lfTexts := eolTree(inlineXsTree(), "\n")
+	uris := writeTree(t, dir, lfTexts)
+
+	open := func(texts map[string]string) fakeSource {
+		return fakeSource{uris["main.rms"]: texts["main.rms"], uris["parts/lib.xs"]: texts["parts/lib.xs"]}
+	}
+
+	// the cursor sits on the sharedFn call inside main.rms's inline
+	// block (line 1)
+	posLF := linePos(lfTexts["main.rms"], 1, "sharedFn", 0)
+
+	rLF := NewResolver(open(lfTexts))
+	baseline := rLF.References(context.Background(), uris["main.rms"], posLF)
+
+	require.NotEmpty(t, baseline, "LF baseline: the block call resolves")
+	require.True(t,
+		slices.ContainsFunc(baseline, func(tg Target) bool { return tg.Range.Contains(posLF) }),
+		"LF baseline: the answer contains the queried occurrence")
+
+	crlfTexts := eolTree(inlineXsTree(), "\r\n")
+	writeTree(t, dir, crlfTexts)
+
+	t.Run("CRLF/inline block call", func(t *testing.T) {
+		t.Parallel()
+
+		pos := linePos(crlfTexts["main.rms"], 1, "sharedFn", 0)
+		refs := NewResolver(open(crlfTexts)).References(context.Background(), uris["main.rms"], pos)
+
+		assert.Equal(t, baseline, refs,
+			"the CRLF inline-block answer must equal the LF twin's set")
+	})
+}
+
+// declTree is the scenario-(f) fixture: an XS library declaring sharedFn
+// next to an RMS map whose #const declares the same name — the cursor
+// sits on the RMS word, the declaration lives in lib.xs.
+func declTree() map[string]string {
+	return map[string]string{
+		"main.rms":     "#includeXS parts/lib.xs\n#const sharedFn 1\n",
+		"parts/lib.xs": "void sharedFn(int n) { }\n",
+	}
+}
+
+// TestResolver_DefinitionCRLFParity pins issue #204 scenario (f): on a
+// CRLF map, Definition on the RMS word sharedFn resolves the top-level
+// declaration in lib.xs exactly like the LF twin (AC3) — symbolNameAt
+// feeds the closure lookup, so a raw-text slice with normalized offsets
+// poisons the name and the answer silently degrades to found=false. A
+// cursor on a non-word (the numeric literal) stays found=false in both
+// spellings (AC3 negative, AC5).
+func TestResolver_DefinitionCRLFParity(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	lfTexts := eolTree(declTree(), "\n")
+	uris := writeTree(t, dir, lfTexts)
+
+	tests := []struct {
+		name   string
+		line   int
+		needle string
+		onWord bool
+	}{
+		{"RMS word resolves the closure declaration", 1, "sharedFn", true},
+		{"number literal stays not-found", 1, "1", false},
+	}
+
+	// the LF twin answers from disk first (nothing open — the
+	// Definition tests run on the bare resolver), then the CRLF twin
+	// overwrites the same paths
+	rLF := NewResolver(fakeSource{})
+
+	baseline := make(map[string]Target, len(tests))
+	baselineFound := make(map[string]bool, len(tests))
+	for _, tc := range tests {
+		pos := linePos(lfTexts["main.rms"], tc.line, tc.needle, 0)
+		baseline[tc.name], baselineFound[tc.name] = rLF.Definition(context.Background(), uris["main.rms"], pos)
+
+		if !tc.onWord {
+			require.False(t, baselineFound[tc.name], "LF baseline: a non-word stays not-found")
+
+			continue
+		}
+
+		require.True(t, baselineFound[tc.name], "LF baseline: the RMS word resolves")
+		require.Equal(t, uris["parts/lib.xs"], baseline[tc.name].URI,
+			"LF baseline: the declaration is in lib.xs")
+	}
+
+	crlfTexts := eolTree(declTree(), "\r\n")
+	writeTree(t, dir, crlfTexts)
+
+	for _, tc := range tests {
+		t.Run("CRLF/"+tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			pos := linePos(crlfTexts["main.rms"], tc.line, tc.needle, 0)
+			target, found := NewResolver(fakeSource{}).
+				Definition(context.Background(), uris["main.rms"], pos)
+
+			if !tc.onWord {
+				assert.False(t, found, "a non-word position must stay not-found (AC5)")
+
+				return
+			}
+
+			require.True(t, found, "the RMS word must resolve on CRLF (AC3)")
+			assert.Equal(t, baseline[tc.name], target,
+				"the CRLF answer must equal the LF twin's target (AC3)")
+		})
+	}
 }

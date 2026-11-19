@@ -495,22 +495,27 @@ func (f RmsFile) wordNear(name string, start common.Pos, fallback common.Range) 
 	return best
 }
 
+// WordAt returns the recorded name of the word token under pos — section,
+// command, attribute or identifier/const word. The recorded name is the
+// exact key References and ReferencesAt answer: RMS Pos.Offset addresses
+// the CRLF-normalized text (Parse), so consumers take the name from here
+// and never slice the raw source with those offsets (issue #204).
+func (f RmsFile) WordAt(pos common.Pos) (string, bool) {
+	for _, w := range f.words {
+		if w.at.Contains(pos) {
+			return w.name, true
+		}
+	}
+
+	return "", false
+}
+
 // ReferencesAt returns every occurrence of the word under pos — section,
 // command, attribute and identifier words — sorted by position (LSP
 // textDocument/references). RMS has no local declarations: all
 // occurrences are equal.
 func (f RmsFile) ReferencesAt(pos common.Pos) []common.Range {
-	var name string
-	found := false
-
-	for _, w := range f.words {
-		if w.at.Contains(pos) {
-			name, found = w.name, true
-
-			break
-		}
-	}
-
+	name, found := f.WordAt(pos)
 	if !found {
 		return nil
 	}
