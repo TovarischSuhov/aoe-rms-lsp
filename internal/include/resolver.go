@@ -362,10 +362,11 @@ func (r *Resolver) definitionInRms(f file, path string, pos common.Pos) (Target,
 			continue
 		}
 
-		target := filepath.Join(filepath.Dir(path), inc.Path)
-
-		st, err := os.Stat(target)
-		if err != nil || !st.Mode().IsRegular() || !withinRoot(filepath.Dir(path), target) {
+		// definition jumps through the same resolution the closure
+		// diagnostics used — a click answers exactly when the directive
+		// is Resolved (issue #210)
+		target, found := r.resolveTarget(path, inc.Path, filepath.Dir(path))
+		if !found {
 			return Target{}, false
 		}
 
