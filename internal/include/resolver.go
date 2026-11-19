@@ -24,7 +24,9 @@ const (
 
 // Resolver computes the #include/#include_drs/#includeXS closure of a
 // document and answers cross-file navigation over it. Editor state (Source)
-// always wins over the disk copy; disk files are cached by size and modtime.
+// always wins over the disk copy; disk files are cached by size and modtime,
+// and open documents' parses are memoized by their canonical path (keyed by
+// byte-identical text, so an edit always re-parses).
 type Resolver struct {
 	source Source
 
@@ -32,6 +34,7 @@ type Resolver struct {
 
 	mu    sync.Mutex
 	cache map[string]*cachedFile
+	memo  map[string]*file
 }
 
 // NewResolver builds a resolver over an editor-state source (DI).
@@ -39,6 +42,7 @@ func NewResolver(source Source) *Resolver {
 	return &Resolver{
 		source: source,
 		cache:  make(map[string]*cachedFile),
+		memo:   make(map[string]*file),
 	}
 }
 
@@ -201,8 +205,8 @@ func (r *Resolver) rootsSnapshot() []string {
 	return slices.Clone(r.roots)
 }
 
-// Drop force-invalidates the disk-cache entries for the given paths;
-// later closures re-read these files regardless of their stat
+// Drop force-invalidates the disk-cache and editor-memo entries for the
+// given paths; later closures re-read these files regardless of their stat
 // fingerprint. Unknown paths are a no-op.
 func (r *Resolver) Drop(paths []string) {
 	r.mu.Lock()
@@ -210,6 +214,7 @@ func (r *Resolver) Drop(paths []string) {
 
 	for _, path := range paths {
 		delete(r.cache, path)
+		delete(r.memo, path)
 	}
 }
 
@@ -229,13 +234,39 @@ func withinRoot(rootDir string, target string) bool {
 }
 
 // load returns the file for uriArg: the editor-state text when open
-// (never cached), otherwise the disk copy through the stat-keyed cache.
+// (memoized by text, keyed by the canonical path), otherwise the disk
+// copy through the stat-keyed cache.
 func (r *Resolver) load(uriArg string, path string) (file, bool) {
 	if text, ok := r.source.Text(uriArg); ok {
-		return parseFile(uriArg, text), true
+		return r.loadEditor(uriArg, path, text)
 	}
 
 	return r.loadDisk(uriArg, path)
+}
+
+// loadEditor serves the editor-state text through the parse memo keyed
+// by the canonical path: a hit with a byte-identical text returns the
+// memoized AST (a light copy — the URI spelling is the current query's),
+// a different text re-parses and replaces the single entry of the path.
+func (r *Resolver) loadEditor(uriArg string, path string, text string) (file, bool) {
+	r.mu.Lock()
+	m, ok := r.memo[path]
+	r.mu.Unlock()
+
+	if ok && m.text == text {
+		copied := *m
+		copied.uri = uriArg
+
+		return copied, true
+	}
+
+	f := parseFile(uriArg, text)
+
+	r.mu.Lock()
+	r.memo[path] = &f
+	r.mu.Unlock()
+
+	return f, true
 }
 
 // loadDisk reads and caches the disk copy; a stale fingerprint reloads.

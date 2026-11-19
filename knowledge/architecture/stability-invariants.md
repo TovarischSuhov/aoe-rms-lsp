@@ -1,7 +1,7 @@
 ---
 type: Invariant
 title: Инварианты стабильности
-description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, пересортировка merged-списков semantic tokens на месте склейки, данные без сети.
+description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, пересортировка merged-списков semantic tokens на месте склейки, мемоизация парсов editor-документов по canonical path с валидацией полным сравнением текста, данные без сети.
 sources:
   - resource: README.md
   - resource: docs/plans/build-lsp-rms-xs.md
@@ -24,8 +24,8 @@ sources:
   - resource: internal/rms/ast.go
   - resource: internal/include/resolver.go
 generated:
-  by: implement-mini fix #206
-  at: 2026-11-19
+  by: implement-mini fix #211
+  at: 2026-11-20
 verified:
   - by: claude-code/claude-haiku-4-5
     at: 2026-10-19T00:00:00Z
@@ -41,6 +41,8 @@ verified:
     at: 2026-11-19T15:26:00Z
   - by: process:go-test-server-internal
     at: 2026-11-19
+  - by: process:go-test-include
+    at: 2026-11-20
 ---
 
 # Инварианты стабильности
@@ -613,6 +615,20 @@ verified:
   продюсеров не позиционный (#206). Пины:
   `TestServerSemanticTokens_InlineXsBeforeContent`, merge-site sort и
   doc-комментарий энкодера в `internal/server/server.go`.
+- **Парс открытого документа мемоизирован резолвером по canonical path,
+  валидация — полное сравнение текста.** `loadEditor`
+  (`internal/include/resolver.go`) кэширует разбор editor-state документа
+  под ключом canonical path; на каждую загрузку текст из `Source.Text`
+  сравнивается побайтово с сохранённым — не по version, у `Source` версии
+  нет. Хит возвращает light-copy с URI, переписанным на написание
+  текущего запроса; расхождение (в том числе правка без смены version)
+  перепарсивает и заменяет единственную запись этого пути. `Drop` чистит
+  disk-cache и editor-memo по одним FsPath-ключам; `SetRoots` намеренно
+  оставляет memo валидным — корни влияют на резолюцию include-путей, а
+  не на парс. Нарушение любого из условий даёт тихий stale-AST в
+  навигации или повторный парс на каждое нажатие (#211). Пины: восемь
+  тестов `internal/include/memo_test.go` (`TestResolver_EditorMemo*`),
+  включая white-box Drop/SetRoots и конкурентный прогон.
 
 ## Данные и окружение
 
