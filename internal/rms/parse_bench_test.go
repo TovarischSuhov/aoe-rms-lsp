@@ -93,3 +93,28 @@ func BenchmarkParseCorpusStyle(b *testing.B) {
 		_, _ = Parse(src, "comments.rms")
 	}
 }
+
+// BenchmarkParseLongBlockComment measures the failure mode of issue #209:
+// one very long line inside /* */ — the per-byte line rebuild in
+// blankComments makes the cost grow superlinearly with the interior size,
+// freezing Parse on every keystroke.
+func BenchmarkParseLongBlockComment(b *testing.B) {
+	for _, size := range []struct {
+		name     string
+		interior int
+	}{
+		{"interior_10KB", 10_000},
+		{"interior_100KB", 100_000},
+	} {
+		src := "create_land X\n/* " + strings.Repeat("x", size.interior) + " */\n"
+
+		b.Run(size.name, func(b *testing.B) {
+			b.SetBytes(int64(len(src)))
+			b.ReportAllocs()
+
+			for b.Loop() {
+				_, _ = Parse(src, "long.rms")
+			}
+		})
+	}
+}
