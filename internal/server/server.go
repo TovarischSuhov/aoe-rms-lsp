@@ -47,6 +47,11 @@ type Server struct {
 	exit      chan struct{}
 	exitOnce  sync.Once
 
+	// shutDown latches the client's shutdown request: serve reports exit
+	// without it as a failed serve (exit code 1) and request handlers
+	// answer InvalidRequest after it — strict LSP lifecycle.
+	shutDown atomic.Bool
+
 	utf16 atomic.Bool // protocol default: translate byte columns unless utf-8 is negotiated
 
 	clientConfigCap atomic.Bool // the client answers workspace/configuration
@@ -342,6 +347,10 @@ func (s *Server) Initialize(
 ) (_ *protocol.InitializeResult, err error) {
 	defer recoverRequest(ctx, "Initialize", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	full := protocol.TextDocumentSyncKindFull
 
 	caps := protocol.ServerCapabilities{
@@ -526,6 +535,10 @@ func (s *Server) Hover(
 ) (_ *protocol.Hover, err error) {
 	defer recoverRequest(ctx, "Hover", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
 		return nil, nil
@@ -628,6 +641,10 @@ func (s *Server) SignatureHelp(
 	params *protocol.SignatureHelpParams,
 ) (_ *protocol.SignatureHelp, err error) {
 	defer recoverRequest(ctx, "SignatureHelp", &err)
+
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
 
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
@@ -746,6 +763,10 @@ func (s *Server) Completion(
 	params *protocol.CompletionParams,
 ) (_ protocol.CompletionResult, err error) {
 	defer recoverRequest(ctx, "Completion", &err)
+
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
 
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
@@ -912,6 +933,10 @@ func (s *Server) Definition(
 ) (_ protocol.DefinitionResult, err error) {
 	defer recoverRequest(ctx, "Definition", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	text, _, _ := s.openDocument(params.TextDocument.URI)
 
 	target, found := s.resolver.Definition(
@@ -941,6 +966,10 @@ func (s *Server) References(
 	params *protocol.ReferenceParams,
 ) (_ []protocol.Location, err error) {
 	defer recoverRequest(ctx, "References", &err)
+
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
 
 	docURI := string(params.TextDocument.URI)
 	text, _, _ := s.openDocument(params.TextDocument.URI)
@@ -1008,6 +1037,10 @@ func (s *Server) PrepareRename(
 ) (_ protocol.PrepareRenameResult, err error) {
 	defer recoverRequest(ctx, "PrepareRename", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
 		return nil, nil
@@ -1063,6 +1096,10 @@ func (s *Server) Rename(
 ) (_ *protocol.WorkspaceEdit, err error) {
 	defer recoverRequest(ctx, "Rename", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	if !validNewName.MatchString(params.NewName) {
 		return nil, fmt.Errorf("invalid new name %q: must match [A-Za-z_][A-Za-z0-9_]*", params.NewName)
 	}
@@ -1107,6 +1144,10 @@ func (s *Server) WillRenameFiles(
 	params *protocol.RenameFilesParams,
 ) (_ *protocol.WorkspaceEdit, err error) {
 	defer recoverRequest(ctx, "WillRenameFiles", &err)
+
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
 
 	changes := make(map[uri.URI][]protocol.TextEdit)
 
@@ -1190,6 +1231,10 @@ func (s *Server) DocumentHighlight(
 ) (_ []protocol.DocumentHighlight, err error) {
 	defer recoverRequest(ctx, "DocumentHighlight", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	docURI := params.TextDocument.URI
 	text, name, _ := s.openDocument(docURI)
 	pos := s.fromProtocolPos(text, params.Position)
@@ -1257,6 +1302,10 @@ func (s *Server) FoldingRanges(
 ) (_ []protocol.FoldingRange, err error) {
 	defer recoverRequest(ctx, "FoldingRanges", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	docURI := params.TextDocument.URI
 	text, name, _ := s.openDocument(docURI)
 
@@ -1310,6 +1359,10 @@ func (s *Server) CodeAction(
 	params *protocol.CodeActionParams,
 ) (_ []protocol.CommandOrCodeAction, err error) {
 	defer recoverRequest(ctx, "CodeAction", &err)
+
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
 
 	if !onlyAllowsQuickFix(params.Context.Only) {
 		return []protocol.CommandOrCodeAction{}, nil
@@ -1641,6 +1694,10 @@ func (s *Server) DocumentSymbol(
 ) (_ protocol.DocumentSymbolResult, err error) {
 	defer recoverRequest(ctx, "DocumentSymbol", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	text, name, ok := s.openDocument(params.TextDocument.URI)
 	if !ok {
 		return protocol.DocumentSymbolSlice{}, nil
@@ -1687,6 +1744,10 @@ func (s *Server) Symbols(
 	params *protocol.WorkspaceSymbolParams,
 ) (_ protocol.WorkspaceSymbolResult, err error) {
 	defer recoverRequest(ctx, "Symbols", &err)
+
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
 
 	query := params.Query
 
@@ -1828,6 +1889,10 @@ func (s *Server) SemanticTokensFull(
 ) (_ *protocol.SemanticTokens, err error) {
 	defer recoverRequest(ctx, "SemanticTokensFull", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	docURI := params.TextDocument.URI
 	text, name, _ := s.openDocument(docURI)
 
@@ -1963,6 +2028,10 @@ func (s *Server) DocumentLink(
 ) (_ []protocol.DocumentLink, err error) {
 	defer recoverRequest(ctx, "DocumentLink", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	docURI := string(params.TextDocument.URI)
 	text, name, _ := s.openDocument(params.TextDocument.URI)
 
@@ -2008,6 +2077,10 @@ func (s *Server) SelectionRange(
 	params *protocol.SelectionRangeParams,
 ) (_ []protocol.SelectionRange, err error) {
 	defer recoverRequest(ctx, "SelectionRange", &err)
+
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
 
 	docURI := params.TextDocument.URI
 	text, name, _ := s.openDocument(docURI)
@@ -2102,6 +2175,10 @@ func (s *Server) Formatting(
 ) (_ []protocol.TextEdit, err error) {
 	defer recoverRequest(ctx, "Formatting", &err)
 
+	if err := s.shutdownGuard(); err != nil {
+		return nil, err
+	}
+
 	text, name, _ := s.openDocument(params.TextDocument.URI) // editor state, not the FS
 
 	// TrimTrailingWhitespace and friends stay unread: the printer owns
@@ -2152,15 +2229,34 @@ func endOfDocument(text string) common.Pos {
 	return common.Pos{Line: line}
 }
 
-// Shutdown acknowledges a clean shutdown request.
+// shutdownGuard rejects a request after shutdown (LSP: every request
+// except exit is answered InvalidRequest once the session shut down).
+func (s *Server) shutdownGuard() error {
+	if s.shutDown.Load() {
+		return jsonrpc2.Errorf(jsonrpc2.InvalidRequest, "server is shut down")
+	}
+
+	return nil
+}
+
+// Shutdown acknowledges a clean shutdown request and latches the fact
+// that serve and the request handlers read back. Per the strict LSP rule
+// a second shutdown is itself rejected.
 func (s *Server) Shutdown(ctx context.Context) (err error) {
 	defer recoverRequest(ctx, "Shutdown", &err)
+
+	if err := s.shutdownGuard(); err != nil {
+		return err
+	}
+
+	s.shutDown.Store(true)
 
 	return nil
 }
 
 // Exit terminates the connection; Serve returns once the exit channel
-// closes.
+// closes. Exit never reads the shutdown flag — its nil cannot shape the
+// exit code, Serve encodes the termination reason.
 func (s *Server) Exit(ctx context.Context) error {
 	s.exitOnce.Do(func() { close(s.exit) })
 

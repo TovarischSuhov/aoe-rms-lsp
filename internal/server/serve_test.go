@@ -1431,3 +1431,150 @@ func TestServe_ConnectionFailureLogged(t *testing.T) {
 	assert.Contains(t, out, "err=",
 		"the log must carry the connection failure cause")
 }
+
+// assertInvalidRequest requires err to be the shutdown gate's answer: a
+// *jsonrpc2.Error carrying code InvalidRequest (-32600) — the wire-error
+// pattern of recover_test.go applied to the lifecycle gate.
+func assertInvalidRequest(t *testing.T, err error, what string) {
+	t.Helper()
+
+	require.Error(t, err, what)
+
+	var rpcErr *jsonrpc2.Error
+	require.ErrorAs(t, err, &rpcErr,
+		"%s: the gate answers *jsonrpc2.Error, not a plain error", what)
+	assert.Equal(t, jsonrpc2.InvalidRequest, rpcErr.Code,
+		"%s: after shutdown every request answers -32600 InvalidRequest", what)
+}
+
+// TestServe_ExitWithoutShutdownFailsServe pins R3 (spec: "Exit without
+// shutdown is a failure exit"): over the real stdio harness, exit without a
+// prior shutdown makes serve return an error naming the missing shutdown —
+// main's existing error path turns it into exit code 1.
+func TestServe_ExitWithoutShutdownFailsServe(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	require.NoError(t, h.disp.Exit(ctx))
+
+	exitErr := h.awaitExit()
+	require.Error(t, exitErr,
+		"exit without shutdown must fail serve — main exits 1 on this error")
+	assert.Contains(t, exitErr.Error(), "shutdown",
+		"the termination reason must name the missing shutdown")
+}
+
+// TestServe_RequestsAfterShutdownInvalidRequest pins R4/R2/R7 (spec:
+// "Requests after shutdown answer InvalidRequest and session survives"):
+// after shutdown every request but exit answers *jsonrpc2.Error -32600
+// without running the handler body, the connection stays alive — the
+// following exit still ends serve with nil — and a repeated exit is
+// absorbed by exitOnce without a double close.
+func TestServe_RequestsAfterShutdownInvalidRequest(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	require.NoError(t, h.disp.Shutdown(ctx),
+		"the first shutdown must succeed — its answer is still null")
+
+	hover, hoverErr := h.disp.Hover(ctx, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI("file:///work/late.rms")},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+	})
+	assertInvalidRequest(t, hoverErr, "hover after shutdown")
+	assert.Nil(t, hover, "the gated hover body never runs")
+
+	assertInvalidRequest(t, h.disp.Shutdown(ctx),
+		"a second shutdown is itself a request and must be gated (strict LSP)")
+
+	// The connection survived the error answers: exit still ends the
+	// session cleanly, twice — exitOnce absorbs the repeat (R7).
+	require.NoError(t, h.disp.Exit(ctx))
+	require.NoError(t, h.disp.Exit(ctx), "a repeated exit must not panic or error")
+
+	require.NoError(t, h.awaitExit(),
+		"shutdown-then-exit stays a clean exit — serve returns nil (R2)")
+	assert.Empty(t, h.done,
+		"serve must return exactly once, however many exits arrive (R7)")
+}
+
+// TestServerLifecycle_UnitGate pins the gate at the Server level, without
+// any transport (the direct-Server fixture idiom): after Shutdown, Hover,
+// re-Initialize and a second Shutdown all answer *jsonrpc2.Error -32600,
+// while the DidOpen notification stays ungated and returns nil.
+func TestServerLifecycle_UnitGate(t *testing.T) {
+	store, err := kb.NewStore()
+	require.NoError(t, err)
+
+	srv := NewServer(
+		store,
+		analysis.NewAnalyzer(store),
+		hints.NewComputer(store),
+		complete.NewCompleter(store),
+		"",
+	)
+	ctx := context.Background()
+
+	require.NoError(t, srv.Shutdown(ctx), "the first shutdown succeeds and latches the flag")
+
+	hover, hoverErr := srv.Hover(ctx, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI("file:///work/late.rms")},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+	})
+	assertInvalidRequest(t, hoverErr, "hover after shutdown")
+	assert.Nil(t, hover, "the gated hover body never runs")
+
+	_, initErr := srv.Initialize(ctx, &protocol.InitializeParams{})
+	assertInvalidRequest(t, initErr, "re-Initialize after shutdown")
+
+	assertInvalidRequest(t, srv.Shutdown(ctx),
+		"a second shutdown is itself a request (strict LSP rule)")
+
+	require.NoError(t, srv.DidOpen(ctx, &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        uri.URI("file:///work/late.rms"),
+			LanguageID: "aoe2rms",
+			Version:    1,
+			Text:       "void f() {}\n",
+		},
+	}), "notifications stay ungated after shutdown — DidOpen keeps working")
+
+	// Exit stays callable after shutdown, and a repeated exit is absorbed
+	// by exitOnce — no double close (R7, unit level: the panic would leave
+	// the direct call).
+	require.NoError(t, srv.Exit(ctx))
+	assert.NotPanics(t, func() { _ = srv.Exit(ctx) },
+		"a repeated exit must be absorbed by exitOnce, not double-close")
+}
+
+// TestServe_ShutdownWithoutExitStaysAlive pins R5 (spec: "Shutdown alone
+// keeps the process alive"): after a lone shutdown nothing arrives on the
+// serve channel within a bounded wait — the session stays alive waiting for
+// exit or transport EOF. The harness cleanup then EOFs the transport and
+// awaits the unchanged (nil/EOF) finish.
+func TestServe_ShutdownWithoutExitStaysAlive(t *testing.T) {
+	h := startHarness(t)
+	ctx := context.Background()
+
+	_, err := h.disp.Initialize(ctx, &protocol.InitializeParams{})
+	require.NoError(t, err)
+
+	require.NoError(t, h.disp.Shutdown(ctx))
+
+	select {
+	case err := <-h.done:
+		t.Fatalf("serve returned after a lone shutdown: %v", err)
+	case <-time.After(300 * time.Millisecond):
+		// Still alive: shutdown alone never ends the session (R5).
+	}
+}
