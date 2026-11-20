@@ -1,7 +1,7 @@
 ---
 type: Invariant
 title: Инварианты стабильности
-description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, пересортировка merged-списков semantic tokens на месте склейки, мемоизация парсов editor-документов по canonical path с валидацией полным сравнением текста, паника в request-хендлере не рвёт сессию (defer recoverRequest), serve логирует conn.Err(), данные без сети.
+description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, пересортировка merged-списков semantic tokens на месте склейки, мемоизация парсов editor-документов по canonical path с валидацией полным сравнением текста, паника в request-хендлере не рвёт сессию (defer recoverRequest), serve логирует conn.Err(), lifecycle: exit без shutdown — ошибка serve и код выхода 1, после shutdown все запросы кроме exit отвечают InvalidRequest (−32600, per-handler shutdownGuard), shutdown без exit — процесс жив, данные без сети.
 sources:
   - resource: README.md
   - resource: docs/plans/build-lsp-rms-xs.md
@@ -13,6 +13,7 @@ sources:
   - resource: .goga/history/2026/task-xs-comment-scan/arch.md
   - resource: internal/xs/parse.go
   - resource: internal/server/server.go
+  - resource: internal/server/serve.go
   - resource: internal/format/rms.go
   - resource: internal/format/xs.go
   - resource: internal/format/fuzz_test.go
@@ -24,7 +25,7 @@ sources:
   - resource: internal/rms/ast.go
   - resource: internal/include/resolver.go
 generated:
-  by: implement-mini fix #213
+  by: implement-mini fix #216
   at: 2026-11-20
 verified:
   - by: claude-code/claude-haiku-4-5
@@ -643,6 +644,19 @@ verified:
   Основания: `internal/server/server.go`
   (recoverRequest/recoverNotification), `internal/server/serve.go`,
   тесты `internal/server/recover_test.go`, `internal/server/serve_test.go`.
+- **Lifecycle: exit без shutdown завершает процесс с кодом 1; после
+  shutdown запросы, кроме exit, отклоняются.** exit без shutdown →
+  serve возвращает ошибку → main выходит с кодом 1; после shutdown все
+  запросы, кроме exit, отвечают InvalidRequest (−32600, per-handler
+  shutdownGuard); повторный Shutdown — тоже InvalidRequest по строгому
+  LSP-правилу; shutdown без exit — процесс жив; EOF/сбой-путь не
+  меняется (serve возвращает nil). Пины: `TestServe_ShutdownExit`,
+  `TestServe_ExitWithoutShutdownFailsServe`,
+  `TestServe_RequestsAfterShutdownInvalidRequest`,
+  `TestServerLifecycle_UnitGate`,
+  `TestServe_ShutdownWithoutExitStaysAlive`. Основания:
+  `internal/server/server.go` (shutDown/shutdownGuard/Shutdown/Exit),
+  `internal/server/serve.go` (exited-дискриминатор).
 
 ## Данные и окружение
 
