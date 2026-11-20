@@ -294,16 +294,20 @@ func TestDiffKB_RenamedToWithOtherFields(t *testing.T) {
 		fields     []string
 		renderLine string
 	}{
-		{name: "desc_and_renamed_to",
+		{
+			name:    "desc_and_renamed_to",
 			oldDesc: "Sets a vector", newDesc: "Keeps a vector",
 			oldSince: "5", newSince: "5",
 			fields:     []string{"desc", "renamed_to"},
-			renderLine: "- ~ xsFoo: desc, renamed_to"},
-		{name: "desc_since_update_and_renamed_to",
+			renderLine: "- ~ xsFoo: desc, renamed_to",
+		},
+		{
+			name:    "desc_since_update_and_renamed_to",
 			oldDesc: "Sets a vector", newDesc: "Keeps a vector",
 			oldSince: "5", newSince: "9",
 			fields:     []string{"desc", "since_update", "renamed_to"},
-			renderLine: "- ~ xsFoo: desc, since_update, renamed_to"},
+			renderLine: "- ~ xsFoo: desc, since_update, renamed_to",
+		},
 	}
 
 	for _, tt := range cases {
