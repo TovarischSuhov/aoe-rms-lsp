@@ -18,13 +18,14 @@ lint:
 # maps (see scripts/corpus-fetch.sh). The fetch runs when the sample is
 # missing or predates the current pin (the recorded .sources-hash); CI
 # caches .corpus by the sources hash.
-corpus: build
+corpus:
+	go build -o aoe2-lsp ./cmd/aoe2-lsp
 	@if scripts/corpus-fetch.sh --check .corpus; then \
 		echo "corpus: sample on disk matches the pin ($$(find .corpus -type f | wc -l) files), skipping fetch"; \
 	else \
 		rm -rf .corpus && scripts/corpus-fetch.sh .corpus; \
 	fi
-	go run ./cmd/corpus -bin aoe2-lsp -dir .corpus
+	go run ./cmd/corpus -bin ./aoe2-lsp -dir .corpus
 
 # Local-only corpus built from the installed game's own scripts. The
 # content is Microsoft-copyrighted: it stays in gitignored .corpus-official

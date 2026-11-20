@@ -3,6 +3,7 @@
 
 # go build artifacts
 /aoe2-lsp
+/aoe2-lsp.exe
 *.test
 
 # corpus downloads (scripts/corpus-fetch.sh)
