@@ -5,3 +5,4 @@ dist/*.map
 tsconfig.json
 build.mjs
 **/.gitignore
+**/*_test.go
