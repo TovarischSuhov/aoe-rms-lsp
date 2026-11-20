@@ -1,7 +1,8 @@
 ---
 type: Invariant
 title: Инварианты стабильности
-description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, пересортировка merged-списков semantic tokens на месте склейки, мемоизация парсов editor-документов по canonical path с валидацией полным сравнением текста, паника в request-хендлере не рвёт сессию (defer recoverRequest), serve логирует conn.Err(), lifecycle: exit без shutdown — ошибка serve и код выхода 1, после shutdown все запросы кроме exit отвечают InvalidRequest (−32600, per-handler shutdownGuard), shutdown без exit — процесс жив, данные без сети.
+description: Правила, которые проект сознательно поддерживает и которые легко сломать незаметно — recovery-парсеры, асимметрия EOL между RMS и XS, сходимость форматтеров (RMS и XS), покрытие потреблённых токенов диагностиками, отказ форматтера на error-диагностиках, стабильные коды диагностик, stdout только для протокола, неизвестные флаги не роняют сервер, пересортировка merged-списков semantic tokens на месте склейки, мемоизация парсов editor-документов по canonical path с валидацией полным сравнением текста, паника в request-хендлере не рвёт сессию (defer recoverRequest), serve логирует conn.Err(), lifecycle: exit без shutdown — ошибка serve и код выхода 1, после shutdown все запросы кроме exit отвечают InvalidRequest (−32600, per-handler shutdownGuard), shutdown без exit — процесс жив, данные без сети, disk-кэш резолвера
+  ограничен LRU (maxCacheEntries = 512, вытеснение по количеству).
 sources:
   - resource: README.md
   - resource: docs/plans/build-lsp-rms-xs.md
@@ -25,7 +26,7 @@ sources:
   - resource: internal/rms/ast.go
   - resource: internal/include/resolver.go
 generated:
-  by: implement-mini fix #216
+  by: implement-mini fix #214
   at: 2026-11-20
 verified:
   - by: claude-code/claude-haiku-4-5
@@ -631,7 +632,18 @@ verified:
   не на парс. Нарушение любого из условий даёт тихий stale-AST в
   навигации или повторный парс на каждое нажатие (#211). Пины: восемь
   тестов `internal/include/memo_test.go` (`TestResolver_EditorMemo*`),
-  включая white-box Drop/SetRoots и конкурентный прогон.
+  включая white-box Drop/SetRoots и конкурентный прогон. Дисковый кэш
+  того же резолвера (`r.cache`, те же canonicalPath-ключи, валидация
+  по stat-отпечатку size+mtime) ограничен LRU — не более
+  `maxCacheEntries` = 512 записей, вытеснение по количеству: при
+  вставке сверх лимита вылетает наименее недавно использовавшаяся
+  запись; `Available` наполняет тот же кэш и ограничен тем же лимитом.
+  Вытеснение перечитывает прозрачно — вытесненный путь загружается
+  заново при следующем обращении, ответы идентичны, правок
+  корректности нет. Editor-memo (`r.memo`) намеренно остаётся
+  неограниченным «открытым набором»: рост равен числу путей, открытых
+  за сессию, — принятый класс роста #211. Основания:
+  `internal/include/resolver.go`, пины `internal/include/lru_test.go`.
 - **Паника в request-хендлере не рвёт сессию.** Каждый request-хендлер
   несёт `defer recoverRequest`: клиенту уходит −32603 `*jsonrpc2.Error`
   с именем метода и значением паники, ERROR-лог «request panic

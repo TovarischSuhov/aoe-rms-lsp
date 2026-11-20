@@ -4,6 +4,7 @@ import (
 	"aoe2-lsp/internal/common"
 	"aoe2-lsp/internal/rms"
 	"aoe2-lsp/internal/xs"
+	"container/list"
 	"context"
 	"os"
 	"path/filepath"
@@ -16,15 +17,19 @@ import (
 )
 
 // Depth and file-count limits guard against include bombs; reaching a
-// limit stops the expansion without reporting an error.
+// limit stops the expansion without reporting an error. maxCacheEntries
+// bounds the disk-cache memory instead: an evicted file costs a re-read,
+// never a wrong answer.
 const (
-	maxDepth = 64
-	maxFiles = 1024
+	maxDepth        = 64
+	maxFiles        = 1024
+	maxCacheEntries = 512
 )
 
 // Resolver computes the #include/#include_drs/#includeXS closure of a
 // document and answers cross-file navigation over it. Editor state (Source)
-// always wins over the disk copy; disk files are cached by size and modtime,
+// always wins over the disk copy; disk files are cached by size and modtime
+// under an LRU entry bound (eviction trades a re-read, never correctness),
 // and open documents' parses are memoized by their canonical path (keyed by
 // byte-identical text, so an edit always re-parses).
 type Resolver struct {
@@ -32,17 +37,20 @@ type Resolver struct {
 
 	roots []string
 
-	mu    sync.Mutex
-	cache map[string]*cachedFile
-	memo  map[string]*file
+	mu         sync.Mutex
+	cache      map[string]*cachedFile
+	lru        list.List // front = MRU; values are cache keys (string)
+	memo       map[string]*file
+	cacheLimit int // set to maxCacheEntries by NewResolver; same-package tests may lower it
 }
 
 // NewResolver builds a resolver over an editor-state source (DI).
 func NewResolver(source Source) *Resolver {
 	return &Resolver{
-		source: source,
-		cache:  make(map[string]*cachedFile),
-		memo:   make(map[string]*file),
+		source:     source,
+		cache:      make(map[string]*cachedFile),
+		memo:       make(map[string]*file),
+		cacheLimit: maxCacheEntries,
 	}
 }
 
@@ -51,6 +59,7 @@ type cachedFile struct {
 	file file
 	size int64
 	mod  time.Time
+	elem *list.Element // valid iff the entry is in r.cache (the map<->list invariant)
 }
 
 // file is one loaded closure member: its text and parsed AST (exactly one
@@ -213,7 +222,13 @@ func (r *Resolver) Drop(paths []string) {
 	defer r.mu.Unlock()
 
 	for _, path := range paths {
-		delete(r.cache, path)
+		// both halves of the entry go together: leaving the list node
+		// would let an unrelated eviction remove it twice
+		if old, ok := r.cache[path]; ok {
+			delete(r.cache, path)
+			r.lru.Remove(old.elem)
+		}
+
 		delete(r.memo, path)
 	}
 }
@@ -278,9 +293,16 @@ func (r *Resolver) loadDisk(uriArg string, path string) (file, bool) {
 
 	r.mu.Lock()
 	cached, ok := r.cache[path]
+	hit := ok && cached.size == st.Size() && cached.mod.Equal(st.ModTime())
+	if hit {
+		// touched under the lock that validated the fingerprint: after an
+		// unlock a parallel insert could evict this entry before an
+		// unlocked MoveToFront and leave cached.elem dangling
+		r.lru.MoveToFront(cached.elem)
+	}
 	r.mu.Unlock()
 
-	if ok && cached.size == st.Size() && cached.mod.Equal(st.ModTime()) {
+	if hit {
 		// a light copy: the ASTs are read-only, the URI spelling is the
 		// current query's — never the first requester's
 		copied := cached.file
@@ -297,7 +319,25 @@ func (r *Resolver) loadDisk(uriArg string, path string) (file, bool) {
 	f := parseFile(uriArg, string(raw))
 
 	r.mu.Lock()
-	r.cache[path] = &cachedFile{file: f, size: st.Size(), mod: st.ModTime()}
+	// a fingerprint replacement re-enters at MRU: the stale element must
+	// be unlinked first, or the list keeps a node the map no longer knows
+	if old, ok := r.cache[path]; ok {
+		r.lru.Remove(old.elem)
+	}
+
+	entry := &cachedFile{file: f, size: st.Size(), mod: st.ModTime()}
+	entry.elem = r.lru.PushFront(path)
+	r.cache[path] = entry
+
+	// the bound holds before unlock; the inserted entry itself can only
+	// be evicted when cacheLimit < 1 (white-box tests) — the caller owns
+	// its copy either way
+	for len(r.cache) > r.cacheLimit {
+		back := r.lru.Back()
+		key := back.Value.(string)
+		delete(r.cache, key)
+		r.lru.Remove(back)
+	}
 	r.mu.Unlock()
 
 	return f, true

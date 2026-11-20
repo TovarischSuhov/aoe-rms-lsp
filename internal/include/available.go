@@ -31,7 +31,8 @@ type AvailableEntry struct {
 // the auto-include feature. Documents with a non-file URI answer nil —
 // the scan needs a real directory. The per-file parse goes through the
 // resolver's caches (editor state wins, the disk copy is
-// stat-fingerprinted), so repeated calls re-read nothing unchanged.
+// stat-fingerprinted), so repeated calls only re-read files the disk
+// cache has evicted.
 func (r *Resolver) Available(ctx context.Context, uriArg string) []AvailableEntry {
 	rootPath := canonicalPath(uriArg)
 	if rootPath == "" {
