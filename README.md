@@ -99,7 +99,7 @@ the paragraph after the table).
 
 | Source | What it provides | License | Link |
 |---|---|---|---|
-| **AoE2DE UGC Guide** (Divy1211 et al.) | `xs-functions.json` (204 XS functions), `xs-constants.json` (27 sections), `prelude.xs` dump, XS language docs | **GPL-3.0** | [github.com/Divy1211/AoE2DE_UGC_Guide](https://github.com/Divy1211/AoE2DE_UGC_Guide) · [ugc.aoe2.rocks](https://ugc.aoe2.rocks/general/xs/) |
+| **AoE2DE UGC Guide** (Divy1211 et al.) | `xs-functions.json` (291 XS functions), `xs-constants.json` (1170 constants), `prelude.xs` dump, XS language docs | **GPL-3.0** | [github.com/Divy1211/AoE2DE_UGC_Guide](https://github.com/Divy1211/AoE2DE_UGC_Guide) · [ugc.aoe2.rocks](https://ugc.aoe2.rocks/general/xs/) |
 | **Zetnus — Definitive Random Map Scripting Guide** | RMS commands/attributes reference (Syntax Skeleton, Constant Reference); only the derived `rms-commands.json` is committed — the full text is not vendored (no explicit license) | derived facts, used with attribution | [Google Doc](https://docs.google.com/document/d/1jnhZXoeL9mkRUJxcGlKnO98fIwFKStP_OBozpr0CHXo/edit) · [forum thread](https://forums.ageofempires.com/t/definitive-random-map-scripting-guide/104902) |
 | **Official AoE2 DE release notes** (World's Edge) | version metadata ("since update N") for KB entries (`docs/ref/aoe2de-xs-rms-changelog.md`) | quoted factually | [ageofempires.com/news](https://www.ageofempires.com/news/) |
 | **aoe2map.net / snippets** (siegeengineers) | real-world RMS/XS corpus: parser fixtures, the corpus gate sample, research notes | community content | [aoe2map.net](https://aoe2map.net/) · [snippets.aoe2map.net](https://snippets.aoe2map.net/) |
