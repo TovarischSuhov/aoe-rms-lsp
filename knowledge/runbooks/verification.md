@@ -50,6 +50,11 @@ Race-прогон — в CI (`go test -race ./...`), не локально.
 без капа (решение 2026-11-18); race и memory-cap остаются в CI. `make test`
 на Windows не работает, остальные цели Makefile — работают.
 
+Оговорка (#217): `make corpus`/`make corpus-official` на Windows требуют
+предварительного `go build ./cmd/aoe2-lsp`: exec не запускает безрасширительный
+`aoe2-lsp` (findExecutable в lp_windows.go пробует только имя+PATHEXT),
+а уже лежащий `aoe2-lsp.exe` подхватывает молча — даже устаревший.
+
 Рабочая копия обязана быть LF: с `core.autocrlf=true` gofumpt рапортует
 ложные «not properly formatted», а golden-тесты (kb) падают на CRLF.
 Лечение: `git config core.autocrlf input` в репозитории +
