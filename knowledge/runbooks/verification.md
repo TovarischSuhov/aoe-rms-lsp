@@ -116,7 +116,7 @@ CI крутит короткие сидированные прогоны: `FuzzP
 - `checks` — goimports, gofumpt (`golangci-lint fmt --diff`), `go test -race`,
   golangci-lint v2, govulncheck.
 - `vscode` — type-check, тесты, упаковка .vsix и проверка, что каждый путь
-  из `contributes` реально лежит в архиве (VS Code молча роняет такие entry).
+  из `contributes` реально лежит в архиве (VS Code молча роняет такие entry). Гейт дополнительно отклоняет .vsix, чей архив содержит `*_test.go` (ненулевой exit, #237).
 - `fuzz`, `corpus` — см. выше.
 - `coverage` — бейдж через JSON на orphan-ветку `badges` (без стороннего
   сервиса).

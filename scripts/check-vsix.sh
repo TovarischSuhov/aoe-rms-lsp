@@ -2,7 +2,8 @@
 # Verify that every contributes.* path of a VS Code extension exists in the
 # packaged .vsix (#68.3): VS Code silently ignores broken grammar, language,
 # snippet and walkthrough media paths, so a packaging regression only
-# surfaces as quietly missing features.
+# surfaces as quietly missing features. Go test files must never ship in
+# the artifact either (#237).
 #
 # Usage: scripts/check-vsix.sh <extension-dir> <file.vsix>
 #   <extension-dir> — directory holding package.json (paths are read from
@@ -37,6 +38,16 @@ contrib_paths="$(jq -r '
 # the .vsix (alongside [Content_Types].xml and the manifest) — compare
 # against the payload-relative names.
 unzip -Z1 "$vsix" | sed 's|^extension/||' >"$vsix.list"
+
+# || true guards the clean path: under set -e a bare grep exits 1 on no match.
+test_entries="$(grep -E '_test\.go$' "$vsix.list" || true)"
+if [ -n "$test_entries" ]; then
+	while IFS= read -r entry; do
+		printf 'check-vsix: GO TEST FILE in %s: extension/%s\n' "$(basename "$vsix")" "$entry" >&2
+	done <<<"$test_entries"
+	rm -f "$vsix.list"
+	exit 1
+fi
 
 missing=0
 while IFS= read -r p; do
