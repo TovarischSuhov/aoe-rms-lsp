@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Verify that every contributes.* path of a VS Code extension exists in the
-# packaged .vsix (#68.3): VS Code silently ignores broken grammar, language
-# and snippet paths, so a packaging regression only surfaces as quietly
-# missing features.
+# packaged .vsix (#68.3): VS Code silently ignores broken grammar, language,
+# snippet and walkthrough media paths, so a packaging regression only
+# surfaces as quietly missing features.
 #
 # Usage: scripts/check-vsix.sh <extension-dir> <file.vsix>
 #   <extension-dir> — directory holding package.json (paths are read from
@@ -21,7 +21,10 @@ vsix="$2"
 contrib_paths="$(jq -r '
   [.contributes.grammars[]?.path,
    .contributes.languages[]?.configuration,
-   .contributes.snippets[]?.path]
+   .contributes.snippets[]?.path,
+   .contributes.walkthroughs[]?.icon,
+   .contributes.walkthroughs[]?.steps[]?.media.markdown,
+   .contributes.walkthroughs[]?.steps[]?.media.image]
   | map(select(. != null))
   | .[]
 ' "$ext_dir/package.json")"
