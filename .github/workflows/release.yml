@@ -25,6 +25,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
 
       # Single job instead of a matrix: sequential builds of a small module
       # cost less than wiring artifact passing between parallel jobs, and
@@ -62,7 +64,7 @@ jobs:
         working-directory: editors/vscode
         run: |
           set -euo pipefail
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run check
           npm run package
 

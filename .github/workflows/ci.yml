@@ -65,22 +65,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # The lockfile (editors/vscode/package-lock.json) is committed and
+      # npm ci installs it exactly, so the .vsix is reproducible. setup-node
+      # caches the npm download cache; cache-dependency-path is required
+      # because the lockfile lives outside the repository root.
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      # No lockfile: the npm registry is unreachable from some dev
-      # environments, so versions are pinned exactly in package.json
-      # and the install cache is keyed by its hash.
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        with:
-          path: editors/vscode/node_modules
-          key: vscode-nm-${{ hashFiles('editors/vscode/package.json') }}
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
 
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Type-check
         run: npm run check
